@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Note Builder">
+<meta name="note-builder-app" content="shell">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -83,6 +84,25 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .patient-status.bad{color:var(--danger)}
 .patient-status.warn{color:var(--warn)}
 .draft-warning{position:sticky;top:0;z-index:50}
+.patient .top>div:first-child{flex:1;min-width:0}
+.patient-heading-actions{display:flex;flex:none;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.patient.is-collapsed .top .sub{display:none}
+.save-state{margin:8px 0;font-size:13px;font-weight:650;overflow-wrap:anywhere}
+.save-state.warn{color:var(--warn)}
+.patient-jumps{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;max-height:180px;overflow:auto}
+.patient-jumps .btn{max-width:100%;overflow-wrap:anywhere;text-align:left}
+.patient-navigator{margin-top:14px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.patient-navigator summary{font-weight:700;cursor:pointer}
+.patient-navigator .row{margin-top:10px}
+.undo-notice{position:fixed;z-index:60;bottom:12px;left:50%;transform:translateX(-50%);width:min(728px,calc(100% - 24px));box-shadow:var(--shadow);display:flex;align-items:center;gap:10px}
+.undo-notice span{flex:1;min-width:0;overflow-wrap:anywhere}
+.change-details,.preserved-answers{margin:10px 0;padding:10px 12px;border:1px solid var(--warn-line);border-radius:10px;background:var(--warn-soft)}
+.change-details summary,.preserved-answers summary{cursor:pointer;font-weight:700}
+.change-details ul,.preserved-answers ul{padding-left:20px;overflow-wrap:anywhere;white-space:pre-wrap}
+.change-details del{color:var(--danger)}
+.change-details ins{color:var(--ok)}
+.offline-status{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px}
+@media(max-width:420px){.patient .top{flex-wrap:wrap}.patient .top>div:first-child{flex-basis:100%}.patient-heading-actions{justify-content:flex-start}.undo-notice{flex-wrap:wrap}}
 
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .top h1{margin:0;font-size:21px;line-height:1.2;font-weight:780;text-wrap:balance}
@@ -224,10 +244,12 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.12</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.13</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
+  <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
+  <div id="storageSetupWarning" class="banner warn" role="alert" hidden><p>Saved information could not be moved to this version’s separate storage. Your previous data is unchanged. Retry to open the app.</p><button type="button" class="btn" id="retryStorageSetup">Retry storage setup</button></div>
   <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
   <div id="shiftClearWarning" class="banner warn" role="alert" hidden>
     <p>Patient forms have been cleared, but some saved information could not be deleted. Retry before closing this page.</p>
@@ -241,16 +263,22 @@ dialog.scrim::backdrop{background:transparent}
     <button type="button" class="btn danger" id="clearShiftBtn">Clear shift</button>
   </div>
   <p id="shiftStatus" class="small" role="status" aria-live="polite"></p>
+  <div id="officeSaveWarning" class="banner warn" role="alert" hidden>
+    <p>Office save pending or unavailable. A copied message does not confirm an Office save. Keep this page open and retry.</p>
+    <button type="button" class="btn" id="retryOfficeSave">Retry save</button>
+  </div>
+  <details id="patientNavigator" class="patient-navigator" open>
+    <summary id="patientNavSummary">Patients</summary>
+    <nav id="patientJumps" class="patient-jumps" aria-label="Jump to patient"></nav>
+    <div class="row"><button class="btn small" type="button" id="collapsePatients">Collapse all</button><button class="btn small" type="button" id="expandPatients">Expand all</button><button class="btn small" type="button" id="appendPatient">+ Add patient</button></div>
+  </details>
   <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
   <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
     <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
-    <div id="officeSaveWarning" class="banner warn" role="alert" hidden>
-      <p>The office list could not be loaded or saved in this browser. Keep this page open and retry before closing it.</p>
-      <button type="button" class="btn" id="retryOfficeSave">Retry save</button>
-    </div>
     <div id="officeContent"></div>
   </section>
+  <div id="undoNotice" class="banner info undo-notice" hidden><span id="undoText" role="status"></span><button id="undoAction" class="btn" type="button">Undo</button><button id="dismissUndo" class="btn small" type="button" aria-label="Dismiss Undo">Dismiss</button></div>
 </main>
 <div id="dialogHosts"></div>
 <dialog class="sheet" id="clearShiftDialog" aria-labelledby="clearShiftTitle">
@@ -267,8 +295,10 @@ dialog.scrim::backdrop{background:transparent}
   <section class="patient">
     <header class="top">
       <div><h2 id="patientTitle"></h2><p class="sub">Complete this patient at your own pace. Other patients stay on the page.</p></div>
-      <button type="button" class="btn" id="editBtn">Edit layout</button>
+      <div class="patient-heading-actions"><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button><button type="button" class="btn" id="editBtn">Edit layout</button></div>
     </header>
+    <div id="saveState" class="save-state" role="status"></div>
+    <div id="patientBody">
     <nav class="tabs" aria-label="Patient sections">
       <div class="seg" role="tablist">
         <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
@@ -292,6 +322,7 @@ dialog.scrim::backdrop{background:transparent}
       <button type="button" class="btn add-patient" id="addPatientBtn">+ Add another patient</button>
       <p class="patient-caption">Adds a blank patient below this one. Everything entered above stays here.</p>
     </div>
+    </div>
     <div id="sheetHost"></div>
   </section>
 </template>
@@ -299,6 +330,23 @@ dialog.scrim::backdrop{background:transparent}
 <script>
 (() => {
 "use strict";
+
+// Migrate once, then never read keys used by older versions again. Existing
+// old tabs cannot overwrite the current version's data after this handoff.
+function migrateStorage(){
+  try{
+    for(const [storage, keys] of [[localStorage, ['layout','office','shift_generation']], [sessionStorage, ['draft']]]){
+      if(storage.getItem('hvnb_current_migrated')) continue;
+      for(const name of keys){
+        const target = 'hvnb_current_' + name;
+        const previous = storage.getItem('hvnb_' + name);
+        if(storage.getItem(target) === null && previous !== null) storage.setItem(target, previous);
+      }
+      storage.setItem('hvnb_current_migrated', '1');
+    }
+    return true;
+  }catch(e){ return false; }
+}
 
 // Each patient owns the original form in a separate closure. Only the layout,
 // office list and whole-page draft are shared; no patient field state is global.
@@ -331,8 +379,8 @@ root.setAttribute('aria-labelledby', prefix + 'patientTitle');
 const dialogHost = root.querySelector('[data-local-id="sheetHost"]');
 page.dialogHosts.append(dialogHost);
 
-const LAYOUT_KEY = 'hvnb_layout';
-const OFFICE_KEY = 'hvnb_office';
+const LAYOUT_KEY = 'hvnb_current_layout';
+const OFFICE_KEY = 'hvnb_current_office';
 const DEFAULT_BASE = 12;
 // iOS Safari copies text that starts like "Symptoms: ..." as a web address, and Teams then pastes it
 // as Symptoms:%20Sore%20throat... An invisible zero-width space in front stops it looking like one.
@@ -615,6 +663,10 @@ let editing = false;
 let layoutTimer = null;
 let pendingUpdate = false;
 let layoutWarning = '';
+let committedLayout = null;
+let collapsed = seed.collapsed === true;
+let preservedAnswers = Array.isArray(seed.preservedAnswers) ? seed.preservedAnswers.filter(x => x && typeof x.label === 'string' && typeof x.value === 'string') : [];
+const clone = value => JSON.parse(JSON.stringify(value));
 
 function freshMeta(){ return { sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
 function restoreMeta(value){
@@ -648,6 +700,7 @@ function loadLayout(){
     if(saved || stored) layoutWarning = 'The saved layout could not be loaded. The default form is shown. Import a valid backup or edit this layout to replace the saved one.';
   }
   normalizeLayout();
+  committedLayout = clone(L);
 }
 function normalizeLayout(){
   const aware = fieldById('aware');
@@ -656,6 +709,24 @@ function normalizeLayout(){
 function saveLayout(migrations){
   clearTimeout(layoutTimer);
   layoutTimer = null;
+  const proposed = clone(L), previous = clone(committedLayout);
+  const impact = page.layoutImpact(proposed, migrations);
+  if(impact.length){
+    L = previous;
+    renderAll();
+    sheet({title:'Review changes to entered answers',
+      body:['This shared layout change affects answers already entered. The original answers will be kept under “Preserved answers” for each affected patient and excluded from new messages.', h('ul', {class:'steplist'}, impact.map(text => h('li', {text})))],
+      buttons:[{label:'Apply and preserve answers', kind:'primary', on:() => { if(page.isCurrentShift()){ L = proposed; commitLayout(migrations); renderAll(); } }}, {label:'Cancel'}]});
+    return false;
+  }
+  commitLayout(migrations);
+  return true;
+}
+function commitLayout(migrations){
+  page.clearUndo();
+  preserveLayoutAnswers(L, migrations);
+  pruneValues(migrations);
+  committedLayout = clone(L);
   if(!writeJSON('local', LAYOUT_KEY, L)) flash('Couldn’t save the layout on this device', 'bad');
   else { layoutWarning = ''; const warning = $('#layoutWarning'); if(warning) warning.remove(); }
   page.layoutChanged(root, L, migrations);
@@ -763,14 +834,14 @@ function hasContent(vals){
   return false;
 }
 
-function pruneValues(migrations){
+function reconcileValues(values, layout, migrations){
   const next = {};
   const migrate = (kind, id, value, itemId) => {
     const change = ((migrations && migrations[kind]) || []).find(c => c.id === id && c.from === value && c.itemId === itemId);
     return change ? change.to : value;
   };
-  for(const sec of L.sections) for(const f of sec.fields){
-    const value = V[f.id];
+  for(const sec of layout.sections) for(const f of sec.fields){
+    const value = values[f.id];
     if(['text','textarea','dob'].includes(f.type)){
       if(typeof value === 'string') next[f.id] = value;
     }else if(f.type === 'check'){
@@ -778,8 +849,8 @@ function pruneValues(migrations){
     }else if(f.type === 'choice'){
       const chosen = migrate('choices', f.id, value);
       if(f.opts.includes(chosen)) next[f.id] = chosen;
-      if(f.detail && typeof V[f.detail.id] === 'string') next[f.detail.id] = V[f.detail.id];
-      if(f.sub && f.sub.opts.includes(V[f.sub.id])) next[f.sub.id] = V[f.sub.id];
+      if(f.detail && typeof values[f.detail.id] === 'string') next[f.detail.id] = values[f.detail.id];
+      if(f.sub && f.sub.opts.includes(values[f.sub.id])) next[f.sub.id] = values[f.sub.id];
     }else if(f.type === 'tests'){
       const tests = {};
       for(const item of f.items){
@@ -796,7 +867,33 @@ function pruneValues(migrations){
       if(Object.keys(tests).length) next[f.id] = tests;
     }
   }
-  V = next;
+  return next;
+}
+function pruneValues(migrations){ V = reconcileValues(V, L, migrations); }
+function affectedAnswers(layout, migrations){
+  const next = reconcileValues(V, layout, migrations);
+  const answers = [];
+  for(const sec of (committedLayout || L).sections) for(const f of sec.fields){
+    const add = (id, label, value, after) => {
+      if(value === undefined || value === '' || value === false || JSON.stringify(value) === JSON.stringify(after)) return;
+      const text = typeof value === 'string' ? value : value === true ? 'Checked' : JSON.stringify(value);
+      answers.push({label, value:text});
+    };
+    if(f.type === 'tests'){
+      for(const it of f.items){
+        const old = V[f.id] && V[f.id][it.id], after = next[f.id] && next[f.id][it.id];
+        if(old && old.on && JSON.stringify(old) !== JSON.stringify(after)) answers.push({label:it.n, value:it.kind === 'done' ? 'Done' : (old.r || 'Result not entered') + (old.s ? ' (' + old.s + ')' : '')});
+      }
+    }else if(!['note','mirror'].includes(f.type)) add(f.id, f.label, V[f.id], next[f.id]);
+    if(f.detail) add(f.detail.id, f.detail.label || f.label + ' details', V[f.detail.id], next[f.detail.id]);
+    if(f.sub) add(f.sub.id, f.sub.label || f.label + ' details', V[f.sub.id], next[f.sub.id]);
+  }
+  return answers;
+}
+function preserveLayoutAnswers(layout, migrations){
+  for(const answer of affectedAnswers(layout, migrations)){
+    if(!preservedAnswers.some(x => x.label === answer.label && x.value === answer.value)) preservedAnswers.push(answer);
+  }
 }
 
 /* ---------- what applies ---------- */
@@ -1022,7 +1119,7 @@ function renderAll(){
   }
   const eb = $('#editBanner');
   eb.hidden = !editing;
-  eb.textContent = editing ? 'Editing the layout on every tab. Changes save on this device as you make them. Tap Done when you’re finished.' : '';
+  eb.textContent = editing ? 'This layout is shared by every patient. Changes can affect entered answers. You will review affected answers before applying a change; originals will be preserved. Tap Done when finished.' : '';
   $('#editBtn').textContent = editing ? 'Done' : 'Edit layout';
   for(const t of TABS){
     $('#panel-' + t).hidden = t !== tab;
@@ -1036,6 +1133,12 @@ function renderAll(){
 function renderVisit(p){
   if(layoutWarning) p.append(h('div', {id:'layoutWarning', class:'banner warn', role:'status', text:layoutWarning}));
   p.append(h('div', {id:'sentBanner', class:'banner ok', hidden:true}));
+  p.append(h('details', {id:'changeDetails', class:'change-details', hidden:true}));
+  if(preservedAnswers.length){
+    p.append(h('details', {class:'preserved-answers'}, h('summary', {text:'Preserved answers (' + preservedAnswers.length + ')'}),
+      h('p', {class:'small', text:'Original answers affected by layout changes. These are kept for reference and are not included in the message.'}),
+      h('ul', {}, preservedAnswers.map(a => h('li', {}, h('strong', {text:a.label + ': '}), a.value)))));
+  }
   for(const sec of secsOf('visit')) p.append(renderSection(sec));
   if(editing) p.append(builderTools('visit'));
   p.append(h('section', {class:'card'},
@@ -1062,7 +1165,7 @@ function renderOfficePanel(){
   if(!page.isOfficeOwner(root)) return;
   const p = page.officeContent;
   p.textContent = '';
-  page.officeSaveWarning.hidden = officeWritable;
+  page.updateOfficeStatus();
   const ordered = office.filter(o => typeof o.overnights === 'string' && overnightText(o));
   const legacy = office.filter(o => typeof o.overnights !== 'string');
   p.append(h('p', {class:'office-summary', text:ordered.length + (ordered.length === 1 ? ' patient with overnight tests.' : ' patients with overnight tests.') + ' Saved in this browser only.'}));
@@ -1317,6 +1420,7 @@ function refresh(opts){
   if(out){ out.value = res.text ? COPY_PREFIX + res.text : ''; autoSize(out); }
   renderTagLine(ctx);
   renderSent(res.text);
+  renderSaveState(res.text);
   updateBadges(ctx);
   page.updateTitles();
   saveDraftSoon();
@@ -1348,12 +1452,50 @@ function renderSent(text){
   const b = $('#sentBanner');
   if(!b) return;
   b.hidden = !M.sentAt;
-  if(!M.sentAt){ b.textContent = ''; return; }
+  if(!M.sentAt){ b.textContent = ''; $('#changeDetails').hidden = true; return; }
   const changed = text !== M.sentText;
   b.className = 'banner ' + (changed ? 'warn' : 'ok');
   b.textContent = changed
     ? 'Copied at ' + fmtTime(M.sentAt) + ', but you changed it since. Copy it again before you post.'
     : 'Copied at ' + fmtTime(M.sentAt) + '. Use Add another patient below for the next person.';
+  const details = $('#changeDetails');
+  details.hidden = !changed;
+  if(changed){
+    const before = M.sentText.split('\n').filter(Boolean), after = text.split('\n').filter(Boolean);
+    const difference = (a, b) => {
+      const counts = new Map(); b.forEach(line => counts.set(line, (counts.get(line) || 0) + 1));
+      return a.filter(line => { const n = counts.get(line) || 0; if(n){ counts.set(line, n - 1); return false; } return true; });
+    };
+    const removed = difference(before, after), added = difference(after, before);
+    details.replaceChildren(h('summary', {text:'See what changed since copying'}));
+    if(removed.length) details.append(h('p', {text:'Previously copied'}), h('ul', {}, removed.map(line => h('li', {}, h('del', {text:line})))));
+    if(added.length) details.append(h('p', {text:'Current message'}), h('ul', {}, added.map(line => h('li', {}, h('ins', {text:line})))));
+    if(!removed.length && !added.length) details.append(h('p', {text:'The order or spacing of the message changed.'}));
+  }
+}
+function renderSaveState(text = buildOutput(V).text){
+  const el = $('#saveState');
+  let copied = M.sentAt ? 'Message copied at ' + fmtTime(M.sentAt) : 'Message not copied';
+  if(M.sentAt && text !== M.sentText) copied += ' · Changes not copied';
+  const pending = !officeWritable || pendingOfficeSync.some(p => p.meta === M);
+  let saved = 'Office saves when you copy';
+  if(M.sentAt){
+    if(pending) saved = 'Office save pending — retry save';
+    else if(M.officeId && office.some(o => o.id === M.officeId)) saved = 'Office saved';
+    else if(overnightText(M.sentVals || {})) saved = 'Office entry removed';
+    else saved = 'No overnight tests to save';
+  }
+  el.textContent = copied + ' · ' + saved;
+  el.classList.toggle('warn', pending || !!(M.sentAt && text !== M.sentText));
+}
+function setCollapsed(value){
+  collapsed = value;
+  root.classList.toggle('is-collapsed', collapsed);
+  $('#patientBody').hidden = collapsed;
+  $('#collapseBtn').textContent = collapsed ? 'Expand' : 'Collapse';
+  $('#collapseBtn').setAttribute('aria-expanded', String(!collapsed));
+  if(!collapsed) autoSize($('#output'));
+  saveDraftSoon();
 }
 
 function updateBadges(ctx){
@@ -1578,7 +1720,15 @@ function editOfficeVisit(o){
 }
 
 function removeOfficeVisit(o){
-  const doit = () => { mutateOffice(() => { office = office.filter(x => x.id !== o.id); }); flash(officeWritable ? 'Removed ' + (o.name || 'the entry') : 'Removal could not be saved. Keep this page open', officeWritable ? '' : 'bad'); };
+  const doit = () => {
+    let removed = null;
+    mutateOffice(() => { const current = office.find(x => x.id === o.id); if(current) removed = clone(current); office = office.filter(x => x.id !== o.id); });
+    if(removed) page.offerUndo('Removed ' + (removed.name || 'Office entry'), () => {
+      mutateOffice(() => { if(!office.some(x => x.id === removed.id)) office.push(removed); });
+      flash(officeWritable ? 'Office entry restored' : 'Restored. Office save pending', officeWritable ? '' : 'warn');
+    });
+    flash(officeWritable ? 'Removed ' + (o.name || 'the entry') : 'Removal could not be saved. Keep this page open', officeWritable ? '' : 'bad');
+  };
   sheet({ title:'Remove ' + (o.name || 'this saved entry') + '?', body:['This removes the saved Office entry. Patient forms stay on the page. Copying that patient again will add their overnight tests back.'],
     buttons:[ {label:'Remove', kind:'solid danger', on:doit}, {label:'Cancel'} ] });
 }
@@ -1606,13 +1756,27 @@ function newPatient(opts){
 }
 
 function clearVisit(msg){
+  const savedValues = clone(V), savedMeta = M, savedAnswers = clone(preservedAnswers);
+  const canUndo = hasContent(V) || preservedAnswers.length;
   page.cancelCopy(root);
   V = {};
   M = freshMeta();
+  preservedAnswers = [];
   renderAll();
   saveDraft();
   setTab('visit');
   if(msg !== false) flash(msg || 'This patient was cleared');
+  if(canUndo) page.offerUndo('Cleared ' + (savedValues.name || 'this patient'), () => {
+    if(hasContent(V) || M.sentAt || preservedAnswers.length){
+      const pending = pendingOfficeSync.filter(p => p.meta === savedMeta);
+      pendingOfficeSync = pendingOfficeSync.filter(p => p.meta !== savedMeta);
+      page.addPatient(root, {vals:savedValues, meta:savedMeta, preservedAnswers:savedAnswers,
+        pendingOfficeSync:pending.map(p => ({values:p.values, meta:p.meta, current:true}))});
+    }else{
+      V = savedValues; M = savedMeta; preservedAnswers = savedAnswers;
+      setCollapsed(false); renderAll(); saveDraft();
+    }
+  });
 }
 
 function sentGuard(){
@@ -1638,8 +1802,8 @@ function offerRestore(d){
 
 function updateSheet(){
   return { title:'Updated form available', dismissable:false,
-    body:['The default form changed since you edited yours. Switch to the new form, or keep your edited one? Your office list stays either way. Answers in fields the new form doesn’t have are cleared.'],
-    buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); page.layoutChanged(root, L); pendingUpdate = false; renderAll(); flash('Switched to the new form'); }},
+    body:['The default form changed since you edited yours. Switch to the new form, or keep your edited one? Your office list stays either way. Affected answers will be reviewed and preserved.'],
+    buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); pendingUpdate = false; layoutChanged(); }},
               {label:'Keep mine', on:() => { L.base = DEFAULT_BASE; saveLayout(); pendingUpdate = false; flash('Kept your form'); }} ] };
 }
 
@@ -1763,8 +1927,7 @@ function fieldEditor(sec, f){
 }
 
 function rerenderField(sec, f, migrations){
-  pruneValues(migrations);
-  saveLayout(migrations);
+  if(!saveLayout(migrations)) return;
   const old = $('[data-field="' + f.id + '"]');
   if(old) old.replaceWith(renderField(sec, f));
   refresh();
@@ -1815,8 +1978,8 @@ function builderTools(t){
     h('button', {type:'button', class:'btn', text:'Export layout', onclick:exportLayout}),
     h('button', {type:'button', class:'btn', text:'Import layout', onclick:importLayout}),
     h('button', {type:'button', class:'btn danger', text:'Reset to default', onclick:() => sheet({
-      title:'Reset the layout?', body:['This puts back the original fields, checklist and office steps. Your office list stays. Answers in fields the original layout doesn’t have are cleared.'],
-      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); page.layoutChanged(root, L); renderAll(); flash('Layout reset'); }}, {label:'Cancel'} ] })}));
+      title:'Reset the layout?', body:['This puts back the original fields, checklist and office steps. Your office list stays. Affected answers will be reviewed and preserved.'],
+      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); layoutChanged(); }}, {label:'Cancel'} ] })}));
 }
 
 function copyPlain(text, okMsg){
@@ -1844,12 +2007,12 @@ function importLayout(){
   const ta = h('textarea', {class:'inp mono', rows:'8', placeholder:'Paste an exported layout here'});
   const err = h('div', {class:'err', role:'alert'});
   let parsed = null;
-  sheet({ title:'Import layout', body:['This replaces your current layout. Your office list stays. Answers in fields the imported layout doesn’t have are cleared.', ta, err],
+  sheet({ title:'Import layout', body:['This replaces your current layout. Your office list stays. Affected answers will be reviewed and preserved.', ta, err],
     buttons:[ {label:'Replace my layout', kind:'primary', validate:() => {
                 try{ parsed = JSON.parse(ta.value); }catch(e){ parsed = null; }
                 if(!validLayout(parsed)){ err.textContent = 'That doesn’t look like an exported layout.'; return false; }
                 return true; },
-              on:() => { L = parsed; saveLayout(); renderAll(); flash('Layout imported'); }},
+              on:() => { L = parsed; layoutChanged(); }},
               {label:'Cancel'} ] });
 }
 
@@ -1881,11 +2044,13 @@ function bind(){
     buttons[next].focus({preventScroll:true});
   });
   $('#editBtn').addEventListener('click', () => {
+    setCollapsed(false);
     editing = !editing;
     if(!editing && tab === 'office') tab = 'visit';
     renderAll();
     flash(editing ? 'Editing the layout' : 'Done editing');
   });
+  $('#collapseBtn').addEventListener('click', () => setCollapsed(!collapsed));
   $('#newBtn').addEventListener('click', () => newPatient());
   $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
   $('#selectBtn').addEventListener('click', () => {
@@ -1897,7 +2062,7 @@ function bind(){
     flash('Message selected');
   });
   $('#copyBtn').addEventListener('click', onCopy);
-  window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); } }, {signal:lifecycle.signal});
+  window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); renderSaveState(); } }, {signal:lifecycle.signal});
 
 }
 
@@ -1906,15 +2071,20 @@ function start(){
   loadOffice();
   bind();
   renderAll();
+  setCollapsed(collapsed);
   if(pendingUpdate && !page.hasPatients()) sheet(updateSheet());
 }
 
 start();
 return {
   root,
-  serialize:() => ({id:root.id, vals:V, meta:M, tab,
+  serialize:() => ({id:root.id, vals:V, meta:M, tab, collapsed, preservedAnswers,
     ...(pendingOfficeSync.length ? {pendingOfficeSync:pendingOfficeSync.map(p => ({values:p.values, meta:p.meta, current:p.meta === M}))} : {})}),
-  hasContent:() => hasContent(V),
+  hasContent:() => hasContent(V) || preservedAnswers.length > 0,
+  collapse:setCollapsed,
+  name:() => String(V.name || '').trim(),
+  layoutImpact:(layout, migrations) => affectedAnswers(layout, migrations).map(a => a.label),
+  renderSaveState,
   hasPendingOffice:() => pendingOfficeSync.length > 0,
   keepPendingOffice:list => { pendingOfficeSync.push(...restorePendingOffice(list, false)); },
   restoreOfficeRecovery:recovery => {
@@ -1933,9 +2103,9 @@ return {
     $('#newBtn').setAttribute('aria-label', 'Clear ' + label);
     $('#addPatientBtn').setAttribute('aria-label', 'Add another patient after ' + label);
   },
-  focus:() => { root.scrollIntoView({block:'start'}); const input = $('#panel-visit input'); if(input) input.focus({preventScroll:true}); },
+  focus:() => { setCollapsed(false); root.scrollIntoView({block:'start'}); const input = $('#panel-visit input'); if(input) input.focus({preventScroll:true}); },
   offerRestore,
-  applyOffice:(values, writable, baseline, readFailed = false) => { office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = readFailed; renderOfficePanel(); updateBadges(); },
+  applyOffice:(values, writable, baseline, readFailed = false) => { office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = readFailed; renderOfficePanel(); updateBadges(); renderSaveState(); },
   getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline, readFailed:officeReadFailed}),
   renderOffice:renderOfficePanel,
   retryOffice:() => { saveOffice(); if(lifecycle.signal.aborted) return; renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
@@ -1948,7 +2118,9 @@ return {
   flushLayout:() => { if(layoutTimer) saveLayout(); },
   resize:() => autoSize($('#output')),
   applyLayout:(layout, migrations) => {
+    preserveLayoutAnswers(layout, migrations);
     L = layout;
+    committedLayout = clone(layout);
     pruneValues(migrations);
     renderAll();
   },
@@ -1968,8 +2140,8 @@ function createPatientPage(){
   const officeSection = document.querySelector('#officeSection');
   const template = document.querySelector('#patientTemplate');
   const warning = document.querySelector('#draftWarning');
-  const key = 'hvnb_draft';
-  const shiftKey = 'hvnb_shift_generation';
+  const key = 'hvnb_current_draft';
+  const shiftKey = 'hvnb_current_shift_generation';
   const clearDialog = document.querySelector('#clearShiftDialog');
   const clearError = document.querySelector('#clearShiftError');
   const clearWarning = document.querySelector('#shiftClearWarning');
@@ -1978,6 +2150,7 @@ function createPatientPage(){
   let activeCopy = null;
   let replayingOffice = false;
   let generation = 'initial', resetting = false;
+  let undo = null, undoTimer = null, navSignature = '';
   const readGeneration = () => { try{ return window.localStorage.getItem(shiftKey) || 'initial'; }catch(e){ return generation; } };
   generation = readGeneration();
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -1986,6 +2159,30 @@ function createPatientPage(){
     dialogHosts:document.querySelector('#dialogHosts'),
     officeContent:document.querySelector('#officeContent'),
     officeSaveWarning:document.querySelector('#officeSaveWarning'),
+    updateOfficeStatus:() => {
+      const first = patients[0];
+      page.officeSaveWarning.hidden = !first || (first.getOffice().writable && !patients.some(p => p.hasPendingOffice()));
+    },
+    clearUndo:() => {
+      clearTimeout(undoTimer); undo = null;
+      document.querySelector('#undoNotice').hidden = true;
+    },
+    offerUndo:(label, run) => {
+      page.clearUndo();
+      undo = {run, shift:generation, expires:Date.now() + 30000};
+      document.querySelector('#undoText').textContent = label + '. Undo is available for 30 seconds.';
+      document.querySelector('#undoNotice').hidden = false;
+      undoTimer = setTimeout(page.clearUndo, 30000);
+    },
+    undoLast:() => {
+      if(!page.isCurrentShift()) return;
+      const action = undo; page.clearUndo();
+      if(action && action.shift === generation && Date.now() <= action.expires) action.run();
+    },
+    layoutImpact:(layout, migrations) => patients.flatMap((p, i) => {
+      const labels = p.layoutImpact(layout, migrations);
+      return labels.length ? ['Patient ' + (i + 1) + (p.name() ? ' · ' + p.name() : '') + ': ' + labels.join(', ')] : [];
+    }),
     updateCopyButtons:() => {
       for(const button of host.querySelectorAll('[data-local-id="copyBtn"]')){
         button.disabled = !!activeCopy;
@@ -2008,7 +2205,7 @@ function createPatientPage(){
     retryPendingOffice:() => {
       if(replayingOffice || !patients.length || !patients[0].getOffice().writable) return;
       replayingOffice = true;
-      try{ patients.forEach(p => p.retryPendingOffice()); }finally{ replayingOffice = false; }
+      try{ patients.forEach(p => p.retryPendingOffice()); }finally{ replayingOffice = false; page.updateOfficeStatus(); patients.forEach(p => p.renderSaveState()); }
     },
     generation:() => generation,
     matchesShift:value => !!value && (value.shift === generation || (!value.shift && generation === 'initial')),
@@ -2029,6 +2226,7 @@ function createPatientPage(){
     showPatients:(scroll = true) => { page.setView('patients', scroll); patients.forEach(p => p.resize()); },
     setView:(view, scroll = true) => {
       host.hidden = view !== 'patients';
+      document.querySelector('#patientNavigator').hidden = view !== 'patients';
       officeSection.hidden = view !== 'office';
       for(const name of ['patients', 'office']){
         const button = document.querySelector('#view-' + name);
@@ -2038,7 +2236,20 @@ function createPatientPage(){
       if(scroll) window.scrollTo(0, 0);
     },
     hasPatients:() => patients.length > 0,
-    updateTitles:() => patients.forEach((p, i) => p.title(i + 1)),
+    updateTitles:() => {
+      patients.forEach((p, i) => p.title(i + 1));
+      const signature = JSON.stringify(patients.map(p => [p.root.id, p.name()]));
+      if(signature === navSignature) return;
+      navSignature = signature;
+      document.querySelector('#patientNavSummary').textContent = 'Patients (' + patients.length + ')';
+      const jumps = document.querySelector('#patientJumps'); jumps.replaceChildren();
+      patients.forEach((p, i) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn small';
+        button.textContent = (i + 1) + '. ' + (p.name() || 'Unnamed patient');
+        button.addEventListener('click', () => { page.showPatients(false); p.focus(); });
+        jumps.append(button);
+      });
+    },
     saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
     saveDraft:() => {
       clearTimeout(timer);
@@ -2068,6 +2279,7 @@ function createPatientPage(){
       if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable, clone(state.baseline), state.readFailed); }
       patients.splice(index, 0, patient);
       page.updateTitles();
+      page.updateOfficeStatus();
       page.updateCopyButtons();
       page.saveDraft();
       if(focus) patient.focus();
@@ -2079,6 +2291,7 @@ function createPatientPage(){
       if(!owner) return;
       const state = owner.getOffice();
       patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline), state.readFailed); });
+      owner.renderSaveState(); page.updateOfficeStatus();
       page.saveDraft();
     },
     restoreOfficeRecovery:draft => {
@@ -2117,12 +2330,12 @@ function createPatientPage(){
       // have started entering patients for the new shift.
       try{
         if(generation !== 'initial'){
-          const raw = window.localStorage.getItem('hvnb_office');
+          const raw = window.localStorage.getItem('hvnb_current_office');
           if(raw){
             let list; try{ list = JSON.parse(raw); }catch(e){ list = []; }
             const keep = Array.isArray(list) ? list.filter(o => object(o) && page.matchesShift(o)) : [];
-            if(!keep.length) window.localStorage.removeItem('hvnb_office');
-            else if(!Array.isArray(list) || keep.length !== list.length) window.localStorage.setItem('hvnb_office', JSON.stringify(keep));
+            if(!keep.length) window.localStorage.removeItem('hvnb_current_office');
+            else if(!Array.isArray(list) || keep.length !== list.length) window.localStorage.setItem('hvnb_current_office', JSON.stringify(keep));
           }
         }
       }catch(e){ cleared = false; }
@@ -2137,6 +2350,7 @@ function createPatientPage(){
       return cleared;
     },
     resetShift:(nextGeneration, message) => {
+      page.clearUndo();
       resetting = true; held = true; clearTimeout(timer);
       patients.forEach(p => p.flushLayout());
       const layout = patients.length ? clone(patients[0].getLayout()) : null;
@@ -2171,6 +2385,11 @@ function createPatientPage(){
     patients[0].retryOffice();
     page.retryPendingOffice();
   });
+  document.querySelector('#undoAction').addEventListener('click', page.undoLast);
+  document.querySelector('#dismissUndo').addEventListener('click', page.clearUndo);
+  document.querySelector('#collapsePatients').addEventListener('click', () => patients.forEach(p => p.collapse(true)));
+  document.querySelector('#expandPatients').addEventListener('click', () => patients.forEach(p => p.collapse(false)));
+  document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(patients.at(-1).root));
   document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
   document.querySelector('#view-office').addEventListener('click', page.showOffice);
   document.querySelector('.workspace-tabs').addEventListener('keydown', e => {
@@ -2194,7 +2413,56 @@ function createPatientPage(){
   window.addEventListener('pagehide', flushBeforeLeaving);
 }
 
-createPatientPage();
+let initialized = false;
+function openCurrentApp(){
+  if(initialized) return;
+  const ready = migrateStorage();
+  document.querySelector('#storageSetupWarning').hidden = ready;
+  document.querySelector('.workspace-tools').hidden = !ready;
+  document.querySelector('#patientNavigator').hidden = !ready;
+  if(ready){ initialized = true; createPatientPage(); }
+}
+document.querySelector('#retryStorageSetup').addEventListener('click', openCurrentApp);
+openCurrentApp();
+})();
+</script>
+<script>
+(() => {
+  const status = document.querySelector('#offlineStatus'), retry = document.querySelector('#retryOffline');
+  let ready = false, pending = false;
+  const show = () => {
+    status.textContent = ready ? (navigator.onLine ? 'Ready for offline opening' : 'Offline · saved app available') : (pending ? 'Preparing offline access…' : 'Offline opening is not ready. Connect and retry.');
+    retry.hidden = ready || pending;
+  };
+  async function setup(){
+    if(pending) return;
+    if(!('serviceWorker' in navigator) || !window.isSecureContext){ status.textContent = 'Offline opening is unavailable in this browser.'; return; }
+    pending = true; show();
+    try{
+      const registration = await navigator.serviceWorker.register('./sw.js', {scope:'./', updateViaCache:'none'});
+      if(registration.active) ready = true;
+      if(registration.installing){
+        const worker = registration.installing;
+        await new Promise((resolve, reject) => {
+          const changed = () => {
+            if(['installed','activated'].includes(worker.state)){ worker.removeEventListener('statechange', changed); resolve(); }
+            else if(worker.state === 'redundant'){ worker.removeEventListener('statechange', changed); reject(Error('Offline setup failed')); }
+          };
+          worker.addEventListener('statechange', changed); changed();
+        });
+        ready = true;
+      }
+    }catch(e){
+      try{ ready = !!(await navigator.serviceWorker.getRegistration('./'))?.active; }catch(_){}
+    }finally{
+      try{ ready = ready && !!await caches.match(new URL('./index.html', location.href).href); }catch(e){ ready = false; }
+      pending = false; show();
+    }
+  }
+  retry.addEventListener('click', setup);
+  window.addEventListener('offline', show);
+  window.addEventListener('online', () => { if(ready) show(); else setup(); });
+  setup();
 })();
 </script>
 <script>

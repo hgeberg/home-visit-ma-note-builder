@@ -202,6 +202,7 @@ textarea.inp{min-height:84px;resize:vertical}
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%231769e0%22%2F%3E%3Cpath%20d%3D%22M10%207h12v18H10z%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M13%2012h6M13%2016h6M13%2020h4%22%20stroke%3D%22%231769e0%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
 </head>
 <body>
+<p style="margin:12px;padding:12px;border:1px solid #b88420;border-radius:10px">Historical version — uses separate saved data. Changes here do not affect the current app.</p>
 <div class="app">
   <header class="top">
     <div>
@@ -242,9 +243,9 @@ textarea.inp{min-height:84px;resize:vertical}
 (() => {
 "use strict";
 
-const LAYOUT_KEY = 'hvnb_layout';
-const DRAFT_KEY = 'hvnb_draft';
-const OFFICE_KEY = 'hvnb_office';
+const LAYOUT_KEY = 'hvnb_legacy_v87backup_layout';
+const DRAFT_KEY = 'hvnb_legacy_v87backup_draft';
+const OFFICE_KEY = 'hvnb_legacy_v87backup_office';
 const DEFAULT_BASE = 12;
 const MAX_DRAFT_AGE = 8 * 60 * 60 * 1000;
 // iOS Safari copies text that starts like "Symptoms: ..." as a web address, and Teams then pastes it
@@ -1567,3 +1568,4 @@ start();
 </script>
 </body>
 </html>
+
