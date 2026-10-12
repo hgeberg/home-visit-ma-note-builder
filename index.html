@@ -224,7 +224,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.11</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.12</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
@@ -445,15 +445,8 @@ function parseTestList(str, old){
     if(prev && prev.hint) it.hint = prev.hint;
     return it;
   }).filter(Boolean);
-  if(old && old.length === out.length){
-    out.forEach((it, i) => {
-      const o = old[i];
-      if(norm(o.n) === norm(it.n)) return;
-      if(out.some(x => x.id === o.id)) return;
-      it.id = o.id;
-      if(o.hint && !it.hint) it.hint = o.hint;
-    });
-  }
+  // Only a matching test name preserves its identity. A replacement must not
+  // inherit a result from whichever test previously occupied that position.
   return out;
 }
 function testListText(items){
@@ -616,7 +609,7 @@ let V = seed.vals || {};              // this visit's values
 let M = restoreMeta(seed.meta);     // this visit's copy/office status
 let office = [];         // saved visits waiting on office steps
 let officeBaseline = []; // last storage snapshot, before any unsaved local changes
-let pendingOfficeSync = [];
+let pendingOfficeSync = restorePendingOffice(seed.pendingOfficeSync);
 let tab = TABS.includes(seed.tab) && seed.tab !== 'office' ? seed.tab : 'visit';
 let editing = false;
 let layoutTimer = null;
@@ -635,6 +628,11 @@ function restoreMeta(value){
   }
   meta.officeId = typeof value.officeId === 'string' && value.officeId ? value.officeId : null;
   return meta;
+}
+function restorePendingOffice(list, linkCurrent = true){
+  if(!Array.isArray(list)) return [];
+  return list.filter(p => p && p.values && typeof p.values === 'object' && !Array.isArray(p.values))
+    .map(p => ({values:p.values, meta:linkCurrent && p.current === true ? M : restoreMeta(p.meta)}));
 }
 
 function secsOf(t){ return L.sections.filter(s => s.tab === t); }
@@ -713,7 +711,10 @@ function saveOffice(){
     const merged = new Map(valid.filter(o => !removed.has(o.id)).map(o => [o.id, o]));
     changed.forEach(o => {
       const before = baseline.get(o.id), remote = merged.get(o.id);
-      if(!before || !remote){ merged.set(o.id, o); return; }
+      // An existing entry missing from storage was deleted in another tab.
+      // Only a genuinely new local entry may be inserted during a retry.
+      if(!before){ merged.set(o.id, o); return; }
+      if(!remote) return;
       const updated = {...remote};
       for(const key of new Set([...Object.keys(before), ...Object.keys(o)])){
         if(JSON.stringify(before[key]) === JSON.stringify(o[key])) continue;
@@ -1563,6 +1564,7 @@ function editOfficeVisit(o){
     h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason, err],
     buttons:[ {label:'Save changes', kind:'primary', validate:() => {
                   if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
+                  if(f.dobIn.value.trim() && !validDob(f.dobIn.value)){ err.textContent = 'DOB: enter a valid date (MM/DD/YYYY).'; return false; }
                   if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the overnight tests, or cancel and remove this entry if no tests were sent.'; return false; }
                   return true; },
                 on:() => {
@@ -1629,7 +1631,7 @@ function sentGuard(){
 function offerRestore(d){
   const count = d.patients.length;
   sheet({ title:count === 1 ? 'Unfinished patient in this tab' : count + ' patients saved in this tab', dismissable:false,
-    body:['Last change at ' + fmtTime(d.t) + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards these drafts; the office list stays.'],
+    body:['Last change at ' + fmtTime(d.t) + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards patient inputs; saved Office entries and pending Office saves are kept.'],
     buttons:[ {label:count === 1 ? 'Restore this visit' : 'Restore all ' + count + ' patients', kind:'primary', on:() => page.restore(d)},
               {label:'Start fresh', kind:'danger', on:() => page.startFresh()} ] });
 }
@@ -1910,8 +1912,18 @@ function start(){
 start();
 return {
   root,
-  serialize:() => ({id:root.id, vals:V, meta:M, tab}),
+  serialize:() => ({id:root.id, vals:V, meta:M, tab,
+    ...(pendingOfficeSync.length ? {pendingOfficeSync:pendingOfficeSync.map(p => ({values:p.values, meta:p.meta, current:p.meta === M}))} : {})}),
   hasContent:() => hasContent(V),
+  hasPendingOffice:() => pendingOfficeSync.length > 0,
+  keepPendingOffice:list => { pendingOfficeSync.push(...restorePendingOffice(list, false)); },
+  restoreOfficeRecovery:recovery => {
+    office = normalizeOffice(recovery.values);
+    officeBaseline = normalizeOffice(recovery.baseline);
+    officeWritable = false;
+    officeReadFailed = recovery.readFailed === true;
+    renderOfficePanel(); updateBadges();
+  },
   title:(number) => {
     const name = String(V.name || '').trim();
     $('#patientTitle').textContent = 'Patient ' + number + (name ? ' · ' + name : '');
@@ -2033,8 +2045,11 @@ function createPatientPage(){
       if(held) return;
       if(!page.isCurrentShift()) return;
       try{
-        if(patients.length === 1 && !patients[0].hasContent()) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, JSON.stringify({version:3, shift:generation, t:Date.now(), layout:patients[0].getLayout(), patients:patients.map(p => p.serialize())}));
+        const state = patients[0].getOffice();
+        const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
+        const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
+        if(patients.length === 1 && !patients[0].hasContent() && !pending) window.sessionStorage.removeItem(key);
+        else window.sessionStorage.setItem(key, JSON.stringify({version:3, shift:generation, t:Date.now(), layout:patients[0].getLayout(), patients:patients.map(p => p.serialize()), ...(officeRecovery ? {officeRecovery} : {})}));
         warning.hidden = true;
       }catch(e){
         warning.textContent = 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
@@ -2064,6 +2079,17 @@ function createPatientPage(){
       if(!owner) return;
       const state = owner.getOffice();
       patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline), state.readFailed); });
+      page.saveDraft();
+    },
+    restoreOfficeRecovery:draft => {
+      const recovery = draft.officeRecovery;
+      const first = patients[0];
+      if(object(recovery) && Array.isArray(recovery.values) && Array.isArray(recovery.baseline)) first.restoreOfficeRecovery(recovery);
+      else if(patients.some(p => p.hasPendingOffice())){
+        const state = first.getOffice();
+        first.applyOffice(state.values, false, state.baseline, true);
+      }
+      page.officeChanged(first.root, first.getOffice().values);
     },
     restore:(draft) => {
       if(!page.isCurrentShift() || !page.matchesShift(draft)) return;
@@ -2071,11 +2097,20 @@ function createPatientPage(){
       held = true;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
       for(const seed of draft.patients) page.addPatient(null, layout ? {...seed, layout} : seed, false);
+      page.restoreOfficeRecovery(draft);
       held = false; page.saveDraft();
       page.showPatients(false);
       if(patients.length) patients[0].root.scrollIntoView({block:'start'});
     },
-    startFresh:() => { held = false; page.saveDraft(); },
+    startFresh:() => {
+      // Starting new forms must not discard already-copied Office work.
+      if(!page.isCurrentShift()) return;
+      if(draft){
+        draft.patients.forEach(p => patients[0].keepPendingOffice(p.pendingOfficeSync));
+        page.restoreOfficeRecovery(draft);
+      }
+      held = false; page.saveDraft();
+    },
     cleanupSavedData:() => {
       let cleared = true;
       // Delete only records from the cleared shift: another tab may already
