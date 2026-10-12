@@ -21,6 +21,9 @@ const patient = (page, index = 0) => patients(page).nth(index);
 const cards = page => page.locator('#officeContent .office-patient');
 const records = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]'));
 const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_draft') || 'null'));
+const dialog = root => root.page().locator('#dialogHosts [role="dialog"]');
+const showOffice = page => page.locator('#view-office').click();
+const showPatients = page => page.locator('#view-patients').click();
 
 async function fillPatient(root, name, overnights = '') {
   await local(root, 'f_name').fill(name);
@@ -44,7 +47,7 @@ async function copyPatient(page, root, expectedCount) {
 }
 
 async function allowSamePatient(root) {
-  const guard = root.getByRole('dialog');
+  const guard = dialog(root);
   if (await guard.isVisible()) {
     await guard.getByRole('button', { name: 'Same patient, keep editing', exact: true }).click();
   }
@@ -57,14 +60,14 @@ async function changeCopied(root, field, value) {
 
 async function clearPatient(root) {
   await local(root, 'newBtn').click();
-  const dialog = root.getByRole('dialog');
-  if (await dialog.isVisible()) await dialog.getByRole('button', { name: 'Clear this patient', exact: true }).click();
+  const confirmation = dialog(root);
+  if (await confirmation.isVisible()) await confirmation.getByRole('button', { name: 'Clear this patient', exact: true }).click();
   assert.equal(await local(root, 'f_name').inputValue(), '');
 }
 
-test('Office is one shared section at the bottom with one reference checklist and scroll navigation', async ({ page }) => {
-  assert.equal(await page.locator('#officeSection').isVisible(), true);
-  assert.equal(await page.locator('#officeHeading').isVisible(), true);
+test('Office is its own view with one reference checklist beneath the saved patient list', async ({ page }) => {
+  assert.equal(await page.locator('#officeSection').isVisible(), false);
+  assert.equal(await page.locator('#patients').isVisible(), true);
   assert.equal(await page.locator('[data-office-reference]').count(), 1);
   await addAfter(page, 0);
   await addAfter(page, 0);
@@ -73,19 +76,20 @@ test('Office is one shared section at the bottom with one reference checklist an
   assert.equal(await page.locator('.patient .office-patient').count(), 0);
   assert.equal(await page.locator('.patient [data-office-reference]').count(), 0);
   assert.equal(await page.evaluate(() => {
-    const section = document.querySelector('#officeSection');
     const reference = document.querySelector('[data-office-reference]');
-    return [...document.querySelectorAll('.patient')].every(root =>
-      !!(root.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING)) &&
-      !!(document.querySelector('#officeContent').compareDocumentPosition(reference) & Node.DOCUMENT_POSITION_FOLLOWING);
-  }), true, 'Office and its shared reference appear after every patient');
+    return !!(document.querySelector('#officeContent').compareDocumentPosition(reference) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }), true, 'The shared reference appears below the saved Office patients');
   const first = patient(page);
   await local(first, 'tab-office').click();
+  assert.equal(await page.locator('#officeSection').isVisible(), true);
+  assert.equal(await page.locator('#patients').isVisible(), false);
   assert.equal(await local(first, 'tab-visit').getAttribute('aria-selected'), 'true');
+  await showPatients(page);
   assert.equal(await local(first, 'panel-visit').isVisible(), true);
   await local(first, 'tab-check').click();
   await local(first, 'tab-office').click();
   assert.equal(await local(first, 'tab-check').getAttribute('aria-selected'), 'true');
+  await showPatients(page);
   assert.equal(await local(first, 'panel-check').isVisible(), true);
   assert.equal(await page.getByRole('button', { name: /^Save to Office$/i }).count(), 0);
 });
@@ -227,6 +231,7 @@ test('legacy Office entries retain identity and steps, disclose missing orders, 
   };
   await page.evaluate(value => localStorage.setItem('hvnb_office', JSON.stringify([value])), legacy);
   await page.reload();
+  await showOffice(page);
   assert.equal(await cards(page).count(), 1);
   const card = cards(page);
   assert.match(await card.innerText(), /missing|not (?:saved|recorded)|unavailable/i);
@@ -260,10 +265,12 @@ test('failed Office storage warns visibly, keeps copied records in memory, and r
     };
   });
   await copyPatient(page, patient(page, 1));
+  await showOffice(page);
   await page.locator('#officeSaveWarning').waitFor({ state: 'visible' });
   assert.match(await page.locator('#officeSaveWarning').innerText(), /not|couldn.t|unable/i);
   assert.equal(await cards(page).count(), 2, 'Both records remain visible despite a write failure');
   assert.equal((await records(page)).length, 1, 'Failed storage did not silently overwrite persisted data');
+  await showPatients(page);
   await local(patient(page), 'tab-office').click();
   assert.equal(await cards(page).count(), 2, 'Navigating to Office does not reload stale persisted data over unsaved records');
   await page.evaluate(() => { Storage.prototype.setItem = window.__originalStorageSetItem; });
@@ -299,6 +306,7 @@ test('retrying a failed Copy save merges another tab\'s newly saved patient', as
     };
   });
   await copyPatient(page, patient(page));
+  await showOffice(page);
   await page.locator('#officeSaveWarning').waitFor({ state: 'visible' });
   assert.deepEqual(await records(page), []);
   assert.match(await cards(page).innerText(), /TEST RETRY TAB ALPHA/);
@@ -334,6 +342,7 @@ test('retrying a failed removal keeps the deletion and another tab\'s newly save
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
+  await showOffice(page);
   await cards(page).getByRole('button', { name: 'Remove', exact: true }).click();
   await page.locator('[role="dialog"]:visible').getByRole('button', { name: 'Remove', exact: true }).click();
   await page.locator('#officeSaveWarning').waitFor({ state: 'visible' });
@@ -366,6 +375,7 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
   await copyPatient(page, patient(page, 1), 2);
   const qaDirectory = path.join(__dirname, 'qa');
   fs.mkdirSync(qaDirectory, { recursive: true });
+  await showOffice(page);
   for (const viewport of [{ name: 'desktop', width: 1280, height: 1100 }, { name: 'mobile', width: 375, height: 1100 }]) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.locator('#officeSection').evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));

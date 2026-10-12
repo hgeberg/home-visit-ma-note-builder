@@ -66,7 +66,12 @@ a{color:var(--accent-text)}
 .patient-actions{display:grid;gap:10px;margin-top:12px}
 .add-patient{width:100%;min-height:48px;border:1px dashed var(--accent);color:var(--accent-text);background:var(--accent-soft)}
 .patient-caption{margin:0;color:var(--muted);font-size:13px}
-.office-section{margin-top:32px;padding-top:24px;border-top:3px solid var(--line);scroll-margin-top:16px}
+.office-section{margin-top:20px;scroll-margin-top:16px}
+.workspace-tools{display:flex;align-items:center;gap:10px;margin-top:16px}
+.workspace-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;background:var(--chip);border:1px solid var(--chip-line);border-radius:12px;padding:4px}
+.workspace-tools>.btn{flex:none}
+dialog.sheet{border:1px solid var(--line);margin:auto;width:calc(100% - 24px);max-width:560px}
+dialog.sheet::backdrop{background:var(--scrim)}
 .office-section h2{margin:0;font-size:21px}
 .office-patient .visit-head{grid-template-columns:1fr}
 .overnight-tests{margin:4px 0 12px;font-weight:720;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -216,13 +221,25 @@ textarea.inp{min-height:84px;resize:vertical}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.9</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.10</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
   <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
-  <div id="patients"></div>
-  <section id="officeSection" class="office-section" aria-labelledby="officeHeading">
+  <div id="shiftClearWarning" class="banner warn" role="alert" hidden>
+    <p>Patient forms have been cleared, but some saved information could not be deleted. Retry before closing this page.</p>
+    <button type="button" class="btn" id="retryShiftClear">Retry clearing saved data</button>
+  </div>
+  <div class="workspace-tools">
+    <nav class="workspace-tabs" role="tablist" aria-label="Workspace">
+      <button type="button" class="tab" role="tab" id="view-patients" aria-controls="patients" aria-selected="true">Patients</button>
+      <button type="button" class="tab" role="tab" id="view-office" aria-controls="officeSection" aria-selected="false" tabindex="-1">Office</button>
+    </nav>
+    <button type="button" class="btn danger" id="clearShiftBtn">Clear shift</button>
+  </div>
+  <p id="shiftStatus" class="small" role="status" aria-live="polite"></p>
+  <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
+  <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
     <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
     <div id="officeSaveWarning" class="banner warn" role="alert" hidden>
@@ -232,6 +249,17 @@ textarea.inp{min-height:84px;resize:vertical}
     <div id="officeContent"></div>
   </section>
 </main>
+<div id="dialogHosts"></div>
+<dialog class="sheet" id="clearShiftDialog" aria-labelledby="clearShiftTitle">
+  <h3 id="clearShiftTitle">Clear everything for this shift?</h3>
+  <p>This removes every patient form, saved draft and Office entry, including unfinished information. It starts one blank patient for your next shift. Your layout settings stay.</p>
+  <p>Other tabs running this version in the same browser will also reset. This cannot be undone.</p>
+  <div id="clearShiftError" class="err" role="alert"></div>
+  <div class="btns">
+    <button type="button" class="btn" id="cancelClearShift" autofocus>Cancel</button>
+    <button type="button" class="btn solid danger" id="confirmClearShift">Clear everything</button>
+  </div>
+</dialog>
 <template id="patientTemplate">
   <section class="patient">
     <header class="top">
@@ -283,6 +311,8 @@ function namespaceElement(node){
 }
 root.querySelectorAll('*').forEach(namespaceElement);
 root.setAttribute('aria-labelledby', prefix + 'patientTitle');
+const dialogHost = root.querySelector('[data-local-id="sheetHost"]');
+page.dialogHosts.append(dialogHost);
 
 const LAYOUT_KEY = 'hvnb_layout';
 const OFFICE_KEY = 'hvnb_office';
@@ -294,7 +324,7 @@ const TABS = ['visit', 'check', 'office'];
 
 /* ---------- helpers ---------- */
 
-const $ = (sel, scope) => (scope || root).querySelector(localSelector(sel));
+const $ = (sel, scope) => !scope && sel === '#sheetHost' ? dialogHost : (scope || root).querySelector(localSelector(sel));
 const $$ = (sel, scope) => Array.from((scope || root).querySelectorAll(localSelector(sel)));
 
 function h(tag, attrs, ...kids){
@@ -544,6 +574,7 @@ function loadLayout(){
 }
 function saveLayout(){
   clearTimeout(layoutTimer);
+  layoutTimer = null;
   if(!writeJSON('local', LAYOUT_KEY, L)) flash('Couldn’t save the layout on this device', 'bad');
   page.layoutChanged(root, L);
   renderOfficePanel();
@@ -555,10 +586,11 @@ let officeWritable = true;
 function loadOffice(){
   if(!officeWritable || !store('local')) return;
   const o = readJSON('local', OFFICE_KEY);
-  office = Array.isArray(o) ? o.filter(v => v && typeof v.id === 'string' && Array.isArray(v.steps)) : [];
+  office = Array.isArray(o) ? o.filter(v => v && typeof v.id === 'string' && Array.isArray(v.steps) && page.matchesShift(v)) : [];
   officeBaseline = JSON.parse(JSON.stringify(office));
 }
 function saveOffice(){
+  if(lifecycle.signal.aborted || !page.isCurrentShift()) return false;
   // Apply only this page's changes to the newest stored list. A failed save may
   // be retried after another tab has added, edited or removed other patients.
   const baseline = new Map(officeBaseline.map(o => [o.id, o]));
@@ -571,7 +603,7 @@ function saveOffice(){
     const raw = storage.getItem(OFFICE_KEY);
     const latest = raw ? JSON.parse(raw) : [];
     if(!Array.isArray(latest)) throw new Error('Invalid stored office list');
-    const valid = latest.filter(o => o && typeof o.id === 'string' && Array.isArray(o.steps));
+    const valid = latest.filter(o => o && typeof o.id === 'string' && Array.isArray(o.steps) && page.matchesShift(o));
     const merged = new Map(valid.filter(o => !removed.has(o.id)).map(o => [o.id, o]));
     changed.forEach(o => merged.set(o.id, o));
     office = Array.from(merged.values());
@@ -584,9 +616,11 @@ function saveOffice(){
   return officeWritable;
 }
 function mutateOffice(fn){
+  if(lifecycle.signal.aborted || !page.isCurrentShift()) return;
   loadOffice();
   const r = fn();
   saveOffice();
+  if(lifecycle.signal.aborted) return;
   renderOfficePanel();
   updateBadges();
   page.officeChanged(root, office);
@@ -744,8 +778,9 @@ function flash(msg, kind){
 let sheetOpen = false;
 let sheetDismiss = null;
 const sheetQueue = [];
-function sheet(opts){ if(sheetOpen) sheetQueue.push(opts); else openSheet(opts); }
+function sheet(opts){ if(lifecycle.signal.aborted) return; if(sheetOpen) sheetQueue.push(opts); else openSheet(opts); }
 function openSheet(opts){
+  if(lifecycle.signal.aborted) return;
   sheetOpen = true;
   const host = $('#sheetHost');
   host.textContent = '';
@@ -767,12 +802,13 @@ function openSheet(opts){
   const scrim = h('div', {class:'scrim', onclick:(e) => { if(e.target === scrim && sheetDismiss) sheetDismiss(); }}, card);
   host.append(scrim);
   setTimeout(() => {
+    if(lifecycle.signal.aborted) return;
     const target = opts.focus ? card.querySelector(localSelector(opts.focus)) : null;
     try{ (target || card.querySelector('.btn')).focus({preventScroll:true}); }catch(e){}
   }, 30);
 }
 function closeSheet(){ $('#sheetHost').textContent = ''; sheetOpen = false; sheetDismiss = null; }
-function drainSheets(){ if(!sheetOpen && sheetQueue.length) openSheet(sheetQueue.shift()); }
+function drainSheets(){ if(!lifecycle.signal.aborted && !sheetOpen && sheetQueue.length) openSheet(sheetQueue.shift()); }
 
 /* ---------- rendering ---------- */
 
@@ -817,7 +853,7 @@ function renderCheck(p){
 
 function renderOfficeTab(p){
   if(editing){
-    p.append(h('div', {class:'banner info', text:'Edit the shared Office checklist shown below the saved patients at the bottom of the page.'}));
+    p.append(h('div', {class:'banner info', text:'Edit the shared Office checklist shown below the saved patients in the Office section.'}));
     for(const sec of secsOf('office')) p.append(renderSection(sec));
     p.append(builderTools('office'));
   }
@@ -1142,6 +1178,7 @@ function configureOfficeLink(){
 }
 function setTab(t){
   if(t === 'office' && !editing){ page.showOffice(); return; }
+  page.showPatients(false);
   tab = t;
   for(const x of TABS){
     $('#panel-' + x).hidden = x !== t;
@@ -1173,8 +1210,9 @@ function doCopy(text){
   const copiedMeta = M;
   const payload = COPY_PREFIX + text;
   let settled = false;
-  const ok = () => { if(settled) return; settled = true; afterCopy(text, copiedValues, copiedMeta); };
-  const fail = () => { if(settled) return; settled = true; if(legacyCopy(payload)) afterCopy(text, copiedValues, copiedMeta); else manualCopy(text, copiedValues, copiedMeta); };
+  const stale = () => lifecycle.signal.aborted || copiedMeta !== M || !page.isCurrentShift();
+  const ok = () => { if(settled || stale()) return; settled = true; afterCopy(text, copiedValues, copiedMeta); };
+  const fail = () => { if(settled || stale()) return; settled = true; if(legacyCopy(payload)) afterCopy(text, copiedValues, copiedMeta); else manualCopy(text, copiedValues, copiedMeta); };
   try{
     if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(payload).then(ok, fail); return; }
   }catch(e){}
@@ -1197,12 +1235,12 @@ function manualCopy(text, copiedValues, copiedMeta){
   ta.value = COPY_PREFIX + text;
   sheet({ title:'Copy it by hand', body:['Copying was blocked. Press and hold in the box, Select All, then Copy.', ta],
     buttons:[ {label:'I copied it', kind:'primary', on:() => afterCopy(text, copiedValues, copiedMeta)}, {label:'Cancel'} ] });
-  setTimeout(() => { try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, ta.value.length); }catch(e){} }, 60);
+  setTimeout(() => { if(lifecycle.signal.aborted) return; try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, ta.value.length); }catch(e){} }, 60);
 }
 
 function afterCopy(text, copiedValues = V, copiedMeta = M){
   // A pending clipboard request must not mark a cleared form as copied.
-  if(copiedMeta !== M) return;
+  if(lifecycle.signal.aborted || copiedMeta !== M || !page.isCurrentShift()) return;
   M.sentAt = Date.now();
   M.sentText = text;
   M.sentVals = JSON.parse(JSON.stringify(copiedValues));
@@ -1240,6 +1278,7 @@ function syncOfficeCard(steps, vals = V){
     const details = officeDetails(vals);
     if(ov.overnights !== details.overnights || ov.bloodreason !== details.bloodreason) changed = true;
     Object.assign(ov, details);
+    ov.shift = page.generation();
     const nm = String(vals.name || '').trim(), db = String(vals.dob || '').trim();
     if(nm !== ov.name){ ov.name = nm; changed = true; }
     if(db !== ov.dob){ ov.dob = db; changed = true; }
@@ -1264,7 +1303,7 @@ function syncVisitSteps(ov, steps){
 /* ---------- office list ---------- */
 
 function addToOffice(name, dob, vals = V){
-  const visit = { id: uid('v'), name, dob, t: Date.now(), ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
+  const visit = { id: uid('v'), name, dob, t: Date.now(), shift:page.generation(), ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
   mutateOffice(() => { office.push(visit); });
   M.officeId = visit.id;
   saveDraft();
@@ -1610,8 +1649,10 @@ return {
   applyOffice:(values, writable, baseline) => { office = values; officeWritable = writable; officeBaseline = baseline; renderOfficePanel(); updateBadges(); },
   getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline}),
   renderOffice:renderOfficePanel,
-  retryOffice:() => { saveOffice(); renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
+  retryOffice:() => { saveOffice(); if(lifecycle.signal.aborted) return; renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
   getLayout:() => L,
+  flushLayout:() => { if(layoutTimer) saveLayout(); },
+  resize:() => autoSize($('#output')),
   applyLayout:(layout) => {
     // Preserve selected choices when another patient's layout editor renames them.
     for(const sec of layout.sections) for(const field of sec.fields){
@@ -1625,7 +1666,7 @@ return {
     }
     L = layout; renderAll();
   },
-  destroy:() => { lifecycle.abort(); clearTimeout(flashTimer); clearTimeout(layoutTimer); }
+  destroy:() => { lifecycle.abort(); clearTimeout(flashTimer); clearTimeout(layoutTimer); sheetQueue.length = 0; dialogHost.remove(); M = freshMeta(); }
 };
 }
 
@@ -1635,17 +1676,47 @@ function createPatientPage(){
   const template = document.querySelector('#patientTemplate');
   const warning = document.querySelector('#draftWarning');
   const key = 'hvnb_draft';
+  const shiftKey = 'hvnb_shift_generation';
+  const clearDialog = document.querySelector('#clearShiftDialog');
+  const clearError = document.querySelector('#clearShiftError');
+  const clearWarning = document.querySelector('#shiftClearWarning');
+  const status = document.querySelector('#shiftStatus');
   let patients = [], timer = null, held = false, serial = 0;
+  let generation = 'initial', resetting = false;
+  const readGeneration = () => { try{ return window.localStorage.getItem(shiftKey) || 'initial'; }catch(e){ return generation; } };
+  generation = readGeneration();
   const clone = value => JSON.parse(JSON.stringify(value));
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const page = {
+    dialogHosts:document.querySelector('#dialogHosts'),
     officeContent:document.querySelector('#officeContent'),
     officeSaveWarning:document.querySelector('#officeSaveWarning'),
+    generation:() => generation,
+    matchesShift:value => !!value && (value.shift === generation || (!value.shift && generation === 'initial')),
+    isCurrentShift:() => {
+      if(resetting) return true;
+      const latest = readGeneration();
+      if(latest === generation) return true;
+      page.resetShift(latest, 'Shift cleared in another tab. Ready for the next patient.');
+      return false;
+    },
     isOfficeOwner:root => !patients.length || patients[0].root === root,
     showOffice:() => {
+      if(!page.isCurrentShift()) return;
       if(patients.length) patients[0].renderOffice();
-      officeSection.scrollIntoView({block:'start'});
+      page.setView('office');
       document.querySelector('#officeHeading').focus({preventScroll:true});
+    },
+    showPatients:(scroll = true) => { page.setView('patients', scroll); patients.forEach(p => p.resize()); },
+    setView:(view, scroll = true) => {
+      host.hidden = view !== 'patients';
+      officeSection.hidden = view !== 'office';
+      for(const name of ['patients', 'office']){
+        const button = document.querySelector('#view-' + name);
+        button.setAttribute('aria-selected', name === view ? 'true' : 'false');
+        button.tabIndex = name === view ? 0 : -1;
+      }
+      if(scroll) window.scrollTo(0, 0);
     },
     hasPatients:() => patients.length > 0,
     updateTitles:() => patients.forEach((p, i) => p.title(i + 1)),
@@ -1653,9 +1724,10 @@ function createPatientPage(){
     saveDraft:() => {
       clearTimeout(timer);
       if(held) return;
+      if(!page.isCurrentShift()) return;
       try{
         if(patients.length === 1 && !patients[0].hasContent()) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, JSON.stringify({version:2, t:Date.now(), patients:patients.map(p => p.serialize())}));
+        else window.sessionStorage.setItem(key, JSON.stringify({version:2, shift:generation, t:Date.now(), patients:patients.map(p => p.serialize())}));
         warning.hidden = true;
       }catch(e){
         warning.textContent = 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
@@ -1681,28 +1753,95 @@ function createPatientPage(){
     layoutChanged:(source, layout) => patients.forEach(p => { if(p.root !== source) p.applyLayout(clone(layout)); }),
     officeChanged:(source, values) => {
       const owner = patients.find(p => p.root === source);
-      const state = owner ? owner.getOffice() : {writable:true, baseline:values};
+      if(!owner) return;
+      const state = owner.getOffice();
       patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline)); });
     },
     restore:(draft) => {
+      if(!page.isCurrentShift() || !page.matchesShift(draft)) return;
       held = true;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
       for(const seed of draft.patients) page.addPatient(null, seed, false);
       held = false; page.saveDraft();
+      page.showPatients(false);
       if(patients.length) patients[0].root.scrollIntoView({block:'start'});
     },
-    startFresh:() => { held = false; page.saveDraft(); }
+    startFresh:() => { held = false; page.saveDraft(); },
+    cleanupSavedData:() => {
+      let cleared = true;
+      // Delete only records from the cleared shift: another tab may already
+      // have started entering patients for the new shift.
+      try{
+        if(generation !== 'initial'){
+          const raw = window.localStorage.getItem('hvnb_office');
+          if(raw){
+            let list; try{ list = JSON.parse(raw); }catch(e){ list = []; }
+            const keep = Array.isArray(list) ? list.filter(o => object(o) && page.matchesShift(o)) : [];
+            if(!keep.length) window.localStorage.removeItem('hvnb_office');
+            else if(!Array.isArray(list) || keep.length !== list.length) window.localStorage.setItem('hvnb_office', JSON.stringify(keep));
+          }
+        }
+      }catch(e){ cleared = false; }
+      try{
+        const raw = window.sessionStorage.getItem(key);
+        if(raw){
+          let draft; try{ draft = JSON.parse(raw); }catch(e){}
+          if(!page.matchesShift(draft)) window.sessionStorage.removeItem(key);
+        }
+      }catch(e){ cleared = false; }
+      clearWarning.hidden = cleared;
+      return cleared;
+    },
+    resetShift:(nextGeneration, message) => {
+      resetting = true; held = true; clearTimeout(timer);
+      patients.forEach(p => p.flushLayout());
+      const layout = patients.length ? clone(patients[0].getLayout()) : null;
+      patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      generation = nextGeneration;
+      if(clearDialog.open) clearDialog.close();
+      const cleared = page.cleanupSavedData();
+      page.addPatient(null, layout ? {layout} : {}, false);
+      held = false; resetting = false;
+      warning.hidden = true;
+      page.showPatients();
+      status.textContent = cleared ? message : 'Patient forms cleared. Saved-data removal still needs a retry.';
+    },
+    clearShift:() => {
+      const nextGeneration = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+      try{ window.localStorage.setItem(shiftKey, nextGeneration); }
+      catch(e){ clearError.textContent = 'Couldn’t clear this shift because browser storage is unavailable. Nothing was cleared. Try again.'; return; }
+      page.resetShift(nextGeneration, 'Shift cleared. Ready for the next patient.');
+    }
   };
   let draft = null;
   try{ draft = JSON.parse(window.sessionStorage.getItem(key)); }catch(e){}
   if(draft && object(draft.vals) && !draft.patients) draft.patients = [{vals:draft.vals, meta:draft.meta}];
-  if(draft && Array.isArray(draft.patients) && draft.patients.length && draft.patients.every(p => object(p) && object(p.vals)) && draft.t && Date.now() - draft.t < 8 * 60 * 60 * 1000){
+  if(draft && page.matchesShift(draft) && Array.isArray(draft.patients) && draft.patients.length && draft.patients.every(p => object(p) && object(p.vals)) && draft.t && Date.now() - draft.t < 8 * 60 * 60 * 1000){
     held = true;
   }else draft = null;
+  if(generation !== 'initial') page.cleanupSavedData();
   const first = page.addPatient(null, {}, false);
   if(draft) first.offerRestore(draft);
   document.querySelector('#retryOfficeSave').addEventListener('click', () => { if(patients.length) patients[0].retryOffice(); });
-  document.addEventListener('visibilitychange', () => { if(document.hidden) page.saveDraft(); });
+  document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
+  document.querySelector('#view-office').addEventListener('click', page.showOffice);
+  document.querySelector('.workspace-tabs').addEventListener('keydown', e => {
+    if(!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const office = e.key === 'End' || (e.key !== 'Home' && document.activeElement.id === 'view-patients');
+    const button = document.querySelector(office ? '#view-office' : '#view-patients');
+    button.click(); button.focus();
+  });
+  document.querySelector('#clearShiftBtn').addEventListener('click', () => { clearError.textContent = ''; clearDialog.showModal(); });
+  document.querySelector('#cancelClearShift').addEventListener('click', () => clearDialog.close());
+  document.querySelector('#confirmClearShift').addEventListener('click', page.clearShift);
+  document.querySelector('#retryShiftClear').addEventListener('click', () => {
+    if(page.isCurrentShift() && page.cleanupSavedData()) status.textContent = 'Saved information from the cleared shift was removed.';
+  });
+  window.addEventListener('storage', e => { if(e.key === shiftKey || e.key === null) page.isCurrentShift(); });
+  window.addEventListener('focus', page.isCurrentShift);
+  window.addEventListener('pageshow', page.isCurrentShift);
+  document.addEventListener('visibilitychange', () => { if(document.hidden) page.saveDraft(); else page.isCurrentShift(); });
   window.addEventListener('pagehide', page.saveDraft);
 }
 
@@ -1719,7 +1858,7 @@ createPatientPage();
     Promise.resolve(context.registerTool({
       name: 'open_note_builder_tab',
       title: 'Open note builder tab',
-      description: 'Open the first patient’s Visit or Checklist tab, or jump to the shared Office overnight-test list.',
+      description: 'Open the first patient’s Visit or Checklist tab, or the separate Office overnight-test view.',
       inputSchema: {type: 'object', properties: {tab: {type: 'string', enum: ['visit', 'check', 'office']}}, required: ['tab'], additionalProperties: false},
       annotations: {readOnlyHint: false, untrustedContentHint: false},
       execute(input) {

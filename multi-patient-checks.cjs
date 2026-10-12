@@ -22,6 +22,7 @@ const patient = (page, index) => patients(page).nth(index);
 const output = root => local(root, 'output').inputValue();
 const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_draft')));
 const office = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]'));
+const dialog = root => root.page().locator('#dialogHosts [role="dialog"]');
 
 async function fillPatient(root, name, symptoms = '') {
   await local(root, 'f_name').fill(name);
@@ -151,6 +152,7 @@ test('copy buttons copy their own output and create separate shared office recor
   assert.match(saved.patients[0].meta.sentText, /alpha only/);
   assert.doesNotMatch(saved.patients[0].meta.sentText, /beta only/);
   for (let index = 0; index < 2; index++) {
+    await page.locator('#view-patients').click();
     await local(patient(page, index), 'tab-office').click();
     assert.match(await page.locator('#officeContent').innerText(), /TEST COPY ALPHA/);
     assert.match(await page.locator('#officeContent').innerText(), /TEST COPY BETA/);
@@ -186,7 +188,7 @@ test('the copied-patient guard can undo the edit and append a blank patient', as
   await local(first, 'copyBtn').click();
   await local(first, 'sentBanner').waitFor({ state: 'visible' });
   await local(first, 'f_symptoms').fill('accidental next patient symptoms');
-  const guard = first.getByRole('dialog');
+  const guard = dialog(first);
   assert.match(await guard.innerText(), /You already copied this visit/);
   await guard.getByRole('button', { name: /^No, undo this edit and add a patient$/ }).click();
   await page.waitForFunction(() => document.querySelectorAll('.patient').length === 2);
@@ -207,14 +209,14 @@ test('clearing warns about uncopied changes and never saves an uncopied patient 
   await local(first, 'sentBanner').waitFor({ state: 'visible' });
   assert.deepEqual(await office(page), []);
   await markTest(first, 'ears');
-  await first.getByRole('dialog').getByRole('button', { name: 'Same patient, keep editing', exact: true }).click();
+  await dialog(first).getByRole('button', { name: 'Same patient, keep editing', exact: true }).click();
   await local(first, 'newBtn').click();
-  const warning = first.getByRole('dialog');
+  const warning = dialog(first);
   assert.match(await warning.innerText(), /Those changes haven.t been copied/);
   assert.equal(await warning.getByRole('button', { name: 'Copy it again first', exact: true }).isVisible(), true);
   assert.doesNotMatch(await warning.innerText(), /These office steps aren.t on your office list yet/);
   await warning.getByRole('button', { name: 'Clear this patient', exact: true }).click();
-  assert.equal(await first.getByRole('dialog').count(), 0);
+  assert.equal(await dialog(first).count(), 0);
   assert.equal(await local(first, 'f_name').inputValue(), '');
   assert.equal(await local(first, 't_tests_ears').isChecked(), false);
   assert.deepEqual(await office(page), []);
@@ -275,7 +277,7 @@ test('clearing one patient preserves the other patient and the aggregate draft',
   await addAfter(page, 0);
   await fillPatient(patient(page, 1), 'TEST KEEP BETA', 'keep this unfinished');
   await local(patient(page, 0), 'newBtn').click();
-  const confirm = patient(page, 0).getByRole('dialog').getByRole('button', { name: /^Clear (?:and start|this patient|patient)/i });
+  const confirm = dialog(patient(page, 0)).getByRole('button', { name: /^Clear (?:and start|this patient|patient)/i });
   await confirm.click();
   assert.equal(await patients(page).count(), 2);
   assert.equal(await local(patient(page, 0), 'f_name').inputValue(), '');

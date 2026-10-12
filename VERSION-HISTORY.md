@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v8.10 — separate Office view and end-of-shift clearing (October 11, 2026)
+
+Use the **Patients** and **Office** tabs at the top to switch views. Office contains the saved overnight-test list and its single shared reference checklist; it is hidden while entering patient information. Each patient's Office button opens the same Office view. Copy-only saving is unchanged.
+
+**Clear shift** is available in either view. After confirmation, it removes all patient forms, saved drafts and Office entries and starts one blank patient. Layout settings are retained. Other tabs running this version reset too, and outdated drafts and pending clipboard requests cannot restore cleared records. If browser storage prevents clearing, the app reports the failure and offers a retry rather than claiming all saved information was removed.
+
+The preceding v8.9 source is preserved in `backups/before-shift-clear-2026-10-11/index.html` and on [codex/backup-before-shift-clear-2026-10-11](https://github.com/hgeberg/home-visit-ma-note-builder/tree/codex/backup-before-shift-clear-2026-10-11), commit `91d0a8295b1fe3da95f47b15349462886818abc3`.
+
 ## v8.9 — saved overnight tests and one Office reference (October 11, 2026)
 
 Office now appears once, below all patient forms. Each patient's Office button jumps to this shared section. The Visit checklist remains separate for each patient.
@@ -35,5 +43,7 @@ To restore the original as the main page, replace `index.html` with `previous-ve
 Run `node multi-patient-checks.cjs` for the current browser regression checks. The script uses an isolated browser, synthetic patient data, and a temporary localhost server. It supports `PLAYWRIGHT_MODULE` and `PLAYWRIGHT_CHROME` overrides for other machines.
 
 Run `node office-checks.cjs` for the overnight list, copy-only saving, legacy records, shared reference, browser storage, and recovery checks.
+
+Run `node shift-checks.cjs` for separate-view navigation, confirmation/cancellation, clearing, cross-tab synchronization, stale drafts, pending copies and failed storage deletion.
 
 `WEBSITE-AUDIT.md` and `audit-checks.cjs` document the original v8.7 audit. That older script deliberately reproduces original defects and reads the preserved v8.7 snapshot; its passing defect checks are not claims that those defects are fixed.
