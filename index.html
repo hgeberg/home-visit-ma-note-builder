@@ -57,8 +57,19 @@ body{
   -webkit-text-size-adjust:100%;
 }
 button{font:inherit;color:inherit}
+a{color:var(--accent-text)}
 :focus-visible{outline:2px solid var(--accent-text);outline-offset:2px}
-.app{max-width:760px;margin-inline:auto;padding-inline:16px;padding-block:14px 176px}
+.app{max-width:760px;margin-inline:auto;padding:14px 16px 40px}
+.patient{margin-top:24px;padding-top:20px;border-top:3px solid var(--line);scroll-margin-top:12px}
+.patient .top h2{margin:0;font-size:20px;line-height:1.3;overflow-wrap:anywhere}
+.patient .top>div{min-width:0}
+.patient-actions{display:grid;gap:10px;margin-top:12px}
+.add-patient{width:100%;min-height:48px;border:1px dashed var(--accent);color:var(--accent-text);background:var(--accent-soft)}
+.patient-caption{margin:0;color:var(--muted);font-size:13px}
+.patient-status{min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
+.patient-status.bad{color:var(--danger)}
+.patient-status.warn{color:var(--warn)}
+.draft-warning{position:sticky;top:0;z-index:50}
 
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .top h1{margin:0;font-size:21px;line-height:1.2;font-weight:780;text-wrap:balance}
@@ -69,7 +80,7 @@ button{font:inherit;color:inherit}
   appearance:none;border:1px solid var(--chip-line);background:var(--card);color:var(--ink);
   border-radius:10px;padding:9px 13px;font-weight:680;cursor:pointer;min-height:42px;line-height:1.2
 }
-#editBtn{white-space:nowrap;flex:none}
+[data-local-id="editBtn"]{white-space:nowrap;flex:none}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.danger{color:var(--danger);border-color:var(--danger-line)}
 .btn.solid.danger{background:var(--pos);border-color:var(--pos);color:var(--fill-ink)}
@@ -168,16 +179,9 @@ textarea.inp{min-height:84px;resize:vertical}
 .addmenu{padding:0 16px 16px}
 .builder{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block:12px}
 
-.actions{
-  position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bar);border-top:1px solid var(--line);
-  padding:10px 16px calc(8px + env(safe-area-inset-bottom,0px));
-  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)
-}
-.actions-inner{max-width:728px;margin-inline:auto;display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:8px}
+.actions{margin-top:12px}
+.actions-inner{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:8px}
 .actions .btn{min-height:48px;border-radius:12px;font-weight:760;padding-inline:8px}
-#status{max-width:728px;margin:6px auto 0;min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
-#status.bad{color:var(--danger)}
-#status.warn{color:var(--warn)}
 
 .scrim{
   position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
@@ -202,51 +206,71 @@ textarea.inp{min-height:84px;resize:vertical}
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%231769e0%22%2F%3E%3Cpath%20d%3D%22M10%207h12v18H10z%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M13%2012h6M13%2016h6M13%2020h4%22%20stroke%3D%22%231769e0%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
 </head>
 <body>
-<div class="app">
-  <header class="top">
-    <div>
-      <h1>Home Visit MA Note Builder</h1>
-      <p class="sub"><b>v8.7</b> · The Visit tab builds your Teams message. Checklist and Office never print.</p>
+<main class="app">
+  <header class="top"><div>
+    <h1>Home Visit MA Note Builder</h1>
+    <p class="sub"><b>v8.8</b> · Multiple patients, one page. Each patient has a separate message and checklist.</p>
+    <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a></p>
+  </div></header>
+  <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
+  <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
+  <div id="patients"></div>
+</main>
+<template id="patientTemplate">
+  <section class="patient">
+    <header class="top">
+      <div><h2 id="patientTitle"></h2><p class="sub">Complete this patient at your own pace. Other patients stay on the page.</p></div>
+      <button type="button" class="btn" id="editBtn">Edit layout</button>
+    </header>
+    <nav class="tabs" aria-label="Patient sections">
+      <div class="seg" role="tablist">
+        <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
+        <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist <span class="badge" id="badge-check"></span></button>
+        <button type="button" class="tab" role="tab" id="tab-office" aria-controls="panel-office" aria-selected="false">Office <span class="badge" id="badge-office"></span></button>
+      </div>
+    </nav>
+    <div id="editBanner" class="banner info" hidden></div>
+    <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
+    <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden></div>
+    <div id="panel-office" role="tabpanel" aria-labelledby="tab-office" hidden></div>
+    <div class="actions">
+      <div class="actions-inner">
+        <button type="button" class="btn" id="newBtn">Clear this patient</button>
+        <button type="button" class="btn" id="selectBtn">Select text</button>
+        <button type="button" class="btn primary" id="copyBtn">Copy message</button>
+      </div>
+      <div id="status" class="patient-status" role="status" aria-live="polite"></div>
     </div>
-    <button type="button" class="btn" id="editBtn">Edit layout</button>
-  </header>
-  <p class="privacy">Nothing is sent anywhere. This visit stays in this tab until you start the next patient. The office list is saved in this browser only, and on iPhone closing Safari may clear it.</p>
-
-  <nav class="tabs" aria-label="Sections">
-    <div class="seg" role="tablist">
-      <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
-      <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist <span class="badge" id="badge-check"></span></button>
-      <button type="button" class="tab" role="tab" id="tab-office" aria-controls="panel-office" aria-selected="false">Office <span class="badge" id="badge-office"></span></button>
+    <div class="patient-actions">
+      <button type="button" class="btn add-patient" id="addPatientBtn">+ Add another patient</button>
+      <p class="patient-caption">Adds a blank patient below this one. Everything entered above stays here.</p>
     </div>
-  </nav>
-
-  <div id="editBanner" class="banner info" hidden></div>
-
-  <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
-  <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden></div>
-  <div id="panel-office" role="tabpanel" aria-labelledby="tab-office" hidden></div>
-</div>
-
-<div class="actions">
-  <div class="actions-inner">
-    <button type="button" class="btn" id="newBtn">New patient</button>
-    <button type="button" class="btn" id="selectBtn">Select text</button>
-    <button type="button" class="btn primary" id="copyBtn">Copy message</button>
-  </div>
-  <div id="status" role="status" aria-live="polite"></div>
-</div>
-
-<div id="sheetHost"></div>
+    <div id="sheetHost"></div>
+  </section>
+</template>
 
 <script>
 (() => {
 "use strict";
 
+// Each patient owns the original form in a separate closure. Only the layout,
+// office list and whole-page draft are shared; no patient field state is global.
+function mountPatient(root, seed, page){
+const prefix = root.id + '_';
+const localSelector = sel => sel.replace(/#([\w-]+)/g, (_, id) => '#' + prefix + id);
+const lifecycle = new AbortController();
+function namespaceElement(node){
+  if(node.id){ node.dataset.localId = node.id; node.id = prefix + node.id; }
+  for(const attr of ['for', 'aria-labelledby', 'aria-controls', 'aria-describedby']){
+    if(node.hasAttribute(attr)) node.setAttribute(attr, node.getAttribute(attr).split(/\s+/).map(id => prefix + id).join(' '));
+  }
+}
+root.querySelectorAll('*').forEach(namespaceElement);
+root.setAttribute('aria-labelledby', prefix + 'patientTitle');
+
 const LAYOUT_KEY = 'hvnb_layout';
-const DRAFT_KEY = 'hvnb_draft';
 const OFFICE_KEY = 'hvnb_office';
 const DEFAULT_BASE = 12;
-const MAX_DRAFT_AGE = 8 * 60 * 60 * 1000;
 // iOS Safari copies text that starts like "Symptoms: ..." as a web address, and Teams then pastes it
 // as Symptoms:%20Sore%20throat... An invisible zero-width space in front stops it looking like one.
 const COPY_PREFIX = '\u200B';
@@ -254,8 +278,8 @@ const TABS = ['visit', 'check', 'office'];
 
 /* ---------- helpers ---------- */
 
-const $ = (sel, root) => (root || document).querySelector(sel);
-const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+const $ = (sel, scope) => (scope || root).querySelector(localSelector(sel));
+const $$ = (sel, scope) => Array.from((scope || root).querySelectorAll(localSelector(sel)));
 
 function h(tag, attrs, ...kids){
   const n = document.createElement(tag);
@@ -271,6 +295,7 @@ function h(tag, attrs, ...kids){
       else n.setAttribute(k, v === true ? '' : v);
     }
   }
+  namespaceElement(n);
   for(const kid of kids.flat()){
     if(kid === null || kid === undefined || kid === false) continue;
     n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
@@ -482,30 +507,28 @@ function validLayout(t){
 /* ---------- state ---------- */
 
 let L = null;            // layout
-let V = {};              // this visit's values
-let M = freshMeta();     // this visit's copy/office status
+let V = seed.vals || {};              // this visit's values
+let M = Object.assign(freshMeta(), seed.meta || {});     // this visit's copy/office status
 let office = [];         // saved visits waiting on office steps
-let tab = 'visit';
+let tab = TABS.includes(seed.tab) ? seed.tab : 'visit';
 let editing = false;
-let draftTimer = null;
 let layoutTimer = null;
-let draftHold = false;   // true while the restore question is open
 let pendingUpdate = false;
 
 function freshMeta(){ return { sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
-let clearNote = '';
 
 function secsOf(t){ return L.sections.filter(s => s.tab === t); }
 function fieldById(id){ for(const s of L.sections) for(const f of s.fields) if(f.id === id) return f; return null; }
 
 function loadLayout(){
-  const saved = readJSON('local', LAYOUT_KEY);
+  const saved = seed.layout || readJSON('local', LAYOUT_KEY);
   if(saved && validLayout(saved)){ L = saved; pendingUpdate = (saved.base || 0) < DEFAULT_BASE; }
   else L = defaultLayout();
 }
 function saveLayout(){
   clearTimeout(layoutTimer);
   if(!writeJSON('local', LAYOUT_KEY, L)) flash('Couldn’t save the layout on this device', 'bad');
+  page.layoutChanged(root, L);
 }
 function saveLayoutSoon(){ clearTimeout(layoutTimer); layoutTimer = setTimeout(saveLayout, 400); }
 function layoutChanged(){ saveLayout(); renderAll(); }
@@ -523,6 +546,7 @@ function mutateOffice(fn){
   saveOffice();
   renderOfficePanel();
   updateBadges();
+  page.officeChanged(root, office);
   return r;
 }
 
@@ -653,13 +677,8 @@ function officeOrder(){
 
 /* ---------- drafts ---------- */
 
-function saveDraft(){
-  clearTimeout(draftTimer);
-  if(draftHold) return;
-  if(!hasContent(V)){ dropKey('session', DRAFT_KEY); return; }
-  writeJSON('session', DRAFT_KEY, { t: Date.now(), vals: V, meta: M });
-}
-function saveDraftSoon(){ clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 350); }
+function saveDraft(){ page.saveDraft(); }
+function saveDraftSoon(){ page.saveDraftSoon(); }
 
 /* ---------- status + sheets ---------- */
 
@@ -667,9 +686,9 @@ let flashTimer = null;
 function flash(msg, kind){
   const s = $('#status');
   s.textContent = msg;
-  s.className = kind || '';
+  s.className = 'patient-status ' + (kind || '');
   clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => { s.textContent = ''; s.className = ''; }, 2800);
+  flashTimer = setTimeout(() => { s.textContent = ''; s.className = 'patient-status'; }, 2800);
 }
 
 let sheetOpen = false;
@@ -698,7 +717,7 @@ function openSheet(opts){
   const scrim = h('div', {class:'scrim', onclick:(e) => { if(e.target === scrim && sheetDismiss) sheetDismiss(); }}, card);
   host.append(scrim);
   setTimeout(() => {
-    const target = opts.focus ? card.querySelector(opts.focus) : null;
+    const target = opts.focus ? card.querySelector(localSelector(opts.focus)) : null;
     try{ (target || card.querySelector('.btn')).focus({preventScroll:true}); }catch(e){}
   }, 30);
 }
@@ -720,6 +739,10 @@ function renderAll(){
   eb.hidden = !editing;
   eb.textContent = editing ? 'Editing the layout on every tab. Changes save on this device as you make them. Tap Done when you’re finished.' : '';
   $('#editBtn').textContent = editing ? 'Done' : 'Edit layout';
+  for(const t of TABS){
+    $('#panel-' + t).hidden = t !== tab;
+    $('#tab-' + t).setAttribute('aria-selected', t === tab ? 'true' : 'false');
+  }
   refresh();
 }
 
@@ -1010,6 +1033,7 @@ function refresh(opts){
   renderTagLine(ctx);
   renderSent(res.text);
   updateBadges(ctx);
+  page.updateTitles();
   saveDraftSoon();
 
   if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard();
@@ -1044,7 +1068,7 @@ function renderSent(text){
   b.className = 'banner ' + (changed ? 'warn' : 'ok');
   b.textContent = changed
     ? 'Copied at ' + fmtTime(M.sentAt) + ', but you changed it since. Copy it again before you post.'
-    : 'Copied at ' + fmtTime(M.sentAt) + '. Tap New patient before you start the next visit.';
+    : 'Copied at ' + fmtTime(M.sentAt) + '. Use Add another patient below for the next person.';
 }
 
 function updateBadges(ctx){
@@ -1073,7 +1097,8 @@ function setTab(t){
     $('#tab-' + x).setAttribute('aria-selected', x === t ? 'true' : 'false');
   }
   if(t === 'visit') autoSize($('#output'));
-  window.scrollTo(0, 0);
+  root.scrollIntoView({block:'start'});
+  saveDraftSoon();
 }
 
 /* ---------- copy ---------- */
@@ -1092,10 +1117,12 @@ function onCopy(){
 }
 
 function doCopy(text){
+  const copiedValues = JSON.parse(JSON.stringify(V));
+  const copiedMeta = M;
   const payload = COPY_PREFIX + text;
   let settled = false;
-  const ok = () => { if(settled) return; settled = true; afterCopy(text); };
-  const fail = () => { if(settled) return; settled = true; if(legacyCopy(payload)) afterCopy(text); else manualCopy(text); };
+  const ok = () => { if(settled) return; settled = true; afterCopy(text, copiedValues, copiedMeta); };
+  const fail = () => { if(settled) return; settled = true; if(legacyCopy(payload)) afterCopy(text, copiedValues, copiedMeta); else manualCopy(text, copiedValues, copiedMeta); };
   try{
     if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(payload).then(ok, fail); return; }
   }catch(e){}
@@ -1113,40 +1140,44 @@ function legacyCopy(text){
   return ok;
 }
 
-function manualCopy(text){
+function manualCopy(text, copiedValues, copiedMeta){
   const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
   ta.value = COPY_PREFIX + text;
   sheet({ title:'Copy it by hand', body:['Copying was blocked. Press and hold in the box, Select All, then Copy.', ta],
-    buttons:[ {label:'I copied it', kind:'primary', on:() => afterCopy(text)}, {label:'Cancel'} ] });
+    buttons:[ {label:'I copied it', kind:'primary', on:() => afterCopy(text, copiedValues, copiedMeta)}, {label:'Cancel'} ] });
   setTimeout(() => { try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, ta.value.length); }catch(e){} }, 60);
 }
 
-function afterCopy(text){
+function afterCopy(text, copiedValues = V, copiedMeta = M){
+  // A pending clipboard request must not mark a cleared form as copied.
+  if(copiedMeta !== M) return;
   M.sentAt = Date.now();
   M.sentText = text;
-  M.sentVals = JSON.parse(JSON.stringify(V));
+  M.sentVals = JSON.parse(JSON.stringify(copiedValues));
   M.sentAck = false;
-  const steps = officeSteps(V);
+  const steps = officeSteps(copiedValues);
+  loadOffice();
+  if(M.officeId && !office.some(o => o.id === M.officeId)) M.officeId = null;
   let msg = 'Copied';
   if(M.officeId){
-    if(syncOfficeCard(steps)) msg = 'Copied. Office list updated';
+    if(syncOfficeCard(steps, copiedValues)) msg = 'Copied. Office list updated';
   } else if(steps.length && !M.officeSkipped){
-    const nm = String(V.name || '').trim(), db = String(V.dob || '').trim();
-    if(nm && db){ addToOffice(nm, db); msg = 'Copied. Added to the office list'; }
-    else officeSheet('copy', steps);
+    const nm = String(copiedValues.name || '').trim(), db = String(copiedValues.dob || '').trim();
+    if(nm && db){ addToOffice(nm, db, copiedValues); msg = 'Copied. Added to the office list'; }
+    else officeSheet('copy', steps, copiedValues);
   }
   saveDraft();
   refresh();
-  flash(msg);
+  flash(officeWritable ? msg : 'Copied, but the office list could not be saved in this browser', officeWritable ? '' : 'bad');
 }
 
-function syncOfficeCard(steps){
+function syncOfficeCard(steps, vals = V){
   let changed = false;
   mutateOffice(() => {
     const ov = office.find(o => o.id === M.officeId);
     if(!ov) return;
     if(syncVisitSteps(ov, steps)) changed = true;
-    const nm = String(V.name || '').trim(), db = String(V.dob || '').trim();
+    const nm = String(vals.name || '').trim(), db = String(vals.dob || '').trim();
     if(nm && nm !== ov.name){ ov.name = nm; changed = true; }
     if(db && db !== ov.dob){ ov.dob = db; changed = true; }
   });
@@ -1169,8 +1200,8 @@ function syncVisitSteps(ov, steps){
 
 /* ---------- office list ---------- */
 
-function addToOffice(name, dob){
-  const visit = { id: uid('v'), name, dob, t: Date.now(), steps: officeSteps(V).map(s => ({ id:s.id, label:s.label, done:false })) };
+function addToOffice(name, dob, vals = V){
+  const visit = { id: uid('v'), name, dob, t: Date.now(), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
   mutateOffice(() => { office.push(visit); });
   M.officeId = visit.id;
   saveDraft();
@@ -1185,8 +1216,8 @@ function nameDobInputs(name, dob){
   return { nameIn, dobIn, nodes: [h('label', {class:'flabel', for:'sheet_name', text:'Name'}), nameIn, h('label', {class:'flabel', for:'sheet_dob', text:'DOB'}), dobIn] };
 }
 
-function officeSheet(mode, steps){
-  const f = nameDobInputs(String(V.name || '').trim(), String(V.dob || '').trim());
+function officeSheet(mode, steps, vals = V){
+  const f = nameDobInputs(String(vals.name || '').trim(), String(vals.dob || '').trim());
   const err = h('div', {class:'err', role:'alert'});
   const validate = () => {
     if(!f.nameIn.value.trim()){ err.textContent = 'Type the patient’s name so you know who this is at the office.'; f.nameIn.focus(); return false; }
@@ -1199,21 +1230,21 @@ function officeSheet(mode, steps){
       if(!String(V.dob || '').trim() && db) V.dob = db;
       renderAll();
     }
-    addToOffice(nm, db);
+    addToOffice(nm, db, vals);
   };
   const list = h('ul', {class:'steplist'}, steps.map(s => h('li', {text:s.label})));
   if(mode === 'copy'){
     sheet({ title:'Add to the office list', focus:'#sheet_name',
       body:['This visit has steps to finish at the office:', list, ...f.nodes, err],
       dismissable:false,
-      buttons:[ {label:'Add to office list', kind:'primary', validate, on:() => { add(); flash('Copied. Added to the office list'); }},
+      buttons:[ {label:'Add to office list', kind:'primary', validate, on:() => { add(); flash(officeWritable ? 'Copied. Added to the office list' : 'Copied, but the office list could not be saved', officeWritable ? '' : 'bad'); }},
                 {label:'Not now', on:() => { M.officeSkipped = true; saveDraft(); }} ] });
   } else {
     sheet({ title:'Before you clear this visit', focus:'#sheet_name', dismissable:false,
       body:['These office steps aren’t on your office list yet:', list, ...f.nodes, err],
-      buttons:[ {label:'Add it, then start the next patient', kind:'primary', validate, on:() => { add(); clearVisit('Added to the office list. Ready for the next patient'); }},
-                {label:'Start the next patient without adding', kind:'danger', on:() => clearVisit()},
-                {label:'Cancel', on:() => { clearNote = ''; }} ] });
+      buttons:[ {label:'Add it, then clear this patient', kind:'primary', validate, on:() => { add(); clearVisit('Added to the office list. This patient was cleared'); }},
+                {label:'Clear this patient without adding', kind:'danger', on:() => clearVisit()},
+                {label:'Cancel'} ] });
   }
 }
 
@@ -1241,69 +1272,63 @@ function removeOfficeVisit(o){
 
 function newPatient(opts){
   opts = opts || {};
-  if(!hasContent(V)){ clearVisit('Ready for the next patient'); return; }
+  if(!hasContent(V)){ clearVisit('This patient is blank'); return; }
+  const changed = !!M.sentAt && buildOutput(V).text !== M.sentText;
+  if(changed && !opts.confirmed){
+    sheet({ title:'Clear this patient?',
+      body:['You changed this patient after copying at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied. All other patients stay on the page.'],
+      buttons:[ {label:'Copy it again first', kind:'primary', on:onCopy},
+                {label:'Clear this patient', kind:'solid danger', on:() => newPatient({confirmed:true})},
+                {label:'Cancel'} ] });
+    return;
+  }
+  loadOffice();
+  if(M.officeId && !office.some(o => o.id === M.officeId)) M.officeId = null;
   const steps = officeSteps(V);
   if(M.officeId) syncOfficeCard(steps);
   else if(steps.length){ officeSheet('clear', steps); return; }
-  const changed = !!M.sentAt && buildOutput(V).text !== M.sentText;
   if(opts.confirmed || (M.sentAt && !changed)){ clearVisit(); return; }
-  sheet({ title:'Start the next patient?',
-    body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied.' : 'This clears the Visit tab and the checklist. The office list stays.' ],
+  sheet({ title:'Clear this patient?',
+    body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied.' : 'This clears only this patient’s Visit tab and checklist. All other patients and the office list stay.' ],
     buttons:[ changed ? {label:'Copy it again first', kind:'primary', on:() => onCopy()} : null,
-              {label:'Clear and start the next patient', kind:'solid danger', on:() => clearVisit()},
+              {label:'Clear this patient', kind:'solid danger', on:() => clearVisit()},
               {label:'Cancel'} ].filter(Boolean) });
 }
 
 function clearVisit(msg){
-  const note = clearNote;
-  clearNote = '';
   V = {};
   M = freshMeta();
-  clearTimeout(draftTimer);
-  dropKey('session', DRAFT_KEY);
   renderAll();
+  saveDraft();
   setTab('visit');
-  if(msg !== false) flash(note || msg || 'Cleared. Ready for the next patient');
+  if(msg !== false) flash(msg || 'This patient was cleared');
 }
 
 function sentGuard(){
   sheet({ title:'You already copied this visit', dismissable:false,
     body:['You copied it at ' + fmtTime(M.sentAt) + '. Is this still the same patient?'],
     buttons:[ {label:'Same patient, keep editing', kind:'primary', on:() => { M.sentAck = true; saveDraft(); }},
-              {label:'No, start the next patient', on:() => {
+              {label:'No, undo this edit and add a patient', on:() => {
                 if(M.sentVals) V = JSON.parse(JSON.stringify(M.sentVals));
-                clearNote = 'Cleared. Enter your last change again for this patient.';
                 renderAll();
-                newPatient({confirmed:true});
+                page.addPatient(root);
               }} ] });
 }
 
 /* ---------- restore + layout updates ---------- */
 
 function offerRestore(d){
-  const lines = buildOutput(d.vals).text.split('\n').filter(Boolean);
-  const when = 'Last change at ' + fmtTime(d.t) + (d.meta && d.meta.sentAt ? '. You copied it at ' + fmtTime(d.meta.sentAt) + '.' : '.');
-  sheet({ title:'Unfinished visit in this tab', dismissable:false,
-    body:[ when, lines.length ? h('pre', {class:'preview', text: lines.slice(0, 5).join('\n') + (lines.length > 5 ? '\n…' : '')}) : 'Only checklist boxes were ticked.' ],
-    buttons:[ {label:'Restore this visit', kind:'primary', on:() => {
-                V = d.vals; M = Object.assign(freshMeta(), d.meta || {}); draftHold = false; renderAll(); saveDraft(); flash('Visit restored'); }},
-              {label:'Start fresh', kind:'danger', on:() => {
-                draftHold = false;
-                const steps = officeSteps(d.vals);
-                if(steps.length && !(d.meta && d.meta.officeId)){
-                  V = d.vals; M = Object.assign(freshMeta(), d.meta || {});
-                  renderAll();
-                  officeSheet('clear', steps);
-                  return;
-                }
-                dropKey('session', DRAFT_KEY);
-                flash('Started fresh'); }} ] });
+  const count = d.patients.length;
+  sheet({ title:count === 1 ? 'Unfinished patient in this tab' : count + ' patients saved in this tab', dismissable:false,
+    body:['Last change at ' + fmtTime(d.t) + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards these drafts; the office list stays.'],
+    buttons:[ {label:count === 1 ? 'Restore this visit' : 'Restore all ' + count + ' patients', kind:'primary', on:() => page.restore(d)},
+              {label:'Start fresh', kind:'danger', on:() => page.startFresh()} ] });
 }
 
 function updateSheet(){
   return { title:'Updated form available', dismissable:false,
     body:['The default form changed since you edited yours. Switch to the new form, or keep your edited one? Your office list stays either way. Answers in fields the new form doesn’t have are cleared.'],
-    buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); pendingUpdate = false; renderAll(); flash('Switched to the new form'); }},
+    buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); page.layoutChanged(root, L); pendingUpdate = false; renderAll(); flash('Switched to the new form'); }},
               {label:'Keep mine', on:() => { L.base = DEFAULT_BASE; saveLayout(); pendingUpdate = false; flash('Kept your form'); }} ] };
 }
 
@@ -1469,7 +1494,7 @@ function builderTools(t){
     h('button', {type:'button', class:'btn', text:'Import layout', onclick:importLayout}),
     h('button', {type:'button', class:'btn danger', text:'Reset to default', onclick:() => sheet({
       title:'Reset the layout?', body:['This puts back the original fields, checklist and office steps. Your office list stays. Answers in fields the original layout doesn’t have are cleared.'],
-      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); renderAll(); flash('Layout reset'); }}, {label:'Cancel'} ] })}));
+      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); page.layoutChanged(root, L); renderAll(); flash('Layout reset'); }}, {label:'Cancel'} ] })}));
 }
 
 function copyPlain(text, okMsg){
@@ -1510,6 +1535,7 @@ function bind(){
     flash(editing ? 'Editing the layout' : 'Done editing');
   });
   $('#newBtn').addEventListener('click', () => newPatient());
+  $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
   $('#selectBtn').addEventListener('click', () => {
     setTab('visit');
     const o = $('#output');
@@ -1519,10 +1545,9 @@ function bind(){
     flash('Message selected');
   });
   $('#copyBtn').addEventListener('click', onCopy);
-  window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); } });
-  document.addEventListener('keydown', e => { if(e.key === 'Escape' && sheetOpen && sheetDismiss) sheetDismiss(); });
-  document.addEventListener('visibilitychange', () => { if(document.hidden) saveDraft(); });
-  window.addEventListener('pagehide', saveDraft);
+  window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); } }, {signal:lifecycle.signal});
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && sheetOpen && sheetDismiss) sheetDismiss(); }, {signal:lifecycle.signal});
+
 }
 
 function start(){
@@ -1530,17 +1555,112 @@ function start(){
   loadOffice();
   bind();
   renderAll();
-  const d = readJSON('session', DRAFT_KEY);
-  if(d && d.vals && typeof d.vals === 'object' && hasContent(d.vals) && d.t && (Date.now() - d.t) < MAX_DRAFT_AGE){
-    draftHold = true;
-    offerRestore(d);
-  } else if(d){
-    dropKey('session', DRAFT_KEY);
-  }
-  if(pendingUpdate) sheet(updateSheet());
+  if(pendingUpdate && !page.hasPatients()) sheet(updateSheet());
 }
 
 start();
+return {
+  root,
+  serialize:() => ({id:root.id, vals:V, meta:M, tab}),
+  hasContent:() => hasContent(V),
+  title:(number) => {
+    const name = String(V.name || '').trim();
+    $('#patientTitle').textContent = 'Patient ' + number + (name ? ' · ' + name : '');
+    const label = 'Patient ' + number + (name ? ', ' + name : '');
+    $('#output').setAttribute('aria-label', label + ' Teams message');
+    $('#copyBtn').setAttribute('aria-label', 'Copy message for ' + label);
+    $('#newBtn').setAttribute('aria-label', 'Clear ' + label);
+    $('#addPatientBtn').setAttribute('aria-label', 'Add another patient after ' + label);
+  },
+  focus:() => { root.scrollIntoView({block:'start'}); const input = $('#panel-visit input'); if(input) input.focus({preventScroll:true}); },
+  offerRestore,
+  applyOffice:(values, writable) => { office = values; officeWritable = writable; renderOfficePanel(); updateBadges(); },
+  getOffice:() => ({values:office, writable:officeWritable}),
+  getLayout:() => L,
+  applyLayout:(layout) => {
+    // Preserve selected choices when another patient's layout editor renames them.
+    for(const sec of layout.sections) for(const field of sec.fields){
+      const old = fieldById(field.id);
+      if(field.type !== 'choice' || !old || !Array.isArray(field.opts) || !Array.isArray(old.opts)) continue;
+      const value = V[field.id];
+      if(value !== undefined && !field.opts.includes(value)){
+        const i = old.opts.indexOf(value);
+        if(i >= 0 && field.opts.length === old.opts.length) V[field.id] = field.opts[i]; else delete V[field.id];
+      }
+    }
+    L = layout; renderAll();
+  },
+  destroy:() => { lifecycle.abort(); clearTimeout(flashTimer); clearTimeout(layoutTimer); }
+};
+}
+
+function createPatientPage(){
+  const host = document.querySelector('#patients');
+  const template = document.querySelector('#patientTemplate');
+  const warning = document.querySelector('#draftWarning');
+  const key = 'hvnb_draft';
+  let patients = [], timer = null, held = false, serial = 0;
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const page = {
+    hasPatients:() => patients.length > 0,
+    updateTitles:() => patients.forEach((p, i) => p.title(i + 1)),
+    saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
+    saveDraft:() => {
+      clearTimeout(timer);
+      if(held) return;
+      try{
+        if(patients.length === 1 && !patients[0].hasContent()) window.sessionStorage.removeItem(key);
+        else window.sessionStorage.setItem(key, JSON.stringify({version:2, t:Date.now(), patients:patients.map(p => p.serialize())}));
+        warning.hidden = true;
+      }catch(e){
+        warning.textContent = 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
+        warning.hidden = false;
+      }
+    },
+    addPatient:(after, seed = {}, focus = true) => {
+      const previous = patients.find(p => p.root === after) || patients[0];
+      if(previous) seed = Object.assign({}, seed, {layout:clone(previous.getLayout())});
+      const root = template.content.firstElementChild.cloneNode(true);
+      const savedId = typeof seed.id === 'string' && /^patient-[a-z0-9-]+$/.test(seed.id) ? seed.id : '';
+      root.id = savedId && !patients.some(p => p.root.id === savedId) ? savedId : 'patient-' + Date.now().toString(36) + '-' + (++serial);
+      const index = after ? patients.findIndex(p => p.root === after) + 1 : patients.length;
+      if(after) after.after(root); else host.append(root);
+      const patient = mountPatient(root, seed, page);
+      if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable); }
+      patients.splice(index, 0, patient);
+      page.updateTitles();
+      page.saveDraft();
+      if(focus) patient.focus();
+      return patient;
+    },
+    layoutChanged:(source, layout) => patients.forEach(p => { if(p.root !== source) p.applyLayout(clone(layout)); }),
+    officeChanged:(source, values) => {
+      const owner = patients.find(p => p.root === source);
+      patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), owner ? owner.getOffice().writable : true); });
+    },
+    restore:(draft) => {
+      held = true;
+      patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      for(const seed of draft.patients) page.addPatient(null, seed, false);
+      held = false; page.saveDraft();
+      if(patients.length) patients[0].root.scrollIntoView({block:'start'});
+    },
+    startFresh:() => { held = false; page.saveDraft(); }
+  };
+  let draft = null;
+  try{ draft = JSON.parse(window.sessionStorage.getItem(key)); }catch(e){}
+  if(draft && object(draft.vals) && !draft.patients) draft.patients = [{vals:draft.vals, meta:draft.meta}];
+  if(draft && Array.isArray(draft.patients) && draft.patients.length && draft.patients.every(p => object(p) && object(p.vals)) && draft.t && Date.now() - draft.t < 8 * 60 * 60 * 1000){
+    held = true;
+  }else draft = null;
+  const first = page.addPatient(null, {}, false);
+  if(draft) first.offerRestore(draft);
+  document.addEventListener('visibilitychange', () => { if(document.hidden) page.saveDraft(); });
+  window.addEventListener('pagehide', page.saveDraft);
+}
+
+createPatientPage();
 })();
 </script>
 <script>
@@ -1558,8 +1678,9 @@ start();
       annotations: {readOnlyHint: false, untrustedContentHint: false},
       execute(input) {
         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1 || !['visit', 'check', 'office'].includes(input.tab)) throw new Error('Choose visit, check, or office.');
-        document.getElementById('tab-' + input.tab).click();
-        return {tab: input.tab, selected: document.getElementById('tab-' + input.tab).getAttribute('aria-selected') === 'true'};
+        const button = document.querySelector('.patient [data-local-id="tab-' + input.tab + '"]');
+        button.click();
+        return {tab: input.tab, selected: button.getAttribute('aria-selected') === 'true'};
       }
     }, {signal: lifecycle.signal})).catch(() => {});
   } catch (_) {}
@@ -1567,3 +1688,4 @@ start();
 </script>
 </body>
 </html>
+
