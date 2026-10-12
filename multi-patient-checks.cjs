@@ -131,9 +131,11 @@ test('add in the middle and at the end, with thirteen independent forms and no d
 test('copy buttons copy their own output and create separate shared office records', async ({ page }) => {
   await fillPatient(patient(page, 0), 'TEST COPY ALPHA', 'alpha only');
   await markTest(patient(page, 0), 'ears');
+  await local(patient(page, 0), 'f_overnights').fill('4plex');
   await addAfter(page, 0);
   await fillPatient(patient(page, 1), 'TEST COPY BETA', 'beta only');
   await markTest(patient(page, 1), 'urine');
+  await local(patient(page, 1), 'f_overnights').fill('Urine culture');
   const alphaOutput = await output(patient(page, 0));
   const betaOutput = await output(patient(page, 1));
   await local(patient(page, 0), 'copyBtn').click();
@@ -150,14 +152,15 @@ test('copy buttons copy their own output and create separate shared office recor
   assert.doesNotMatch(saved.patients[0].meta.sentText, /beta only/);
   for (let index = 0; index < 2; index++) {
     await local(patient(page, index), 'tab-office').click();
-    assert.match(await local(patient(page, index), 'panel-office').innerText(), /TEST COPY ALPHA/);
-    assert.match(await local(patient(page, index), 'panel-office').innerText(), /TEST COPY BETA/);
+    assert.match(await page.locator('#officeContent').innerText(), /TEST COPY ALPHA/);
+    assert.match(await page.locator('#officeContent').innerText(), /TEST COPY BETA/);
   }
 });
 
 test('pending clipboard completion retains the original patient and value snapshot', async ({ page }) => {
   await fillPatient(patient(page, 0), 'TEST ASYNC ALPHA', 'before copying');
   await markTest(patient(page, 0), 'ears');
+  await local(patient(page, 0), 'f_overnights').fill('Strep throat PCR');
   await addAfter(page, 0);
   await fillPatient(patient(page, 1), 'TEST ASYNC BETA', 'beta original');
   await page.evaluate(() => { window.__deferCopy = true; });
@@ -197,7 +200,7 @@ test('the copied-patient guard can undo the edit and append a blank patient', as
   assert.equal(saved.patients[1].meta.sentAt, null);
 });
 
-test('clearing warns about uncopied changes before offering to save new office steps', async ({ page }) => {
+test('clearing warns about uncopied changes and never saves an uncopied patient to Office', async ({ page }) => {
   const first = patient(page, 0);
   await fillPatient(first, 'TEST CLEAR WARNING', 'already copied symptoms');
   await local(first, 'copyBtn').click();
@@ -211,12 +214,10 @@ test('clearing warns about uncopied changes before offering to save new office s
   assert.equal(await warning.getByRole('button', { name: 'Copy it again first', exact: true }).isVisible(), true);
   assert.doesNotMatch(await warning.innerText(), /These office steps aren.t on your office list yet/);
   await warning.getByRole('button', { name: 'Clear this patient', exact: true }).click();
-  const officePrompt = first.getByRole('dialog');
-  assert.match(await officePrompt.innerText(), /Before you clear this visit/);
-  assert.match(await officePrompt.innerText(), /These office steps aren.t on your office list yet/);
-  await officePrompt.getByRole('button', { name: 'Cancel', exact: true }).click();
-  assert.equal(await local(first, 'f_name').inputValue(), 'TEST CLEAR WARNING');
-  assert.equal(await local(first, 't_tests_ears').isChecked(), true);
+  assert.equal(await first.getByRole('dialog').count(), 0);
+  assert.equal(await local(first, 'f_name').inputValue(), '');
+  assert.equal(await local(first, 't_tests_ears').isChecked(), false);
+  assert.deepEqual(await office(page), []);
 });
 
 test('session-storage quota failure warns visibly and preserves both patients in memory', async ({ page }) => {

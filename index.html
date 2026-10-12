@@ -66,6 +66,13 @@ a{color:var(--accent-text)}
 .patient-actions{display:grid;gap:10px;margin-top:12px}
 .add-patient{width:100%;min-height:48px;border:1px dashed var(--accent);color:var(--accent-text);background:var(--accent-soft)}
 .patient-caption{margin:0;color:var(--muted);font-size:13px}
+.office-section{margin-top:32px;padding-top:24px;border-top:3px solid var(--line);scroll-margin-top:16px}
+.office-section h2{margin:0;font-size:21px}
+.office-patient .visit-head{grid-template-columns:1fr}
+.overnight-tests{margin:4px 0 12px;font-weight:720;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.office-reference-list{margin:0;padding:0 16px 16px 38px;display:grid;gap:10px}
+.office-reference-list .small{margin-top:2px}
+.office-summary{margin:8px 0;color:var(--muted)}
 .patient-status{min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
 .patient-status.bad{color:var(--danger)}
 .patient-status.warn{color:var(--warn)}
@@ -209,12 +216,21 @@ textarea.inp{min-height:84px;resize:vertical}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.8</b> · Multiple patients, one page. Each patient has a separate message and checklist.</p>
-    <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a></p>
+    <p class="sub"><b>v8.9</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
   <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
   <div id="patients"></div>
+  <section id="officeSection" class="office-section" aria-labelledby="officeHeading">
+    <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
+    <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
+    <div id="officeSaveWarning" class="banner warn" role="alert" hidden>
+      <p>The office list could not be saved in this browser. Keep this page open until saving succeeds.</p>
+      <button type="button" class="btn" id="retryOfficeSave">Retry save</button>
+    </div>
+    <div id="officeContent"></div>
+  </section>
 </main>
 <template id="patientTemplate">
   <section class="patient">
@@ -467,7 +483,7 @@ function defaultLayout(){
       { id:'k_after', type:'note', label:'“If office closed/after 8 and you have any issues text/call me, Chayala or Yaakov.”' }
     ]},
 
-    { id:'o_steps', tab:'office', title:'Steps added for each visit', fields:[
+    { id:'o_steps', tab:'office', title:'Requisition and follow-up reminders', fields:[
       { id:'o_reqtests', type:'check', label:'Req: all tests done are checked off, and the provider', when:'anyTest' },
       { id:'o_4plex', type:'check', label:'Req: overnight viral / flu / COVID PCR has 4plex checked, unless the provider ordered RPP', when:'viralPcr' },
       { id:'o_strep', type:'check', label:'Req: strep throat PCR checked, unless the provider ordered a culture', when:'strep' },
@@ -510,7 +526,8 @@ let L = null;            // layout
 let V = seed.vals || {};              // this visit's values
 let M = Object.assign(freshMeta(), seed.meta || {});     // this visit's copy/office status
 let office = [];         // saved visits waiting on office steps
-let tab = TABS.includes(seed.tab) ? seed.tab : 'visit';
+let officeBaseline = []; // last storage snapshot, before any unsaved local changes
+let tab = TABS.includes(seed.tab) && seed.tab !== 'office' ? seed.tab : 'visit';
 let editing = false;
 let layoutTimer = null;
 let pendingUpdate = false;
@@ -529,6 +546,7 @@ function saveLayout(){
   clearTimeout(layoutTimer);
   if(!writeJSON('local', LAYOUT_KEY, L)) flash('Couldn’t save the layout on this device', 'bad');
   page.layoutChanged(root, L);
+  renderOfficePanel();
 }
 function saveLayoutSoon(){ clearTimeout(layoutTimer); layoutTimer = setTimeout(saveLayout, 400); }
 function layoutChanged(){ saveLayout(); renderAll(); }
@@ -538,8 +556,33 @@ function loadOffice(){
   if(!officeWritable || !store('local')) return;
   const o = readJSON('local', OFFICE_KEY);
   office = Array.isArray(o) ? o.filter(v => v && typeof v.id === 'string' && Array.isArray(v.steps)) : [];
+  officeBaseline = JSON.parse(JSON.stringify(office));
 }
-function saveOffice(){ if(!writeJSON('local', OFFICE_KEY, office)){ officeWritable = false; flash('Couldn’t save the office list in this browser', 'bad'); } }
+function saveOffice(){
+  // Apply only this page's changes to the newest stored list. A failed save may
+  // be retried after another tab has added, edited or removed other patients.
+  const baseline = new Map(officeBaseline.map(o => [o.id, o]));
+  const current = new Map(office.map(o => [o.id, o]));
+  const removed = new Set(officeBaseline.filter(o => !current.has(o.id)).map(o => o.id));
+  const changed = office.filter(o => JSON.stringify(o) !== JSON.stringify(baseline.get(o.id)));
+  try{
+    const storage = store('local');
+    if(!storage) throw new Error('Storage unavailable');
+    const raw = storage.getItem(OFFICE_KEY);
+    const latest = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(latest)) throw new Error('Invalid stored office list');
+    const valid = latest.filter(o => o && typeof o.id === 'string' && Array.isArray(o.steps));
+    const merged = new Map(valid.filter(o => !removed.has(o.id)).map(o => [o.id, o]));
+    changed.forEach(o => merged.set(o.id, o));
+    office = Array.from(merged.values());
+    officeBaseline = JSON.parse(JSON.stringify(valid));
+    storage.setItem(OFFICE_KEY, JSON.stringify(office));
+    officeBaseline = JSON.parse(JSON.stringify(office));
+    officeWritable = true;
+  }catch(e){ officeWritable = false; }
+  if(!officeWritable) flash('Couldn’t save the office list in this browser', 'bad');
+  return officeWritable;
+}
 function mutateOffice(fn){
   loadOffice();
   const r = fn();
@@ -669,6 +712,13 @@ function officeSteps(vals){
   }
   return out;
 }
+function overnightText(vals){
+  const text = String(vals.overnights || '').trim();
+  return /^(none|no|n\/?a|nothing|-+)\.?$/i.test(text) ? '' : text;
+}
+function officeDetails(vals){
+  return {overnights:overnightText(vals), bloodreason:context(vals).blood ? String(vals.bloodreason || '').trim() : ''};
+}
 function officeOrder(){
   const ids = [];
   for(const sec of secsOf('office')) for(const f of sec.fields) if(f.type === 'check') ids.push(f.id);
@@ -743,6 +793,8 @@ function renderAll(){
     $('#panel-' + t).hidden = t !== tab;
     $('#tab-' + t).setAttribute('aria-selected', t === tab ? 'true' : 'false');
   }
+  configureOfficeLink();
+  renderOfficePanel();
   refresh();
 }
 
@@ -765,62 +817,54 @@ function renderCheck(p){
 
 function renderOfficeTab(p){
   if(editing){
-    p.append(h('div', {class:'banner info', text:'These steps get added to a visit’s office card when they apply. The office list itself shows again when you tap Done.'}));
+    p.append(h('div', {class:'banner info', text:'Edit the shared Office checklist shown below the saved patients at the bottom of the page.'}));
     for(const sec of secsOf('office')) p.append(renderSection(sec));
     p.append(builderTools('office'));
-    return;
-  }
-  const head = h('section', {class:'card'},
-    h('h2', {class:'sec-title', text:'Office list'}),
-    h('p', {class:'small pad-x', text:'Visits with steps left to do at the office, oldest first. Saved in this browser only, never sent anywhere. On iPhone, closing Safari may clear this list, so don’t leave it overnight.'}));
-  p.append(head);
-  if(!office.length){
-    head.append(h('div', {class:'empty', text:'Nothing waiting. When you copy a visit that had tests, it shows up here with its req and follow-up steps.'}));
-  } else {
-    const finished = office.filter(o => o.steps.every(s => s.done)).length;
-    if(finished) head.append(h('div', {class:'pad', style:'padding-top:10px'},
-      h('button', {type:'button', class:'btn small', text:'Remove ' + finished + ' finished', onclick:() => {
-        mutateOffice(() => { office = office.filter(o => !o.steps.every(s => s.done)); });
-        flash('Removed finished visits');
-      }})));
-    else head.append(h('div', {style:'height:12px'}));
-  }
-  office.slice().sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
-  for(const sec of secsOf('office')){
-    const notes = sec.fields.filter(f => f.type === 'note');
-    if(!notes.length) continue;
-    const grid = h('div', {class:'grid'});
-    notes.forEach(n => grid.append(h('div', {class:'field full'}, h('div', {class:'note', text:n.label}))));
-    p.append(h('section', {class:'card'}, h('h2', {class:'sec-title', text:sec.title}), grid));
   }
 }
-function renderOfficePanel(){ if(editing) return; const p = $('#panel-office'); p.textContent = ''; renderOfficeTab(p); }
+function renderOfficePanel(){
+  if(!page.isOfficeOwner(root)) return;
+  const p = page.officeContent;
+  p.textContent = '';
+  page.officeSaveWarning.hidden = officeWritable;
+  const ordered = office.filter(o => typeof o.overnights === 'string' && overnightText(o));
+  const legacy = office.filter(o => typeof o.overnights !== 'string');
+  p.append(h('p', {class:'office-summary', text:ordered.length + (ordered.length === 1 ? ' patient with overnight tests.' : ' patients with overnight tests.') + ' Saved in this browser only.'}));
+  if(!office.length){
+    p.append(h('div', {class:'banner info', text:'No overnight tests saved yet. Enter a patient’s overnight tests in the Visit form, then press Copy message.'}));
+  }
+  ordered.sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
+  if(legacy.length){
+    p.append(h('h3', {text:'Earlier saved patients'}), h('p', {class:'office-summary', text:'The previous version saved these patients without the test names. Edit each entry to add its tests, or copy its completed visit again.'}));
+    legacy.sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
+  }
+  const reference = h('section', {class:'card', data:{officeReference:'true'}},
+    h('h3', {class:'sec-title', text:'Office checklist — reference'}),
+    h('p', {class:'small pad-x', text:'Use these reminders for the patients they apply to. This checklist is shared across the full list.'}));
+  for(const sec of secsOf('office')){
+    const fields = sec.fields.filter(f => f.type === 'check' || f.type === 'note');
+    if(!fields.length) continue;
+    reference.append(h('h4', {class:'sec-title', text:sec.title}));
+    const list = h('ul', {class:'office-reference-list'});
+    fields.forEach(f => list.append(h('li', {}, h('span', {text:f.label}), f.when ? h('p', {class:'small', text:'Applies when ' + whenText(f.when) + '.'}) : null)));
+    reference.append(list);
+  }
+  p.append(reference);
+}
 
 function officeCard(o){
-  const left = o.steps.filter(s => !s.done).length;
-  const card = h('section', {class:'card'});
+  const card = h('section', {class:'card office-patient', data:{officeId:o.id}});
   card.append(h('div', {class:'visit-head'},
-    h('div', {class:'visit-name', text:o.name || 'No name'}),
-    h('span', {class:'pill ' + (left ? 'warn' : 'ok'), text: left ? left + ' left' : 'All done'}),
-    h('div', {class:'visit-meta', text:(o.dob ? 'DOB ' + o.dob : 'No DOB') + ' · ' + fmtDayTime(o.t)})));
-  const list = h('div', {class:'steps'});
-  o.steps.forEach(s => {
-    const id = 'ov_' + o.id + '_' + s.id;
-    const cb = h('input', {type:'checkbox', id});
-    cb.checked = !!s.done;
-    cb.addEventListener('change', () => {
-      const done = cb.checked;
-      mutateOffice(() => {
-        const v = office.find(x => x.id === o.id);
-        const st = v && v.steps.find(x => x.id === s.id);
-        if(st) st.done = done;
-      });
-    });
-    list.append(h('label', {class:'checkrow' + (s.done ? ' done' : ''), for:id}, cb, h('span', {text:s.label})));
-  });
-  card.append(list);
+    h('div', {class:'visit-name', text:o.name || 'Name not entered'}),
+    h('div', {class:'visit-meta', text:(o.dob ? 'DOB ' + o.dob : 'DOB not entered') + ' · ' + fmtDayTime(o.t)})));
+  const details = h('div', {class:'pad'});
+  if(typeof o.overnights === 'string'){
+    details.append(h('p', {class:'small', text:'Overnight tests'}), h('p', {class:'overnight-tests', text:o.overnights}));
+    if(o.bloodreason) details.append(h('p', {class:'small', text:'Reason for blood work'}), h('p', {class:'overnight-tests', text:o.bloodreason}));
+  }else details.append(h('p', {class:'banner warn', text:'Overnight test details were not saved in this older entry.'}));
+  card.append(details);
   card.append(h('div', {class:'row pad'},
-    h('button', {type:'button', class:'btn small', text:'Edit name / DOB', onclick:() => editOfficeVisit(o)}),
+    h('button', {type:'button', class:'btn small', text:'Edit saved entry', onclick:() => editOfficeVisit(o)}),
     h('button', {type:'button', class:'btn small danger', text:'Remove', onclick:() => removeOfficeVisit(o)})));
   return card;
 }
@@ -1084,18 +1128,26 @@ function updateBadges(ctx){
   const bc = $('#badge-check');
   bc.textContent = total ? done + '/' + total : '';
   bc.classList.toggle('complete', total > 0 && done === total);
-  const waiting = office.filter(o => o.steps.some(s => !s.done)).length;
+  const waiting = office.filter(o => typeof o.overnights !== 'string' || overnightText(o)).length;
   $('#badge-office').textContent = waiting ? String(waiting) : '';
 }
 
 /* ---------- tabs ---------- */
 
+function configureOfficeLink(){
+  const button = $('#tab-office');
+  button.setAttribute('role', editing ? 'tab' : 'button');
+  button.setAttribute('aria-controls', editing ? prefix + 'panel-office' : 'officeSection');
+  if(!editing) button.removeAttribute('aria-selected');
+}
 function setTab(t){
+  if(t === 'office' && !editing){ page.showOffice(); return; }
   tab = t;
   for(const x of TABS){
     $('#panel-' + x).hidden = x !== t;
     $('#tab-' + x).setAttribute('aria-selected', x === t ? 'true' : 'false');
   }
+  configureOfficeLink();
   if(t === 'visit') autoSize($('#output'));
   root.scrollIntoView({block:'start'});
   saveDraftSoon();
@@ -1159,12 +1211,20 @@ function afterCopy(text, copiedValues = V, copiedMeta = M){
   loadOffice();
   if(M.officeId && !office.some(o => o.id === M.officeId)) M.officeId = null;
   let msg = 'Copied';
-  if(M.officeId){
-    if(syncOfficeCard(steps, copiedValues)) msg = 'Copied. Office list updated';
-  } else if(steps.length && !M.officeSkipped){
+  if(!overnightText(copiedValues)){
+    if(M.officeId){
+      const removedId = M.officeId;
+      mutateOffice(() => { office = office.filter(o => o.id !== removedId); });
+      M.officeId = null;
+      msg = 'Copied. No overnight tests — removed from Office';
+    }
+  }else if(M.officeId){
+    syncOfficeCard(steps, copiedValues);
+    msg = 'Copied. Overnight tests updated in Office';
+  }else{
     const nm = String(copiedValues.name || '').trim(), db = String(copiedValues.dob || '').trim();
-    if(nm && db){ addToOffice(nm, db, copiedValues); msg = 'Copied. Added to the office list'; }
-    else officeSheet('copy', steps, copiedValues);
+    addToOffice(nm, db, copiedValues);
+    msg = 'Copied. Overnight tests saved to Office';
   }
   saveDraft();
   refresh();
@@ -1177,9 +1237,12 @@ function syncOfficeCard(steps, vals = V){
     const ov = office.find(o => o.id === M.officeId);
     if(!ov) return;
     if(syncVisitSteps(ov, steps)) changed = true;
+    const details = officeDetails(vals);
+    if(ov.overnights !== details.overnights || ov.bloodreason !== details.bloodreason) changed = true;
+    Object.assign(ov, details);
     const nm = String(vals.name || '').trim(), db = String(vals.dob || '').trim();
-    if(nm && nm !== ov.name){ ov.name = nm; changed = true; }
-    if(db && db !== ov.dob){ ov.dob = db; changed = true; }
+    if(nm !== ov.name){ ov.name = nm; changed = true; }
+    if(db !== ov.dob){ ov.dob = db; changed = true; }
   });
   return changed;
 }
@@ -1201,7 +1264,7 @@ function syncVisitSteps(ov, steps){
 /* ---------- office list ---------- */
 
 function addToOffice(name, dob, vals = V){
-  const visit = { id: uid('v'), name, dob, t: Date.now(), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
+  const visit = { id: uid('v'), name, dob, t: Date.now(), ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
   mutateOffice(() => { office.push(visit); });
   M.officeId = visit.id;
   saveDraft();
@@ -1216,55 +1279,29 @@ function nameDobInputs(name, dob){
   return { nameIn, dobIn, nodes: [h('label', {class:'flabel', for:'sheet_name', text:'Name'}), nameIn, h('label', {class:'flabel', for:'sheet_dob', text:'DOB'}), dobIn] };
 }
 
-function officeSheet(mode, steps, vals = V){
-  const f = nameDobInputs(String(vals.name || '').trim(), String(vals.dob || '').trim());
-  const err = h('div', {class:'err', role:'alert'});
-  const validate = () => {
-    if(!f.nameIn.value.trim()){ err.textContent = 'Type the patient’s name so you know who this is at the office.'; f.nameIn.focus(); return false; }
-    return true;
-  };
-  const add = () => {
-    const nm = f.nameIn.value.trim(), db = f.dobIn.value.trim();
-    if(mode === 'copy'){
-      if(!String(V.name || '').trim() && nm) V.name = nm;
-      if(!String(V.dob || '').trim() && db) V.dob = db;
-      renderAll();
-    }
-    addToOffice(nm, db, vals);
-  };
-  const list = h('ul', {class:'steplist'}, steps.map(s => h('li', {text:s.label})));
-  if(mode === 'copy'){
-    sheet({ title:'Add to the office list', focus:'#sheet_name',
-      body:['This visit has steps to finish at the office:', list, ...f.nodes, err],
-      dismissable:false,
-      buttons:[ {label:'Add to office list', kind:'primary', validate, on:() => { add(); flash(officeWritable ? 'Copied. Added to the office list' : 'Copied, but the office list could not be saved', officeWritable ? '' : 'bad'); }},
-                {label:'Not now', on:() => { M.officeSkipped = true; saveDraft(); }} ] });
-  } else {
-    sheet({ title:'Before you clear this visit', focus:'#sheet_name', dismissable:false,
-      body:['These office steps aren’t on your office list yet:', list, ...f.nodes, err],
-      buttons:[ {label:'Add it, then clear this patient', kind:'primary', validate, on:() => { add(); clearVisit('Added to the office list. This patient was cleared'); }},
-                {label:'Clear this patient without adding', kind:'danger', on:() => clearVisit()},
-                {label:'Cancel'} ] });
-  }
-}
-
 function editOfficeVisit(o){
   const f = nameDobInputs(o.name, o.dob);
+  const tests = h('textarea', {class:'inp', id:'sheet_overnights', value:o.overnights || '', rows:'3'});
+  const reason = h('input', {class:'inp', id:'sheet_bloodreason', value:o.bloodreason || '', type:'text'});
   const err = h('div', {class:'err', role:'alert'});
-  sheet({ title:'Edit name and DOB', focus:'#sheet_name', body:[...f.nodes, err],
-    buttons:[ {label:'Save', kind:'primary', validate:() => { if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; } return true; },
+  sheet({ title:'Edit saved entry', focus:'#sheet_name', body:[
+    'Changes apply to this saved entry. Copying the patient again replaces it with the current visit details.', ...f.nodes,
+    h('label', {class:'flabel', for:'sheet_overnights', text:'Overnight tests'}), tests,
+    h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason, err],
+    buttons:[ {label:'Save changes', kind:'primary', validate:() => {
+                  if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
+                  if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the overnight tests, or cancel and remove this entry if no tests were sent.'; return false; }
+                  return true; },
                 on:() => {
                   const nm = f.nameIn.value.trim(), db = f.dobIn.value.trim();
-                  mutateOffice(() => { const v = office.find(x => x.id === o.id); if(v){ v.name = nm; v.dob = db; } });
-                  flash('Saved'); }},
+                  mutateOffice(() => { const v = office.find(x => x.id === o.id); if(v){ v.name = nm; v.dob = db; v.overnights = tests.value.trim(); v.bloodreason = reason.value.trim(); } });
+                  flash(officeWritable ? 'Saved changes' : 'Changes could not be saved. Keep this page open', officeWritable ? '' : 'bad'); }},
               {label:'Cancel'} ] });
 }
 
 function removeOfficeVisit(o){
-  const left = o.steps.filter(s => !s.done).length;
-  const doit = () => { mutateOffice(() => { office = office.filter(x => x.id !== o.id); }); flash('Removed ' + (o.name || 'the visit')); };
-  if(!left){ doit(); return; }
-  sheet({ title:'Remove ' + (o.name || 'this visit') + '?', body:[left + (left === 1 ? ' step isn’t' : ' steps aren’t') + ' ticked yet.'],
+  const doit = () => { mutateOffice(() => { office = office.filter(x => x.id !== o.id); }); flash(officeWritable ? 'Removed ' + (o.name || 'the entry') : 'Removal could not be saved. Keep this page open', officeWritable ? '' : 'bad'); };
+  sheet({ title:'Remove ' + (o.name || 'this saved entry') + '?', body:['This removes the saved Office entry. Patient forms stay on the page. Copying that patient again will add their overnight tests back.'],
     buttons:[ {label:'Remove', kind:'solid danger', on:doit}, {label:'Cancel'} ] });
 }
 
@@ -1282,11 +1319,6 @@ function newPatient(opts){
                 {label:'Cancel'} ] });
     return;
   }
-  loadOffice();
-  if(M.officeId && !office.some(o => o.id === M.officeId)) M.officeId = null;
-  const steps = officeSteps(V);
-  if(M.officeId) syncOfficeCard(steps);
-  else if(steps.length){ officeSheet('clear', steps); return; }
   if(opts.confirmed || (M.sentAt && !changed)){ clearVisit(); return; }
   sheet({ title:'Clear this patient?',
     body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied.' : 'This clears only this patient’s Visit tab and checklist. All other patients and the office list stay.' ],
@@ -1531,6 +1563,7 @@ function bind(){
   for(const t of TABS) $('#tab-' + t).addEventListener('click', () => setTab(t));
   $('#editBtn').addEventListener('click', () => {
     editing = !editing;
+    if(!editing && tab === 'office') tab = 'visit';
     renderAll();
     flash(editing ? 'Editing the layout' : 'Done editing');
   });
@@ -1574,8 +1607,10 @@ return {
   },
   focus:() => { root.scrollIntoView({block:'start'}); const input = $('#panel-visit input'); if(input) input.focus({preventScroll:true}); },
   offerRestore,
-  applyOffice:(values, writable) => { office = values; officeWritable = writable; renderOfficePanel(); updateBadges(); },
-  getOffice:() => ({values:office, writable:officeWritable}),
+  applyOffice:(values, writable, baseline) => { office = values; officeWritable = writable; officeBaseline = baseline; renderOfficePanel(); updateBadges(); },
+  getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline}),
+  renderOffice:renderOfficePanel,
+  retryOffice:() => { saveOffice(); renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
   getLayout:() => L,
   applyLayout:(layout) => {
     // Preserve selected choices when another patient's layout editor renames them.
@@ -1596,6 +1631,7 @@ return {
 
 function createPatientPage(){
   const host = document.querySelector('#patients');
+  const officeSection = document.querySelector('#officeSection');
   const template = document.querySelector('#patientTemplate');
   const warning = document.querySelector('#draftWarning');
   const key = 'hvnb_draft';
@@ -1603,6 +1639,14 @@ function createPatientPage(){
   const clone = value => JSON.parse(JSON.stringify(value));
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const page = {
+    officeContent:document.querySelector('#officeContent'),
+    officeSaveWarning:document.querySelector('#officeSaveWarning'),
+    isOfficeOwner:root => !patients.length || patients[0].root === root,
+    showOffice:() => {
+      if(patients.length) patients[0].renderOffice();
+      officeSection.scrollIntoView({block:'start'});
+      document.querySelector('#officeHeading').focus({preventScroll:true});
+    },
     hasPatients:() => patients.length > 0,
     updateTitles:() => patients.forEach((p, i) => p.title(i + 1)),
     saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
@@ -1627,7 +1671,7 @@ function createPatientPage(){
       const index = after ? patients.findIndex(p => p.root === after) + 1 : patients.length;
       if(after) after.after(root); else host.append(root);
       const patient = mountPatient(root, seed, page);
-      if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable); }
+      if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable, clone(state.baseline)); }
       patients.splice(index, 0, patient);
       page.updateTitles();
       page.saveDraft();
@@ -1637,7 +1681,8 @@ function createPatientPage(){
     layoutChanged:(source, layout) => patients.forEach(p => { if(p.root !== source) p.applyLayout(clone(layout)); }),
     officeChanged:(source, values) => {
       const owner = patients.find(p => p.root === source);
-      patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), owner ? owner.getOffice().writable : true); });
+      const state = owner ? owner.getOffice() : {writable:true, baseline:values};
+      patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline)); });
     },
     restore:(draft) => {
       held = true;
@@ -1656,6 +1701,7 @@ function createPatientPage(){
   }else draft = null;
   const first = page.addPatient(null, {}, false);
   if(draft) first.offerRestore(draft);
+  document.querySelector('#retryOfficeSave').addEventListener('click', () => { if(patients.length) patients[0].retryOffice(); });
   document.addEventListener('visibilitychange', () => { if(document.hidden) page.saveDraft(); });
   window.addEventListener('pagehide', page.saveDraft);
 }
@@ -1673,14 +1719,14 @@ createPatientPage();
     Promise.resolve(context.registerTool({
       name: 'open_note_builder_tab',
       title: 'Open note builder tab',
-      description: 'Open the existing Visit, Checklist, or Office tab in the note builder.',
+      description: 'Open the first patient’s Visit or Checklist tab, or jump to the shared Office overnight-test list.',
       inputSchema: {type: 'object', properties: {tab: {type: 'string', enum: ['visit', 'check', 'office']}}, required: ['tab'], additionalProperties: false},
       annotations: {readOnlyHint: false, untrustedContentHint: false},
       execute(input) {
         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1 || !['visit', 'check', 'office'].includes(input.tab)) throw new Error('Choose visit, check, or office.');
         const button = document.querySelector('.patient [data-local-id="tab-' + input.tab + '"]');
         button.click();
-        return {tab: input.tab, selected: button.getAttribute('aria-selected') === 'true'};
+        return {tab: input.tab, selected: input.tab === 'office' ? document.activeElement === document.getElementById('officeHeading') : button.getAttribute('aria-selected') === 'true'};
       }
     }, {signal: lifecycle.signal})).catch(() => {});
   } catch (_) {}

@@ -1,0 +1,1569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Note Builder">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Home Visit MA Note Builder</title>
+<style>
+:root{
+  --bg:#f1f4f8; --card:#ffffff; --ink:#15202b; --muted:#5b6b7b; --line:#d5dde6;
+  --field:#ffffff; --field-line:#c2ccd7;
+  --accent:#1769e0; --accent-text:#1461cf; --accent-ink:#ffffff; --accent-soft:rgba(23,105,224,.14);
+  --chip:#e8eef5; --chip-ink:#23364a; --chip-line:#c8d3de;
+  --ok:#0a7442; --ok-soft:#e7f5ed; --ok-line:#a6d8bb;
+  --warn:#835400; --warn-soft:#fff4d9; --warn-line:#eccf88;
+  --danger:#b3261e; --danger-soft:#fdecea; --danger-line:#f0c0bb;
+  --pos:#c0342b; --neg:#0b7a47; --fill-ink:#ffffff;
+  --out-bg:#0f1822; --out-ink:#eaf0f6;
+  --tab-on:#ffffff; --bar:rgba(255,255,255,.95); --scrim:rgba(10,18,26,.55); --shadow:0 18px 44px rgba(10,18,26,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0c1219; --card:#151d27; --ink:#e3eaf1; --muted:#95a5b5; --line:#253140;
+    --field:#0f1720; --field-line:#33414f;
+    --accent:#2f6ee0; --accent-text:#8fb5ff; --accent-ink:#ffffff; --accent-soft:rgba(110,160,255,.20);
+    --chip:#1c2733; --chip-ink:#d5dfe9; --chip-line:#33414f;
+    --ok:#6fd49c; --ok-soft:#10251a; --ok-line:#22583a;
+    --warn:#f0c46a; --warn-soft:#282010; --warn-line:#5a481c;
+    --danger:#ff8e84; --danger-soft:#2b1513; --danger-line:#6b2b25;
+    --pos:#b8352c; --neg:#1d7a4c; --fill-ink:#ffffff;
+    --out-bg:#070b10; --out-ink:#e3eaf1;
+    --tab-on:#2b3a4b; --bar:rgba(21,29,39,.95); --scrim:rgba(0,0,0,.62); --shadow:0 18px 44px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0c1219; --card:#151d27; --ink:#e3eaf1; --muted:#95a5b5; --line:#253140;
+  --field:#0f1720; --field-line:#33414f;
+  --accent:#2f6ee0; --accent-text:#8fb5ff; --accent-ink:#ffffff; --accent-soft:rgba(110,160,255,.20);
+  --chip:#1c2733; --chip-ink:#d5dfe9; --chip-line:#33414f;
+  --ok:#6fd49c; --ok-soft:#10251a; --ok-line:#22583a;
+  --warn:#f0c46a; --warn-soft:#282010; --warn-line:#5a481c;
+  --danger:#ff8e84; --danger-soft:#2b1513; --danger-line:#6b2b25;
+  --pos:#b8352c; --neg:#1d7a4c; --fill-ink:#ffffff;
+  --out-bg:#070b10; --out-ink:#e3eaf1;
+  --tab-on:#2b3a4b; --bar:rgba(21,29,39,.95); --scrim:rgba(0,0,0,.62); --shadow:0 18px 44px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.42 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent-text);outline-offset:2px}
+.app{max-width:760px;margin-inline:auto;padding-inline:16px;padding-block:14px 176px}
+
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.top h1{margin:0;font-size:21px;line-height:1.2;font-weight:780;text-wrap:balance}
+.sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+.privacy{margin:10px 0 0;color:var(--muted);font-size:12.5px;line-height:1.45}
+
+.btn{
+  appearance:none;border:1px solid var(--chip-line);background:var(--card);color:var(--ink);
+  border-radius:10px;padding:9px 13px;font-weight:680;cursor:pointer;min-height:42px;line-height:1.2
+}
+#editBtn{white-space:nowrap;flex:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger);border-color:var(--danger-line)}
+.btn.solid.danger{background:var(--pos);border-color:var(--pos);color:var(--fill-ink)}
+.btn.small{min-height:36px;padding:7px 11px;font-size:14px}
+.btn:active{transform:translateY(1px)}
+
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:10px 8px;margin-top:6px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:12px;background:var(--chip);border:1px solid var(--chip-line)}
+.tab{
+  appearance:none;border:0;background:transparent;color:var(--muted);font-weight:720;font-size:15px;
+  padding:8px 4px;border-radius:9px;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;gap:6px
+}
+.tab[aria-selected="true"]{background:var(--tab-on);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.badge{font-size:12px;font-weight:760;padding:1px 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line);font-variant-numeric:tabular-nums}
+.badge:empty{display:none}
+.badge.complete{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-line)}
+
+.banner{margin:6px 0 10px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:620;line-height:1.4}
+.banner.ok{background:var(--ok-soft);border:1px solid var(--ok-line);color:var(--ok)}
+.banner.warn{background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn)}
+.banner.info{background:var(--chip);border:1px solid var(--chip-line);color:var(--chip-ink)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-block:12px}
+.sec-title{margin:0;padding:14px 16px 2px;font-size:16px;font-weight:760;text-wrap:balance}
+.grid{display:grid;grid-template-columns:1fr;gap:14px;padding:12px 16px 16px}
+@media (min-width:640px){.grid{grid-template-columns:1fr 1fr}.full{grid-column:1/-1}}
+.pad{padding:0 16px 14px}
+.pad-x{padding-inline:16px}
+.small{font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.4}
+
+.flabel{display:block;font-size:13px;font-weight:720;margin-bottom:6px}
+.inp{
+  width:100%;border:1px solid var(--field-line);border-radius:10px;padding:11px 12px;
+  font:inherit;font-size:16px;background:var(--field);color:var(--ink);outline:none
+}
+textarea.inp{min-height:84px;resize:vertical}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.inp::placeholder{color:var(--muted);opacity:.85}
+.inp.detail{margin-top:8px}
+.inp.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.flabel + .chips{margin-top:0}
+.chip{
+  border:1px solid var(--chip-line);background:var(--chip);color:var(--chip-ink);border-radius:999px;
+  padding:7px 12px;font-size:14px;font-weight:650;cursor:pointer;min-height:36px;line-height:1.2
+}
+.chip[aria-pressed="true"],.chip[aria-checked="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.pos[aria-checked="true"]{background:var(--pos);border-color:var(--pos);color:var(--fill-ink)}
+.chip.neg[aria-checked="true"]{background:var(--neg);border-color:var(--neg);color:var(--fill-ink)}
+
+.checkrow{
+  display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid var(--field-line);
+  border-radius:10px;background:var(--field);cursor:pointer;font-weight:620;line-height:1.35
+}
+.checkrow input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
+.checkrow.done{background:var(--ok-soft);border-color:var(--ok-line);color:var(--ok)}
+.checkrow.remind:not(.done){background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.checkrow.template{cursor:default;color:var(--muted)}
+.checkrow .box{width:20px;height:20px;border:2px solid var(--field-line);border-radius:5px;flex:none}
+
+.note{padding:11px 12px;border-radius:10px;background:var(--chip);border:1px solid var(--chip-line);color:var(--chip-ink);font-size:14px;font-weight:600;line-height:1.4}
+
+.tests{display:grid;gap:9px}
+.testrow{border:1px solid var(--field-line);border-radius:12px;background:var(--field);padding:10px 12px}
+.testrow.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.thead{display:flex;align-items:center;gap:12px;font-weight:680;cursor:pointer;min-height:30px}
+.thead input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
+.tkind{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted)}
+.testrow .res,.testrow .sub{margin-top:10px;align-items:center}
+.subchoice{margin-top:10px;align-items:center}
+.sublabel{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
+.hint{font-size:12.5px;font-weight:650;color:var(--warn);margin:6px 0 0 34px}
+
+.tagline{margin:10px 16px 0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn);font-size:14px;font-weight:650;line-height:1.4}
+.output{
+  display:block;width:100%;min-height:150px;border:0;border-radius:10px;padding:13px;resize:none;
+  background:var(--out-bg);color:var(--out-ink);font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+}
+.out-wrap{padding:12px 16px 16px}
+
+.visit-head{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:14px 16px 4px;align-items:center}
+.visit-name{font-weight:760;font-size:16px}
+.visit-meta{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.pill{grid-column:2;grid-row:1 / span 2;border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:760;white-space:nowrap}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
+.steps{display:grid;gap:8px;padding:8px 16px 12px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.empty{padding:6px 16px 16px;color:var(--muted)}
+
+.editor{margin-top:10px;padding:10px;border:1px dashed var(--field-line);border-radius:10px;background:var(--bg);display:grid;gap:7px}
+.elabel{font-size:12px;font-weight:700;color:var(--muted);line-height:1.35}
+.sec-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:0 16px 12px}
+.sec-tools .inp{flex:1 1 180px;min-width:0;padding:8px 10px}
+.addmenu{padding:0 16px 16px}
+.builder{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block:12px}
+
+.actions{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bar);border-top:1px solid var(--line);
+  padding:10px 16px calc(8px + env(safe-area-inset-bottom,0px));
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)
+}
+.actions-inner{max-width:728px;margin-inline:auto;display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:8px}
+.actions .btn{min-height:48px;border-radius:12px;font-weight:760;padding-inline:8px}
+#status{max-width:728px;margin:6px auto 0;min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
+#status.bad{color:var(--danger)}
+#status.warn{color:var(--warn)}
+
+.scrim{
+  position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px))
+}
+@media (min-width:640px){.scrim{align-items:center}}
+.sheet{width:min(100%,560px);max-height:86vh;overflow:auto;background:var(--card);color:var(--ink);border-radius:16px;padding:18px 16px 16px;box-shadow:var(--shadow)}
+.sheet h3{margin:0 0 8px;font-size:18px;line-height:1.25;text-wrap:balance}
+.sheet p{margin:0 0 10px;color:var(--muted)}
+.sheet .flabel{margin-top:10px}
+.sheet .btns{display:grid;gap:8px;margin-top:14px}
+.sheet .btns .btn{min-height:46px}
+.steplist{margin:4px 0 8px;padding-left:20px;display:grid;gap:4px}
+.preview{margin:0 0 6px;padding:10px 12px;border-radius:10px;background:var(--out-bg);color:var(--out-ink);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.err{color:var(--danger);font-size:13px;font-weight:650;min-height:18px;margin-top:6px}
+@media (prefers-reduced-motion:no-preference){
+  .sheet{animation:rise .16s ease-out}
+  @keyframes rise{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+<meta name="description" content="Build home visit MA notes, follow visit checklists, and track office follow-up tasks.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%231769e0%22%2F%3E%3Cpath%20d%3D%22M10%207h12v18H10z%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M13%2012h6M13%2016h6M13%2020h4%22%20stroke%3D%22%231769e0%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Home Visit MA Note Builder</h1>
+      <p class="sub"><b>v8.7</b> · The Visit tab builds your Teams message. Checklist and Office never print.</p>
+    </div>
+    <button type="button" class="btn" id="editBtn">Edit layout</button>
+  </header>
+  <p class="privacy">Nothing is sent anywhere. This visit stays in this tab until you start the next patient. The office list is saved in this browser only, and on iPhone closing Safari may clear it.</p>
+
+  <nav class="tabs" aria-label="Sections">
+    <div class="seg" role="tablist">
+      <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
+      <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist <span class="badge" id="badge-check"></span></button>
+      <button type="button" class="tab" role="tab" id="tab-office" aria-controls="panel-office" aria-selected="false">Office <span class="badge" id="badge-office"></span></button>
+    </div>
+  </nav>
+
+  <div id="editBanner" class="banner info" hidden></div>
+
+  <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
+  <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden></div>
+  <div id="panel-office" role="tabpanel" aria-labelledby="tab-office" hidden></div>
+</div>
+
+<div class="actions">
+  <div class="actions-inner">
+    <button type="button" class="btn" id="newBtn">New patient</button>
+    <button type="button" class="btn" id="selectBtn">Select text</button>
+    <button type="button" class="btn primary" id="copyBtn">Copy message</button>
+  </div>
+  <div id="status" role="status" aria-live="polite"></div>
+</div>
+
+<div id="sheetHost"></div>
+
+<script>
+(() => {
+"use strict";
+
+const LAYOUT_KEY = 'hvnb_layout';
+const DRAFT_KEY = 'hvnb_draft';
+const OFFICE_KEY = 'hvnb_office';
+const DEFAULT_BASE = 12;
+const MAX_DRAFT_AGE = 8 * 60 * 60 * 1000;
+// iOS Safari copies text that starts like "Symptoms: ..." as a web address, and Teams then pastes it
+// as Symptoms:%20Sore%20throat... An invisible zero-width space in front stops it looking like one.
+const COPY_PREFIX = '\u200B';
+const TABS = ['visit', 'check', 'office'];
+
+/* ---------- helpers ---------- */
+
+const $ = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+function h(tag, attrs, ...kids){
+  const n = document.createElement(tag);
+  if(attrs){
+    for(const k of Object.keys(attrs)){
+      const v = attrs[k];
+      if(v === null || v === undefined || v === false) continue;
+      if(k === 'class') n.className = v;
+      else if(k === 'text') n.textContent = v;
+      else if(k === 'value') n.value = v;
+      else if(k === 'data') Object.assign(n.dataset, v);
+      else if(k.slice(0, 2) === 'on' && typeof v === 'function') n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+  }
+  for(const kid of kids.flat()){
+    if(kid === null || kid === undefined || kid === false) continue;
+    n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return n;
+}
+
+function uid(p){ return (p || 'x') + Math.random().toString(36).slice(2, 9); }
+function norm(s){ return String(s == null ? '' : s).trim().toLowerCase(); }
+function fmtTime(t){ try{ return new Date(t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }catch(e){ return ''; } }
+function fmtDayTime(t){
+  try{
+    const d = new Date(t);
+    const today = d.toDateString() === new Date().toDateString();
+    return (today ? 'Today ' : d.toLocaleDateString([], {weekday:'short', month:'numeric', day:'numeric'}) + ', ') + fmtTime(t);
+  }catch(e){ return ''; }
+}
+
+function store(kind){ try{ return kind === 'local' ? window.localStorage : window.sessionStorage; }catch(e){ return null; } }
+function readJSON(kind, key){
+  const s = store(kind); if(!s) return null;
+  try{ const raw = s.getItem(key); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function writeJSON(kind, key, val){
+  const s = store(kind); if(!s) return false;
+  try{ s.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; }
+}
+function dropKey(kind, key){ const s = store(kind); if(!s) return; try{ s.removeItem(key); }catch(e){} }
+
+function chips(str){
+  return String(str || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+    const add = s.charAt(0) === '+';
+    return { v: add ? s.slice(1).trim() : s, m: add ? 'add' : 'fill' };
+  }).filter(c => c.v);
+}
+function chipsText(list){ return (list || []).map(c => (c.m === 'add' ? '+' : '') + c.v).join(', '); }
+function listItems(v){ return String(v || '').split(',').map(x => x.trim()).filter(Boolean); }
+function listHas(v, item){ const t = norm(item); return listItems(v).some(x => norm(x) === t); }
+function listToggle(v, item){
+  const items = listItems(v).filter(x => norm(x) !== 'none');
+  const i = items.findIndex(x => norm(x) === norm(item));
+  if(i >= 0) items.splice(i, 1); else items.push(item);
+  return items.join(', ');
+}
+
+function maskDob(v){
+  if(/[a-z]/i.test(v)) return v;
+  if(/[\/.\-]/.test(v)){
+    const parts = v.split(/[\/.\-]/);
+    v = parts.map((p, i) => { p = p.replace(/\D/g, ''); return (i < 2 && i < parts.length - 1 && p.length === 1) ? '0' + p : p; }).join('');
+  }
+  const d = v.replace(/\D/g, '').slice(0, 8);
+  if(d.length <= 2) return d;
+  if(d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
+  return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
+}
+
+function parseTestList(str, old){
+  const byName = new Map((old || []).map(it => [norm(it.n), it]));
+  const used = new Set();
+  const out = String(str || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+    let kind = 'posneg';
+    if(/\(done\)/i.test(s)){ kind = 'done'; s = s.replace(/\(done\)/ig, '').trim(); }
+    let sub = null;
+    const m = s.match(/\[(.*)\]\s*$/);
+    if(m){ sub = m[1].split('|').map(x => x.trim()).filter(Boolean); s = s.slice(0, m.index).trim(); }
+    if(!s) return null;
+    const prev = byName.get(norm(s));
+    const id = prev && !used.has(prev.id) ? prev.id : uid('t');
+    used.add(id);
+    const it = { id, n: s, kind };
+    if(kind === 'posneg' && sub && sub.length) it.sub = sub;
+    if(prev && prev.hint) it.hint = prev.hint;
+    return it;
+  }).filter(Boolean);
+  if(old && old.length === out.length){
+    out.forEach((it, i) => {
+      const o = old[i];
+      if(norm(o.n) === norm(it.n)) return;
+      if(out.some(x => x.id === o.id)) return;
+      it.id = o.id;
+      if(o.hint && !it.hint) it.hint = o.hint;
+    });
+  }
+  return out;
+}
+function testListText(items){
+  return (items || []).map(it => it.n + (it.kind === 'done' ? ' (done)' : '') + (it.sub && it.sub.length ? '[' + it.sub.join('|') + ']' : '')).join(', ');
+}
+
+/* ---------- default layout ---------- */
+
+function defaultLayout(){
+  return { v: 4, base: DEFAULT_BASE, sections: [
+    { id:'s_door', tab:'visit', title:'At the door', fields:[
+      { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
+      { id:'dob', type:'dob', label:'DOB', req:true },
+      { id:'inspic', type:'check', remind:true, label:'Took a pic of the insurance card, even if they say they sent it' },
+      { id:'added', type:'check', label:'Patient added at the house' },
+      { id:'correction', type:'text', label:'Correction', ph:'Only if something was wrong, like spelling or DOB' }
+    ]},
+    { id:'s_hx', tab:'visit', title:'Symptoms & history', fields:[
+      { id:'symptoms', type:'textarea', label:'Symptoms', ph:'Type symptoms or tap common ones',
+        chips: chips('+Sore throat, +Cough, +Congestion, +Fever, +Headache, +Ear pain, +Ear pulling, +Nausea/vomiting, +Diarrhea, +Rash') },
+      { id:'duration', type:'text', label:'Duration', ph:'2 days', chips: chips('1 day, 2 days, 3 days, 1 week') },
+      { id:'exposure', type:'choice', label:'Exposure', opts:['No','Yes','Unknown'], detail:{ id:'exposureto', on:'Yes', ph:'Exposed to what?' } },
+      { id:'allergies', type:'text', label:'Medication allergies', ph:'Medication or food allergy', chips: chips('NKDA, None') },
+      { id:'abx', type:'text', label:'Recent antibiotics', ph:'Name and dates', chips: chips('No, None') },
+      { id:'history', type:'textarea', label:'Medical history', ph:'Relevant history', chips: chips('None') },
+      { id:'meds', type:'text', label:'Daily medications', ph:'Medication list', chips: chips('None') },
+      { id:'preg', type:'choice', label:'Nursing / pregnant', opts:['No','Yes','N/A'],
+        sub:{ id:'pregtype', on:'Yes', label:'Which?', opts:['Nursing','Pregnant','Both'], out:{ Both:'Nursing and pregnant' } } }
+    ]},
+    { id:'s_vitals', tab:'visit', title:'Vitals', fields:[
+      { id:'temp', type:'text', label:'Temp', ph:'98.7 °F', im:'decimal' },
+      { id:'o2', type:'text', label:'O2', ph:'98%', im:'numeric' },
+      { id:'hr', type:'text', label:'HR', ph:'72 bpm', im:'numeric' },
+      { id:'bp', type:'text', label:'BP', ph:'Only if the provider asks', chips: chips('N/A') },
+      { id:'weight', type:'text', label:'Weight', ph:'Peds or under 100 lb', im:'decimal', chips: chips('N/A') }
+    ]},
+    { id:'s_rx', tab:'visit', title:'Pharmacy', fields:[
+      { id:'pharmacy', type:'text', label:'Pharmacy', ph:'Pharmacy name', chips: chips('Madison') },
+      { id:'formpref', type:'choice', label:'Pills or liquid', opts:['Pill','Liquid','Either','N/A'] }
+    ]},
+    { id:'s_tests', tab:'visit', title:'Tests', fields:[
+      { id:'tests', type:'tests', label:'Tap each test you did', items:[
+        { id:'strep', n:'Rapid strep', kind:'posneg', hint:'No strep under 2 yrs' },
+        { id:'flu', n:'Rapid flu', kind:'posneg', sub:['A','B'] },
+        { id:'covid', n:'Rapid COVID', kind:'posneg' },
+        { id:'ears', n:'Ears', kind:'done' },
+        { id:'urine', n:'Urine dip', kind:'done' }
+      ]},
+      { id:'aware', type:'choice', label:'Patient aware of positive', opts:['Aware','Unaware'], when:'anyPositive', req:true, underPositive:true },
+      { id:'overnights', type:'text', label:'Overnights sent', ph:'Overnights and samples that went out',
+        chips: chips('None, +4plex, +Strep throat PCR, +RPP, +Strep culture, +Urine culture, +Blood') },
+      { id:'bloodreason', type:'text', label:'Reason for blood work', ph:'Why the blood work was ordered', when:'blood', req:true }
+    ]},
+    { id:'s_ins', tab:'visit', title:'Insurance', fields:[
+      { id:'polholder', type:'dob', label:'Policy holder DOB', ph:'Family plan only', chips: chips('N/A') }
+    ]},
+    { id:'s_notes', tab:'visit', title:'Notes', fields:[
+      { id:'notes', type:'textarea', label:'Notes', ph:'Anything else for the office', keepLines:true, chips: chips('None') }
+    ]},
+
+    { id:'k_before', tab:'check', title:'Before you leave', fields:[
+      { id:'k_wipes', type:'note', label:'Clean catch wipes are in the supply closet.' }
+    ]},
+    { id:'k_door', tab:'check', title:'At the door', fields:[
+      { id:'k_confirm', type:'check', label:'Confirmed name, DOB, spelling and phone number' },
+      { id:'k_inspic', type:'mirror', of:'inspic' },
+      { id:'k_polholder', type:'check', label:'Family plan: got the policy holder’s birthday' }
+    ]},
+    { id:'k_visit', tab:'check', title:'During the visit', fields:[
+      { id:'k_pa', type:'check', label:'PA video call done' },
+      { id:'k_strep2', type:'note', label:'No strep under 2 yrs.' },
+      { id:'k_label', type:'check', label:'LABEL EVERYTHING' },
+      { id:'k_script', type:'check', label:'Took a pic of the blood work script', when:'blood' }
+    ]},
+    { id:'k_post', tab:'check', title:'When you post', fields:[
+      { id:'k_posted', type:'check', label:'Posted the message with the insurance pic' },
+      { id:'k_scriptpost', type:'check', label:'Posted the script pic', when:'blood' },
+      { id:'k_tagcorr', type:'check', label:'Correction: tagged the person who posted the stop', when:'correction' },
+      { id:'k_tagadd', type:'check', label:'Added patient: tagged the person who posted the stop', when:'added' },
+      { id:'k_tagprov', type:'check', label:'Positive: tagged the provider', when:'anyPositive' },
+      { id:'k_tagunaware', type:'check', label:'Patient unaware: tagged the person who posted the stop', when:'positiveUnaware' },
+      { id:'k_who', type:'note', label:'Tag people at office: Chaya Baila 9-5, Mary Grace 9am-8pm, Tzvi 9-3/4.' }
+    ]},
+    { id:'k_help', tab:'check', title:'Office closed or after 8', fields:[
+      { id:'k_after', type:'note', label:'“If office closed/after 8 and you have any issues text/call me, Chayala or Yaakov.”' }
+    ]},
+
+    { id:'o_steps', tab:'office', title:'Steps added for each visit', fields:[
+      { id:'o_reqtests', type:'check', label:'Req: all tests done are checked off, and the provider', when:'anyTest' },
+      { id:'o_4plex', type:'check', label:'Req: overnight viral / flu / COVID PCR has 4plex checked, unless the provider ordered RPP', when:'viralPcr' },
+      { id:'o_strep', type:'check', label:'Req: strep throat PCR checked, unless the provider ordered a culture', when:'strep' },
+      { id:'o_match', type:'check', label:'Req: name, spelling and DOB match', when:'anyTest' },
+      { id:'o_corr', type:'check', label:'Req: the correction is fixed on the req too. If not, cross out and write it out', when:['correction', 'anyTest'] },
+      { id:'o_date', type:'check', label:'Req: collection date is correct', when:'anyTest' },
+      { id:'o_blood', type:'check', label:'Blood req: tests filled in and the patient’s provider checked at the bottom. If not, fill in from the script pic', when:'blood' },
+      { id:'o_dip', type:'check', label:'Dipstick pic uploaded to Teams under the patient, and the provider tagged', when:'urine' },
+      { id:'o_ears', type:'check', label:'Provider posted the ear check results. If not, tag the provider under the patient', when:'ears' }
+    ]},
+    { id:'o_ref', tab:'office', title:'Req didn’t print?', fields:[
+      { id:'o_blank', type:'note', label:'There should be blank reqs. Fill in all the info off Teams, and the insurance info off the pic you took.' }
+    ]}
+  ]};
+}
+
+const WHEN_TEXT = {
+  added:'“Patient added at the house” is ticked',
+  correction:'a correction is typed',
+  anyPositive:'a test is marked Positive',
+  positiveUnaware:'a test is positive and the patient is unaware',
+  blood:'Blood is in overnights sent',
+  viralPcr:'4plex or RPP is in overnights sent',
+  strep:'a strep test was done or sent',
+  ears:'Ears is ticked',
+  urine:'Urine dip is ticked',
+  anyTest:'any test was done or sent'
+};
+function whenText(w){ return (Array.isArray(w) ? w : [w]).map(k => WHEN_TEXT[k] || k).join(' and '); }
+
+function validLayout(t){
+  return !!t && Array.isArray(t.sections) && t.sections.every(s =>
+    s && typeof s.id === 'string' && TABS.indexOf(s.tab) >= 0 && typeof s.title === 'string' && Array.isArray(s.fields) &&
+    s.fields.every(f => f && typeof f.id === 'string' && typeof f.type === 'string'));
+}
+
+/* ---------- state ---------- */
+
+let L = null;            // layout
+let V = {};              // this visit's values
+let M = freshMeta();     // this visit's copy/office status
+let office = [];         // saved visits waiting on office steps
+let tab = 'visit';
+let editing = false;
+let draftTimer = null;
+let layoutTimer = null;
+let draftHold = false;   // true while the restore question is open
+let pendingUpdate = false;
+
+function freshMeta(){ return { sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
+let clearNote = '';
+
+function secsOf(t){ return L.sections.filter(s => s.tab === t); }
+function fieldById(id){ for(const s of L.sections) for(const f of s.fields) if(f.id === id) return f; return null; }
+
+function loadLayout(){
+  const saved = readJSON('local', LAYOUT_KEY);
+  if(saved && validLayout(saved)){ L = saved; pendingUpdate = (saved.base || 0) < DEFAULT_BASE; }
+  else L = defaultLayout();
+}
+function saveLayout(){
+  clearTimeout(layoutTimer);
+  if(!writeJSON('local', LAYOUT_KEY, L)) flash('Couldn’t save the layout on this device', 'bad');
+}
+function saveLayoutSoon(){ clearTimeout(layoutTimer); layoutTimer = setTimeout(saveLayout, 400); }
+function layoutChanged(){ saveLayout(); renderAll(); }
+
+let officeWritable = true;
+function loadOffice(){
+  if(!officeWritable || !store('local')) return;
+  const o = readJSON('local', OFFICE_KEY);
+  office = Array.isArray(o) ? o.filter(v => v && typeof v.id === 'string' && Array.isArray(v.steps)) : [];
+}
+function saveOffice(){ if(!writeJSON('local', OFFICE_KEY, office)){ officeWritable = false; flash('Couldn’t save the office list in this browser', 'bad'); } }
+function mutateOffice(fn){
+  loadOffice();
+  const r = fn();
+  saveOffice();
+  renderOfficePanel();
+  updateBadges();
+  return r;
+}
+
+function hasContent(vals){
+  vals = vals || {};
+  for(const sec of L.sections){
+    if(sec.tab === 'office') continue;
+    for(const f of sec.fields){
+      const v = vals[f.id];
+      if(f.type === 'tests'){ if(v && (f.items || []).some(it => v[it.id] && v[it.id].on)) return true; }
+      else if(f.type === 'check'){ if(v) return true; }
+      else if(typeof v === 'string' && v.trim()) return true;
+    }
+  }
+  return false;
+}
+
+function pruneValues(){
+  const keep = new Set();
+  for(const sec of L.sections) for(const f of sec.fields){ keep.add(f.id); if(f.detail) keep.add(f.detail.id); if(f.sub) keep.add(f.sub.id); }
+  for(const k of Object.keys(V)) if(!keep.has(k)) delete V[k];
+}
+
+/* ---------- what applies ---------- */
+
+function context(vals){
+  const ticked = [], positive = [];
+  for(const sec of secsOf('visit')) for(const f of sec.fields){
+    if(f.type !== 'tests') continue;
+    const tv = vals[f.id] || {};
+    for(const it of f.items || []){
+      const s = tv[it.id];
+      if(!s || !s.on) continue;
+      ticked.push(it);
+      if(it.kind !== 'done' && s.r === 'Positive') positive.push(it);
+    }
+  }
+  let lab = norm(vals.overnights);
+  if(/^(none|no|n\/?a|nothing|-+)\.?$/.test(lab)) lab = '';
+  const did = (id, re) => ticked.some(it => it.id === id || re.test(it.n));
+  const anyPositive = positive.length > 0;
+  return {
+    added: !!vals.added,
+    correction: !!String(vals.correction || '').trim(),
+    anyPositive,
+    positiveUnaware: anyPositive && vals.aware === 'Unaware',
+    blood: /blood/.test(lab),
+    viralPcr: /4\s*-?\s*plex|\brpp\b|(flu|covid|viral)[^,]*pcr/.test(lab),
+    strep: did('strep', /strep/i) || /strep/.test(lab),
+    ears: did('ears', /\bears?\b/i),
+    urine: did('urine', /urine|dip/i),
+    anyTest: ticked.length > 0 || lab !== ''
+  };
+}
+function whenOK(w, ctx){
+  if(!w) return true;
+  return (Array.isArray(w) ? w : [w]).every(k => (k in ctx) ? !!ctx[k] : true);
+}
+
+function buildOutput(vals){
+  // The message only ever holds what was entered. Anything missing goes into `issues`,
+  // which the "Before you copy" sheet shows. Nothing like NOT MARKED is ever printed.
+  const ctx = context(vals);
+  const lines = [], issues = [];
+  let aware = '';   // printed in capitals under each positive test
+  for(const sec of secsOf('visit')) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
+  for(const sec of secsOf('visit')) for(const f of sec.fields){
+    if(!whenOK(f.when, ctx)) continue;
+    const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
+    if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
+      let v = String(vals[f.id] || '').trim();
+      if(v){
+        if(!f.keepLines) v = v.replace(/\s*\n+\s*/g, '; ');
+        lines.push(name + ': ' + v);
+      } else if(f.req) issues.push(name + ': not entered');
+    } else if(f.type === 'choice' && f.underPositive){
+      if(!vals[f.id] && f.req) issues.push(name + ': not marked');
+    } else if(f.type === 'choice'){
+      const v = vals[f.id];
+      if(v){
+        let line = name + ': ' + v;
+        if(f.detail && v === f.detail.on){
+          const d = String(vals[f.detail.id] || '').trim().replace(/^to\s+/i, '').replace(/\s*\n+\s*/g, '; ');
+          if(d) line += ', to ' + d;
+          else issues.push(name + ': exposed to what?');
+        }
+        if(f.sub && v === f.sub.on){
+          const sv = vals[f.sub.id];
+          if(sv) line = name + ': ' + ((f.sub.out && f.sub.out[sv]) || sv);
+          else {
+            const o = (f.sub.opts || []).map(x => x.toLowerCase());
+            issues.push(name + ': ' + (o.length > 1 ? o.slice(0, -1).join(', ') + ' or ' + o[o.length - 1] : o.join('')) + '?');
+          }
+        }
+        lines.push(line);
+      } else if(f.req) issues.push(name + ': not marked');
+    } else if(f.type === 'tests'){
+      const tv = vals[f.id] || {};
+      for(const it of f.items || []){
+        const s = tv[it.id];
+        if(!s || !s.on) continue;
+        if(it.kind === 'done'){ lines.push(it.n + ': Done'); continue; }
+        if(!s.r){ issues.push(it.n + ': result not marked'); continue; }
+        const needsType = s.r === 'Positive' && it.sub && it.sub.length;
+        lines.push(it.n + ': ' + s.r.toUpperCase() + (needsType && s.s ? ' (' + s.s + ')' : ''));
+        if(s.r === 'Positive' && aware) lines.push('PATIENT ' + String(aware).toUpperCase());
+        if(needsType && !s.s) issues.push(it.n + ': ' + it.sub.join(' or ') + ' not marked');
+      }
+    }
+  }
+  if(!lines.length) return { text: '', issues: [], ctx };
+  return { text: lines.join('\n'), issues, ctx };
+}
+
+function officeSteps(vals){
+  const ctx = context(vals);
+  const out = [];
+  for(const sec of secsOf('office')) for(const f of sec.fields){
+    if(f.type === 'check' && whenOK(f.when, ctx)) out.push({ id: f.id, label: f.label });
+  }
+  return out;
+}
+function officeOrder(){
+  const ids = [];
+  for(const sec of secsOf('office')) for(const f of sec.fields) if(f.type === 'check') ids.push(f.id);
+  return ids;
+}
+
+/* ---------- drafts ---------- */
+
+function saveDraft(){
+  clearTimeout(draftTimer);
+  if(draftHold) return;
+  if(!hasContent(V)){ dropKey('session', DRAFT_KEY); return; }
+  writeJSON('session', DRAFT_KEY, { t: Date.now(), vals: V, meta: M });
+}
+function saveDraftSoon(){ clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 350); }
+
+/* ---------- status + sheets ---------- */
+
+let flashTimer = null;
+function flash(msg, kind){
+  const s = $('#status');
+  s.textContent = msg;
+  s.className = kind || '';
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { s.textContent = ''; s.className = ''; }, 2800);
+}
+
+let sheetOpen = false;
+let sheetDismiss = null;
+const sheetQueue = [];
+function sheet(opts){ if(sheetOpen) sheetQueue.push(opts); else openSheet(opts); }
+function openSheet(opts){
+  sheetOpen = true;
+  const host = $('#sheetHost');
+  host.textContent = '';
+  const card = h('div', {class:'sheet', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'sheetTitle'});
+  card.append(h('h3', {id:'sheetTitle', text:opts.title}));
+  for(const b of opts.body || []){ if(b) card.append(typeof b === 'string' ? h('p', {text:b}) : b); }
+  const btns = h('div', {class:'btns'});
+  for(const b of opts.buttons || []){
+    btns.append(h('button', {type:'button', class:'btn ' + (b.kind || ''), text:b.label, onclick:() => {
+      if(b.keepOpen){ if(b.on) b.on(); return; }
+      if(b.validate && b.validate() === false) return;
+      closeSheet();
+      if(b.on) b.on();
+      drainSheets();
+    }}));
+  }
+  card.append(btns);
+  sheetDismiss = opts.dismissable === false ? null : () => { closeSheet(); if(opts.onDismiss) opts.onDismiss(); drainSheets(); };
+  const scrim = h('div', {class:'scrim', onclick:(e) => { if(e.target === scrim && sheetDismiss) sheetDismiss(); }}, card);
+  host.append(scrim);
+  setTimeout(() => {
+    const target = opts.focus ? card.querySelector(opts.focus) : null;
+    try{ (target || card.querySelector('.btn')).focus({preventScroll:true}); }catch(e){}
+  }, 30);
+}
+function closeSheet(){ $('#sheetHost').textContent = ''; sheetOpen = false; sheetDismiss = null; }
+function drainSheets(){ if(!sheetOpen && sheetQueue.length) openSheet(sheetQueue.shift()); }
+
+/* ---------- rendering ---------- */
+
+function renderAll(){
+  pruneValues();
+  for(const t of TABS){
+    const p = $('#panel-' + t);
+    p.textContent = '';
+    if(t === 'visit') renderVisit(p);
+    else if(t === 'check') renderCheck(p);
+    else renderOfficeTab(p);
+  }
+  const eb = $('#editBanner');
+  eb.hidden = !editing;
+  eb.textContent = editing ? 'Editing the layout on every tab. Changes save on this device as you make them. Tap Done when you’re finished.' : '';
+  $('#editBtn').textContent = editing ? 'Done' : 'Edit layout';
+  refresh();
+}
+
+function renderVisit(p){
+  p.append(h('div', {id:'sentBanner', class:'banner ok', hidden:true}));
+  for(const sec of secsOf('visit')) p.append(renderSection(sec));
+  if(editing) p.append(builderTools('visit'));
+  p.append(h('section', {class:'card'},
+    h('h2', {class:'sec-title', text:'Teams message'}),
+    h('div', {id:'tagLine', class:'tagline', hidden:true}),
+    h('div', {class:'out-wrap'},
+      h('textarea', {id:'output', class:'output', readonly:true, 'aria-label':'Teams message'}),
+      h('p', {class:'small', text:'Checklist and Office items never appear here. If Copy is ever blocked, press and hold in this box, Select All, then Copy.'}))));
+}
+
+function renderCheck(p){
+  for(const sec of secsOf('check')) p.append(renderSection(sec));
+  if(editing) p.append(builderTools('check'));
+}
+
+function renderOfficeTab(p){
+  if(editing){
+    p.append(h('div', {class:'banner info', text:'These steps get added to a visit’s office card when they apply. The office list itself shows again when you tap Done.'}));
+    for(const sec of secsOf('office')) p.append(renderSection(sec));
+    p.append(builderTools('office'));
+    return;
+  }
+  const head = h('section', {class:'card'},
+    h('h2', {class:'sec-title', text:'Office list'}),
+    h('p', {class:'small pad-x', text:'Visits with steps left to do at the office, oldest first. Saved in this browser only, never sent anywhere. On iPhone, closing Safari may clear this list, so don’t leave it overnight.'}));
+  p.append(head);
+  if(!office.length){
+    head.append(h('div', {class:'empty', text:'Nothing waiting. When you copy a visit that had tests, it shows up here with its req and follow-up steps.'}));
+  } else {
+    const finished = office.filter(o => o.steps.every(s => s.done)).length;
+    if(finished) head.append(h('div', {class:'pad', style:'padding-top:10px'},
+      h('button', {type:'button', class:'btn small', text:'Remove ' + finished + ' finished', onclick:() => {
+        mutateOffice(() => { office = office.filter(o => !o.steps.every(s => s.done)); });
+        flash('Removed finished visits');
+      }})));
+    else head.append(h('div', {style:'height:12px'}));
+  }
+  office.slice().sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
+  for(const sec of secsOf('office')){
+    const notes = sec.fields.filter(f => f.type === 'note');
+    if(!notes.length) continue;
+    const grid = h('div', {class:'grid'});
+    notes.forEach(n => grid.append(h('div', {class:'field full'}, h('div', {class:'note', text:n.label}))));
+    p.append(h('section', {class:'card'}, h('h2', {class:'sec-title', text:sec.title}), grid));
+  }
+}
+function renderOfficePanel(){ if(editing) return; const p = $('#panel-office'); p.textContent = ''; renderOfficeTab(p); }
+
+function officeCard(o){
+  const left = o.steps.filter(s => !s.done).length;
+  const card = h('section', {class:'card'});
+  card.append(h('div', {class:'visit-head'},
+    h('div', {class:'visit-name', text:o.name || 'No name'}),
+    h('span', {class:'pill ' + (left ? 'warn' : 'ok'), text: left ? left + ' left' : 'All done'}),
+    h('div', {class:'visit-meta', text:(o.dob ? 'DOB ' + o.dob : 'No DOB') + ' · ' + fmtDayTime(o.t)})));
+  const list = h('div', {class:'steps'});
+  o.steps.forEach(s => {
+    const id = 'ov_' + o.id + '_' + s.id;
+    const cb = h('input', {type:'checkbox', id});
+    cb.checked = !!s.done;
+    cb.addEventListener('change', () => {
+      const done = cb.checked;
+      mutateOffice(() => {
+        const v = office.find(x => x.id === o.id);
+        const st = v && v.steps.find(x => x.id === s.id);
+        if(st) st.done = done;
+      });
+    });
+    list.append(h('label', {class:'checkrow' + (s.done ? ' done' : ''), for:id}, cb, h('span', {text:s.label})));
+  });
+  card.append(list);
+  card.append(h('div', {class:'row pad'},
+    h('button', {type:'button', class:'btn small', text:'Edit name / DOB', onclick:() => editOfficeVisit(o)}),
+    h('button', {type:'button', class:'btn small danger', text:'Remove', onclick:() => removeOfficeVisit(o)})));
+  return card;
+}
+
+function renderSection(sec){
+  const card = h('section', {class:'card', data:{sec:sec.id}});
+  card.append(h('h2', {class:'sec-title', text:sec.title, data:{secTitle:sec.id}}));
+  const grid = h('div', {class:'grid'});
+  sec.fields.forEach(f => grid.append(renderField(sec, f)));
+  if(!sec.fields.length && editing) grid.append(h('p', {class:'small', text:'Empty section. Add something below.'}));
+  card.append(grid);
+  if(editing) card.append(sectionTools(sec));
+  return card;
+}
+
+function renderField(sec, f){
+  const full = sec.tab !== 'visit' || ['textarea', 'check', 'note', 'tests', 'mirror'].indexOf(f.type) >= 0 || (f.type === 'choice' && (f.detail || f.sub));
+  const w = h('div', {class:'field' + (full ? ' full' : ''), data:{field:f.id}});
+  if(f.when) w.dataset.when = JSON.stringify(f.when);
+  if(sec.tab === 'office' && f.type === 'check'){
+    w.append(h('div', {class:'checkrow template'}, h('span', {class:'box', 'aria-hidden':'true'}), h('span', {text:f.label, data:{labelOf:f.id}})));
+  } else if(f.type === 'note'){
+    w.append(h('div', {class:'note', text:f.label, data:{labelOf:f.id}}));
+  } else if(f.type === 'check'){
+    w.append(checkRow(f.id, f.label, f.remind, 'f_' + f.id));
+  } else if(f.type === 'mirror'){
+    const src = fieldById(f.of);
+    if(src) w.append(checkRow(f.of, src.label, src.remind, 'm_' + f.id));
+    else if(editing) w.append(h('div', {class:'note', text:'This item pointed to a Visit tab box that was deleted.'}));
+    else w.hidden = true;
+  } else if(f.type === 'tests'){
+    w.append(...testsField(f));
+  } else if(f.type === 'choice'){
+    w.append(...choiceField(f));
+  } else {
+    w.append(...textField(f));
+  }
+  if(editing) w.append(fieldEditor(sec, f));
+  return w;
+}
+
+function checkRow(fid, label, remind, domId){
+  const cb = h('input', {type:'checkbox', id:domId, data:{fid}});
+  cb.addEventListener('change', () => {
+    if(cb.checked) V[fid] = true; else delete V[fid];
+    refresh({user:true});
+  });
+  return h('label', {class:'checkrow' + (remind ? ' remind' : ''), for:domId}, cb, h('span', {text:label, data:{labelOf:fid}}));
+}
+
+function textField(f){
+  const id = 'f_' + f.id;
+  const isArea = f.type === 'textarea';
+  const inp = h(isArea ? 'textarea' : 'input', {class:'inp', id, autocomplete:'off',
+    placeholder: f.ph || (f.type === 'dob' ? 'MM/DD/YYYY' : ''),
+    autocapitalize: f.type === 'dob' ? 'off' : (f.cap || 'sentences'),
+    spellcheck: f.cap === 'words' ? 'false' : null,
+    autocorrect: f.cap === 'words' ? 'off' : null});
+  if(!isArea) inp.type = 'text';
+  if(f.type === 'dob') inp.setAttribute('inputmode', 'numeric');
+  else if(f.im) inp.setAttribute('inputmode', f.im);
+  inp.value = V[f.id] || '';
+  inp.addEventListener('input', () => {
+    if(f.type === 'dob'){ const m = maskDob(inp.value); if(m !== inp.value) inp.value = m; }
+    V[f.id] = inp.value;
+    refresh({user:true});
+  });
+  const parts = [h('label', {class:'flabel', for:id, text:f.label, data:{labelOf:f.id}}), inp];
+  if(f.chips && f.chips.length){
+    const row = h('div', {class:'chips'});
+    for(const c of f.chips){
+      row.append(h('button', {type:'button', class:'chip', text:c.v, 'aria-pressed':'false', data:{for:f.id, v:c.v, mode:c.m}, onclick:() => {
+        const cur = String(V[f.id] || '');
+        V[f.id] = c.m === 'add' ? listToggle(cur, c.v) : (norm(cur) === norm(c.v) ? '' : c.v);
+        inp.value = V[f.id];
+        refresh({user:true});
+      }}));
+    }
+    parts.push(row);
+  }
+  return parts;
+}
+
+function choiceField(f){
+  const parts = [h('div', {class:'flabel', id:'l_' + f.id, text:f.label, data:{labelOf:f.id}})];
+  const group = h('div', {class:'chips', role:'radiogroup', 'aria-labelledby':'l_' + f.id});
+  (f.opts || []).forEach((opt, i) => {
+    group.append(h('button', {type:'button', class:'chip', role:'radio', id:'c_' + f.id + '_' + i, 'aria-checked':'false', data:{choice:f.id, v:opt}, text:opt, onclick:() => {
+      if(V[f.id] === opt) delete V[f.id]; else V[f.id] = opt;
+      refresh({user:true});
+    }}));
+  });
+  parts.push(group);
+  if(f.detail){
+    const d = f.detail;
+    const inp = h('input', {type:'text', class:'inp detail', id:'f_' + d.id, placeholder:d.ph || '', autocomplete:'off', data:{detailOf:f.id, detailOn:d.on}});
+    inp.value = V[d.id] || '';
+    inp.addEventListener('input', () => { V[d.id] = inp.value; refresh({user:true}); });
+    parts.push(inp);
+  }
+  if(f.sub){
+    const sb = f.sub;
+    const row = h('div', {class:'chips subchoice', role:'radiogroup', 'aria-label':f.label + ', which', data:{subOf:f.id, subOn:sb.on}},
+      h('span', {class:'sublabel', text:sb.label || 'Which?'}));
+    (sb.opts || []).forEach((opt, i) => {
+      row.append(h('button', {type:'button', class:'chip', role:'radio', id:'c_' + sb.id + '_' + i, 'aria-checked':'false', data:{choice:sb.id, v:opt}, text:opt, onclick:() => {
+        if(V[sb.id] === opt) delete V[sb.id]; else V[sb.id] = opt;
+        refresh({user:true});
+      }}));
+    });
+    parts.push(row);
+  }
+  return parts;
+}
+
+function testsField(f){
+  const box = h('div', {class:'tests'});
+  for(const it of f.items || []){
+    const cid = 't_' + f.id + '_' + it.id;
+    const cb = h('input', {type:'checkbox', id:cid});
+    cb.addEventListener('change', () => {
+      const tv = V[f.id] = Object.assign({}, V[f.id]);
+      if(cb.checked) tv[it.id] = { on:true }; else delete tv[it.id];
+      refresh({user:true});
+    });
+    const row = h('div', {class:'testrow', data:{fid:f.id, item:it.id}});
+    row.append(h('label', {class:'thead', for:cid}, cb, h('span', {text:it.n}),
+      it.kind === 'done' ? h('span', {class:'tkind', text:'no result to mark'}) : null));
+    if(it.hint) row.append(h('div', {class:'hint', text:it.hint}));
+    if(it.kind !== 'done'){
+      const res = h('div', {class:'chips res', role:'radiogroup', 'aria-label':it.n + ' result'});
+      for(const r of ['Positive', 'Negative']){
+        res.append(h('button', {type:'button', class:'chip ' + (r === 'Positive' ? 'pos' : 'neg'), role:'radio', 'aria-checked':'false', data:{r}, text:r, onclick:() => {
+          const tv = V[f.id] = Object.assign({}, V[f.id]);
+          const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
+          if(s.r === r){ delete s.r; delete s.s; }
+          else { s.r = r; if(r !== 'Positive') delete s.s; }
+          refresh({user:true});
+        }}));
+      }
+      row.append(res);
+      if(it.sub && it.sub.length){
+        const sub = h('div', {class:'chips sub', role:'radiogroup', 'aria-label':it.n + ' type'}, h('span', {class:'sublabel', text:'Type'}));
+        for(const sv of it.sub){
+          sub.append(h('button', {type:'button', class:'chip', role:'radio', 'aria-checked':'false', data:{s:sv}, text:sv, onclick:() => {
+            const tv = V[f.id] = Object.assign({}, V[f.id]);
+            const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
+            if(s.s === sv) delete s.s; else s.s = sv;
+            refresh({user:true});
+          }}));
+        }
+        row.append(sub);
+      }
+    }
+    box.append(row);
+  }
+  return [h('div', {class:'flabel', text:f.label, data:{labelOf:f.id}}), box];
+}
+
+/* ---------- refresh: everything that depends on the values ---------- */
+
+function refresh(opts){
+  opts = opts || {};
+  const res = buildOutput(V);
+  const ctx = res.ctx;
+
+  $$('[data-when]').forEach(el => {
+    let w = null; try{ w = JSON.parse(el.dataset.when); }catch(e){}
+    el.hidden = !editing && !whenOK(w, ctx);
+  });
+  $$('[data-detail-of]').forEach(inp => { inp.hidden = V[inp.dataset.detailOf] !== inp.dataset.detailOn; });
+  $$('[data-sub-of]').forEach(row => { row.hidden = V[row.dataset.subOf] !== row.dataset.subOn; });
+  $$('section.card[data-sec]').forEach(card => {
+    if(editing){ card.hidden = false; return; }
+    const kids = $$(':scope > .grid > .field', card);
+    card.hidden = kids.length > 0 && kids.every(k => k.hidden);
+  });
+  $$('.chip[data-for]').forEach(ch => {
+    const cur = String(V[ch.dataset.for] || '');
+    const on = ch.dataset.mode === 'add' ? listHas(cur, ch.dataset.v) : norm(cur) === norm(ch.dataset.v);
+    ch.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  $$('[data-choice]').forEach(b => b.setAttribute('aria-checked', V[b.dataset.choice] === b.dataset.v ? 'true' : 'false'));
+  $$('input[type="checkbox"][data-fid]').forEach(cb => {
+    const on = !!V[cb.dataset.fid];
+    cb.checked = on;
+    const row = cb.closest('.checkrow');
+    if(row) row.classList.toggle('done', on);
+  });
+  $$('.testrow').forEach(row => {
+    const s = (V[row.dataset.fid] || {})[row.dataset.item] || {};
+    const on = !!s.on;
+    row.classList.toggle('on', on);
+    const cb = row.querySelector('input[type="checkbox"]');
+    if(cb) cb.checked = on;
+    const r = row.querySelector('.res');
+    if(r){
+      r.hidden = !on;
+      r.querySelectorAll('[data-r]').forEach(b => b.setAttribute('aria-checked', s.r === b.dataset.r ? 'true' : 'false'));
+    }
+    const sub = row.querySelector('.sub');
+    if(sub){
+      sub.hidden = !(on && s.r === 'Positive');
+      sub.querySelectorAll('[data-s]').forEach(b => b.setAttribute('aria-checked', s.s === b.dataset.s ? 'true' : 'false'));
+    }
+  });
+
+  const out = $('#output');
+  if(out){ out.value = res.text ? COPY_PREFIX + res.text : ''; autoSize(out); }
+  renderTagLine(ctx);
+  renderSent(res.text);
+  updateBadges(ctx);
+  saveDraftSoon();
+
+  if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard();
+}
+
+function autoSize(el){
+  if(!el || el.offsetParent === null) return;
+  el.style.height = 'auto';
+  el.style.height = Math.max(150, el.scrollHeight + 2) + 'px';
+}
+
+function renderTagLine(ctx){
+  const el = $('#tagLine');
+  if(!el) return;
+  const parts = [];
+  if(ctx.anyPositive) parts.push('the provider (positive result)');
+  const why = [];
+  if(ctx.positiveUnaware) why.push('patient unaware');
+  if(ctx.correction) why.push('correction');
+  if(ctx.added) why.push('added patient');
+  if(why.length) parts.push('the person who posted the stop (' + why.join(', ') + ')');
+  el.hidden = !parts.length;
+  el.textContent = parts.length ? 'Tag when you post: ' + parts.join(' and ') + '.' : '';
+}
+
+function renderSent(text){
+  const b = $('#sentBanner');
+  if(!b) return;
+  b.hidden = !M.sentAt;
+  if(!M.sentAt){ b.textContent = ''; return; }
+  const changed = text !== M.sentText;
+  b.className = 'banner ' + (changed ? 'warn' : 'ok');
+  b.textContent = changed
+    ? 'Copied at ' + fmtTime(M.sentAt) + ', but you changed it since. Copy it again before you post.'
+    : 'Copied at ' + fmtTime(M.sentAt) + '. Tap New patient before you start the next visit.';
+}
+
+function updateBadges(ctx){
+  ctx = ctx || context(V);
+  let total = 0, done = 0;
+  for(const sec of secsOf('check')) for(const f of sec.fields){
+    if(f.type !== 'check' && f.type !== 'mirror') continue;
+    if(f.type === 'mirror' && !fieldById(f.of)) continue;
+    if(!whenOK(f.when, ctx)) continue;
+    total++;
+    if(V[f.type === 'mirror' ? f.of : f.id]) done++;
+  }
+  const bc = $('#badge-check');
+  bc.textContent = total ? done + '/' + total : '';
+  bc.classList.toggle('complete', total > 0 && done === total);
+  const waiting = office.filter(o => o.steps.some(s => !s.done)).length;
+  $('#badge-office').textContent = waiting ? String(waiting) : '';
+}
+
+/* ---------- tabs ---------- */
+
+function setTab(t){
+  tab = t;
+  for(const x of TABS){
+    $('#panel-' + x).hidden = x !== t;
+    $('#tab-' + x).setAttribute('aria-selected', x === t ? 'true' : 'false');
+  }
+  if(t === 'visit') autoSize($('#output'));
+  window.scrollTo(0, 0);
+}
+
+/* ---------- copy ---------- */
+
+function onCopy(){
+  const res = buildOutput(V);
+  if(!res.text){ flash('Nothing to copy yet', 'bad'); return; }
+  const warn = res.issues.slice();
+  if(fieldById('inspic') && !V.inspic) warn.unshift('Insurance pic box isn’t ticked');
+  if(warn.length){
+    sheet({ title:'Before you copy', body:['Check these first:', h('ul', {class:'steplist'}, warn.map(w => h('li', {text:w})))],
+      buttons:[ {label:'Go back', kind:'primary'}, {label:'Copy anyway', on:() => doCopy(buildOutput(V).text)} ] });
+    return;
+  }
+  doCopy(res.text);
+}
+
+function doCopy(text){
+  const payload = COPY_PREFIX + text;
+  let settled = false;
+  const ok = () => { if(settled) return; settled = true; afterCopy(text); };
+  const fail = () => { if(settled) return; settled = true; if(legacyCopy(payload)) afterCopy(text); else manualCopy(text); };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(payload).then(ok, fail); return; }
+  }catch(e){}
+  fail();
+}
+
+function legacyCopy(text){
+  const ta = h('textarea', {readonly:true, 'aria-hidden':'true'});
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;border:0;padding:0';
+  document.body.append(ta);
+  let ok = false;
+  try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  return ok;
+}
+
+function manualCopy(text){
+  const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
+  ta.value = COPY_PREFIX + text;
+  sheet({ title:'Copy it by hand', body:['Copying was blocked. Press and hold in the box, Select All, then Copy.', ta],
+    buttons:[ {label:'I copied it', kind:'primary', on:() => afterCopy(text)}, {label:'Cancel'} ] });
+  setTimeout(() => { try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, ta.value.length); }catch(e){} }, 60);
+}
+
+function afterCopy(text){
+  M.sentAt = Date.now();
+  M.sentText = text;
+  M.sentVals = JSON.parse(JSON.stringify(V));
+  M.sentAck = false;
+  const steps = officeSteps(V);
+  let msg = 'Copied';
+  if(M.officeId){
+    if(syncOfficeCard(steps)) msg = 'Copied. Office list updated';
+  } else if(steps.length && !M.officeSkipped){
+    const nm = String(V.name || '').trim(), db = String(V.dob || '').trim();
+    if(nm && db){ addToOffice(nm, db); msg = 'Copied. Added to the office list'; }
+    else officeSheet('copy', steps);
+  }
+  saveDraft();
+  refresh();
+  flash(msg);
+}
+
+function syncOfficeCard(steps){
+  let changed = false;
+  mutateOffice(() => {
+    const ov = office.find(o => o.id === M.officeId);
+    if(!ov) return;
+    if(syncVisitSteps(ov, steps)) changed = true;
+    const nm = String(V.name || '').trim(), db = String(V.dob || '').trim();
+    if(nm && nm !== ov.name){ ov.name = nm; changed = true; }
+    if(db && db !== ov.dob){ ov.dob = db; changed = true; }
+  });
+  return changed;
+}
+
+function syncVisitSteps(ov, steps){
+  const want = new Set(steps.map(s => s.id));
+  let changed = false;
+  const kept = ov.steps.filter(s => { const keep = want.has(s.id) || s.done; if(!keep) changed = true; return keep; });
+  for(const s of steps){
+    if(!kept.some(k => k.id === s.id)){ kept.push({ id:s.id, label:s.label, done:false }); changed = true; }
+  }
+  const order = officeOrder();
+  const rank = id => { const i = order.indexOf(id); return i < 0 ? 999 : i; };
+  kept.sort((a, b) => rank(a.id) - rank(b.id));
+  ov.steps = kept;
+  return changed;
+}
+
+/* ---------- office list ---------- */
+
+function addToOffice(name, dob){
+  const visit = { id: uid('v'), name, dob, t: Date.now(), steps: officeSteps(V).map(s => ({ id:s.id, label:s.label, done:false })) };
+  mutateOffice(() => { office.push(visit); });
+  M.officeId = visit.id;
+  saveDraft();
+}
+
+function nameDobInputs(name, dob){
+  const nameIn = h('input', {class:'inp', type:'text', id:'sheet_name', autocomplete:'off', autocapitalize:'words', autocorrect:'off', spellcheck:'false', placeholder:'Patient name'});
+  const dobIn = h('input', {class:'inp', type:'text', id:'sheet_dob', autocomplete:'off', inputmode:'numeric', placeholder:'MM/DD/YYYY'});
+  nameIn.value = name || '';
+  dobIn.value = dob || '';
+  dobIn.addEventListener('input', () => { const m = maskDob(dobIn.value); if(m !== dobIn.value) dobIn.value = m; });
+  return { nameIn, dobIn, nodes: [h('label', {class:'flabel', for:'sheet_name', text:'Name'}), nameIn, h('label', {class:'flabel', for:'sheet_dob', text:'DOB'}), dobIn] };
+}
+
+function officeSheet(mode, steps){
+  const f = nameDobInputs(String(V.name || '').trim(), String(V.dob || '').trim());
+  const err = h('div', {class:'err', role:'alert'});
+  const validate = () => {
+    if(!f.nameIn.value.trim()){ err.textContent = 'Type the patient’s name so you know who this is at the office.'; f.nameIn.focus(); return false; }
+    return true;
+  };
+  const add = () => {
+    const nm = f.nameIn.value.trim(), db = f.dobIn.value.trim();
+    if(mode === 'copy'){
+      if(!String(V.name || '').trim() && nm) V.name = nm;
+      if(!String(V.dob || '').trim() && db) V.dob = db;
+      renderAll();
+    }
+    addToOffice(nm, db);
+  };
+  const list = h('ul', {class:'steplist'}, steps.map(s => h('li', {text:s.label})));
+  if(mode === 'copy'){
+    sheet({ title:'Add to the office list', focus:'#sheet_name',
+      body:['This visit has steps to finish at the office:', list, ...f.nodes, err],
+      dismissable:false,
+      buttons:[ {label:'Add to office list', kind:'primary', validate, on:() => { add(); flash('Copied. Added to the office list'); }},
+                {label:'Not now', on:() => { M.officeSkipped = true; saveDraft(); }} ] });
+  } else {
+    sheet({ title:'Before you clear this visit', focus:'#sheet_name', dismissable:false,
+      body:['These office steps aren’t on your office list yet:', list, ...f.nodes, err],
+      buttons:[ {label:'Add it, then start the next patient', kind:'primary', validate, on:() => { add(); clearVisit('Added to the office list. Ready for the next patient'); }},
+                {label:'Start the next patient without adding', kind:'danger', on:() => clearVisit()},
+                {label:'Cancel', on:() => { clearNote = ''; }} ] });
+  }
+}
+
+function editOfficeVisit(o){
+  const f = nameDobInputs(o.name, o.dob);
+  const err = h('div', {class:'err', role:'alert'});
+  sheet({ title:'Edit name and DOB', focus:'#sheet_name', body:[...f.nodes, err],
+    buttons:[ {label:'Save', kind:'primary', validate:() => { if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; } return true; },
+                on:() => {
+                  const nm = f.nameIn.value.trim(), db = f.dobIn.value.trim();
+                  mutateOffice(() => { const v = office.find(x => x.id === o.id); if(v){ v.name = nm; v.dob = db; } });
+                  flash('Saved'); }},
+              {label:'Cancel'} ] });
+}
+
+function removeOfficeVisit(o){
+  const left = o.steps.filter(s => !s.done).length;
+  const doit = () => { mutateOffice(() => { office = office.filter(x => x.id !== o.id); }); flash('Removed ' + (o.name || 'the visit')); };
+  if(!left){ doit(); return; }
+  sheet({ title:'Remove ' + (o.name || 'this visit') + '?', body:[left + (left === 1 ? ' step isn’t' : ' steps aren’t') + ' ticked yet.'],
+    buttons:[ {label:'Remove', kind:'solid danger', on:doit}, {label:'Cancel'} ] });
+}
+
+/* ---------- new patient ---------- */
+
+function newPatient(opts){
+  opts = opts || {};
+  if(!hasContent(V)){ clearVisit('Ready for the next patient'); return; }
+  const steps = officeSteps(V);
+  if(M.officeId) syncOfficeCard(steps);
+  else if(steps.length){ officeSheet('clear', steps); return; }
+  const changed = !!M.sentAt && buildOutput(V).text !== M.sentText;
+  if(opts.confirmed || (M.sentAt && !changed)){ clearVisit(); return; }
+  sheet({ title:'Start the next patient?',
+    body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied.' : 'This clears the Visit tab and the checklist. The office list stays.' ],
+    buttons:[ changed ? {label:'Copy it again first', kind:'primary', on:() => onCopy()} : null,
+              {label:'Clear and start the next patient', kind:'solid danger', on:() => clearVisit()},
+              {label:'Cancel'} ].filter(Boolean) });
+}
+
+function clearVisit(msg){
+  const note = clearNote;
+  clearNote = '';
+  V = {};
+  M = freshMeta();
+  clearTimeout(draftTimer);
+  dropKey('session', DRAFT_KEY);
+  renderAll();
+  setTab('visit');
+  if(msg !== false) flash(note || msg || 'Cleared. Ready for the next patient');
+}
+
+function sentGuard(){
+  sheet({ title:'You already copied this visit', dismissable:false,
+    body:['You copied it at ' + fmtTime(M.sentAt) + '. Is this still the same patient?'],
+    buttons:[ {label:'Same patient, keep editing', kind:'primary', on:() => { M.sentAck = true; saveDraft(); }},
+              {label:'No, start the next patient', on:() => {
+                if(M.sentVals) V = JSON.parse(JSON.stringify(M.sentVals));
+                clearNote = 'Cleared. Enter your last change again for this patient.';
+                renderAll();
+                newPatient({confirmed:true});
+              }} ] });
+}
+
+/* ---------- restore + layout updates ---------- */
+
+function offerRestore(d){
+  const lines = buildOutput(d.vals).text.split('\n').filter(Boolean);
+  const when = 'Last change at ' + fmtTime(d.t) + (d.meta && d.meta.sentAt ? '. You copied it at ' + fmtTime(d.meta.sentAt) + '.' : '.');
+  sheet({ title:'Unfinished visit in this tab', dismissable:false,
+    body:[ when, lines.length ? h('pre', {class:'preview', text: lines.slice(0, 5).join('\n') + (lines.length > 5 ? '\n…' : '')}) : 'Only checklist boxes were ticked.' ],
+    buttons:[ {label:'Restore this visit', kind:'primary', on:() => {
+                V = d.vals; M = Object.assign(freshMeta(), d.meta || {}); draftHold = false; renderAll(); saveDraft(); flash('Visit restored'); }},
+              {label:'Start fresh', kind:'danger', on:() => {
+                draftHold = false;
+                const steps = officeSteps(d.vals);
+                if(steps.length && !(d.meta && d.meta.officeId)){
+                  V = d.vals; M = Object.assign(freshMeta(), d.meta || {});
+                  renderAll();
+                  officeSheet('clear', steps);
+                  return;
+                }
+                dropKey('session', DRAFT_KEY);
+                flash('Started fresh'); }} ] });
+}
+
+function updateSheet(){
+  return { title:'Updated form available', dismissable:false,
+    body:['The default form changed since you edited yours. Switch to the new form, or keep your edited one? Your office list stays either way. Answers in fields the new form doesn’t have are cleared.'],
+    buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); pendingUpdate = false; renderAll(); flash('Switched to the new form'); }},
+              {label:'Keep mine', on:() => { L.base = DEFAULT_BASE; saveLayout(); pendingUpdate = false; flash('Kept your form'); }} ] };
+}
+
+/* ---------- layout editing ---------- */
+
+const ADD_TYPES = {
+  visit: [['Short text', 'text'], ['Long text', 'textarea'], ['DOB', 'dob'], ['Yes / No / N/A', 'yesno'], ['Custom choices', 'choice'], ['Checkbox (not copied)', 'check'], ['Reminder note', 'note'], ['Test panel', 'tests']],
+  check: [['Checklist item', 'check'], ['Reminder note', 'note']],
+  office: [['Office step', 'check'], ['Reminder note', 'note']]
+};
+
+function sectionTools(sec){
+  const wrap = h('div', {});
+  const ti = h('input', {class:'inp', type:'text', id:'e_sec_' + sec.id, value:sec.title, 'aria-label':'Section name'});
+  ti.addEventListener('input', () => {
+    sec.title = ti.value;
+    const t = $('[data-sec-title="' + sec.id + '"]');
+    if(t) t.textContent = sec.title;
+    saveLayoutSoon();
+  });
+  ti.addEventListener('change', () => { if(!sec.title.trim()){ sec.title = 'Untitled section'; ti.value = sec.title; } saveLayout(); });
+  wrap.append(h('div', {class:'sec-tools'}, ti,
+    h('button', {type:'button', class:'btn small', text:'▲', 'aria-label':'Move section up', onclick:() => moveSection(sec, -1)}),
+    h('button', {type:'button', class:'btn small', text:'▼', 'aria-label':'Move section down', onclick:() => moveSection(sec, 1)}),
+    h('button', {type:'button', class:'btn small danger', text:'Delete section', onclick:() => sheet({
+      title:'Delete “' + sec.title + '”?', body:['This removes the section and everything in it from the layout.'],
+      buttons:[ {label:'Delete section', kind:'solid danger', on:() => { L.sections = L.sections.filter(s => s !== sec); layoutChanged(); }}, {label:'Cancel'} ] })})));
+  const menu = h('div', {class:'chips'});
+  for(const [label, type] of ADD_TYPES[sec.tab]) menu.append(h('button', {type:'button', class:'chip', text:'+ ' + label, onclick:() => addField(sec, type)}));
+  wrap.append(h('div', {class:'addmenu'}, h('div', {class:'elabel', text:'Add to this section'}), menu));
+  return wrap;
+}
+
+function fieldEditor(sec, f){
+  const box = h('div', {class:'editor'});
+  if(f.type === 'mirror'){
+    const src = fieldById(f.of);
+    box.append(h('div', {class:'elabel', text: src ? 'Same box as on the Visit tab. Change its text there.' : 'Its Visit tab box was deleted.'}));
+  } else {
+    const isNote = f.type === 'note';
+    box.append(h('label', {class:'elabel', for:'e_label_' + f.id, text: isNote ? 'Reminder text' : (f.type === 'check' ? 'Item text' : 'Field name (also used in the message)')}));
+    const li = h(isNote ? 'textarea' : 'input', {class:'inp', id:'e_label_' + f.id});
+    if(!isNote) li.type = 'text';
+    li.value = f.label;
+    li.addEventListener('input', () => {
+      f.label = li.value;
+      $$('[data-label-of="' + f.id + '"]').forEach(n => { n.textContent = f.label; });
+      saveLayoutSoon();
+    });
+    li.addEventListener('change', () => {
+      if(!f.label.trim()){ f.label = 'Untitled'; li.value = f.label; $$('[data-label-of="' + f.id + '"]').forEach(n => { n.textContent = f.label; }); }
+      saveLayout();
+      refresh();
+    });
+    box.append(li);
+  }
+  if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
+    box.append(h('label', {class:'elabel', for:'e_chips_' + f.id, text:'Quick buttons, separated by commas. Put + in front of ones that add to a list instead of replacing.'}));
+    const ci = h('input', {class:'inp', type:'text', id:'e_chips_' + f.id, placeholder:'None, +Strep, +Flu'});
+    ci.value = chipsText(f.chips);
+    ci.addEventListener('change', () => { f.chips = chips(ci.value); rerenderField(sec, f); });
+    box.append(ci);
+    box.append(h('label', {class:'elabel', for:'e_ph_' + f.id, text:'Gray hint inside the box'}));
+    const pi = h('input', {class:'inp', type:'text', id:'e_ph_' + f.id});
+    pi.value = f.ph || '';
+    pi.addEventListener('input', () => { f.ph = pi.value; const inp = $('#f_' + f.id); if(inp) inp.placeholder = f.ph; saveLayoutSoon(); });
+    box.append(pi);
+  }
+  if(f.type === 'choice'){
+    box.append(h('label', {class:'elabel', for:'e_opts_' + f.id, text:'Choices, separated by commas'}));
+    const oi = h('input', {class:'inp', type:'text', id:'e_opts_' + f.id});
+    oi.value = (f.opts || []).join(', ');
+    oi.addEventListener('change', () => {
+      const list = oi.value.split(',').map(s => s.trim()).filter(Boolean);
+      if(!list.length){ oi.value = (f.opts || []).join(', '); return; }
+      const old = f.opts || [];
+      const cur = V[f.id];
+      if(cur !== undefined && list.indexOf(cur) < 0){
+        const i = old.indexOf(cur);
+        if(i >= 0 && list.length === old.length) V[f.id] = list[i]; else delete V[f.id];
+      }
+      for(const k of ['detail', 'sub']){
+        const o = f[k];
+        if(o && list.indexOf(o.on) < 0 && list.length === old.length && old.indexOf(o.on) >= 0) o.on = list[old.indexOf(o.on)];
+      }
+      f.opts = list;
+      rerenderField(sec, f);
+    });
+    box.append(oi);
+  }
+  if(f.type === 'tests'){
+    box.append(h('label', {class:'elabel', for:'e_tests_' + f.id, text:'Tests, separated by commas. Add (done) for ones with no result, like Ears (done). Add [A|B] for choices that show when it’s positive.'}));
+    const tt = h('input', {class:'inp', type:'text', id:'e_tests_' + f.id});
+    tt.value = testListText(f.items);
+    tt.addEventListener('change', () => {
+      const list = parseTestList(tt.value, f.items);
+      if(list.length) f.items = list; else tt.value = testListText(f.items);
+      rerenderField(sec, f);
+    });
+    box.append(tt);
+  }
+  if(f.when) box.append(h('div', {class:'elabel', text:'Shows only when ' + whenText(f.when) + '.'}));
+  if(f.underPositive) box.append(h('div', {class:'elabel', text:'Prints in capitals under each positive test, not as its own line.'}));
+  box.append(h('div', {class:'row'},
+    h('button', {type:'button', class:'btn small', text:'▲ Up', onclick:() => moveField(sec, f, -1)}),
+    h('button', {type:'button', class:'btn small', text:'▼ Down', onclick:() => moveField(sec, f, 1)}),
+    h('button', {type:'button', class:'btn small danger', text:'Delete', onclick:() => sheet({
+      title:'Delete “' + (f.type === 'mirror' ? ((fieldById(f.of) || {}).label || 'this item') : f.label) + '”?', body:['This removes it from the layout.'],
+      buttons:[ {label:'Delete', kind:'solid danger', on:() => { sec.fields = sec.fields.filter(x => x !== f); layoutChanged(); }}, {label:'Cancel'} ] })})));
+  return box;
+}
+
+function rerenderField(sec, f){
+  saveLayout();
+  const old = $('[data-field="' + f.id + '"]');
+  if(old) old.replaceWith(renderField(sec, f));
+  refresh();
+}
+
+function moveSection(sec, dir){
+  const list = secsOf(sec.tab);
+  const i = list.indexOf(sec), j = i + dir;
+  if(j < 0 || j >= list.length) return;
+  const a = L.sections.indexOf(list[i]), b = L.sections.indexOf(list[j]);
+  const tmp = L.sections[a]; L.sections[a] = L.sections[b]; L.sections[b] = tmp;
+  layoutChanged();
+}
+
+function moveField(sec, f, dir){
+  const list = secsOf(sec.tab);
+  const si = list.indexOf(sec);
+  const fi = sec.fields.indexOf(f);
+  if(fi < 0) return;
+  if(dir < 0 && fi === 0){
+    if(si <= 0) return;
+    sec.fields.splice(fi, 1); list[si - 1].fields.push(f);
+  } else if(dir > 0 && fi === sec.fields.length - 1){
+    if(si >= list.length - 1) return;
+    sec.fields.splice(fi, 1); list[si + 1].fields.unshift(f);
+  } else {
+    sec.fields.splice(fi, 1); sec.fields.splice(fi + dir, 0, f);
+  }
+  layoutChanged();
+}
+
+function addField(sec, type){
+  const f = { id: uid('f'), type, label: 'New field' };
+  if(type === 'yesno'){ f.type = 'choice'; f.opts = ['Yes', 'No', 'N/A']; }
+  else if(type === 'choice') f.opts = ['Option 1', 'Option 2'];
+  else if(type === 'text' || type === 'textarea' || type === 'dob'){ f.chips = []; f.ph = type === 'dob' ? 'MM/DD/YYYY' : ''; }
+  else if(type === 'check'){ f.label = sec.tab === 'office' ? 'New office step' : 'New item'; if(sec.tab === 'office') f.when = 'anyTest'; }
+  else if(type === 'note') f.label = 'New reminder';
+  else if(type === 'tests'){ f.label = 'Tap each test you did'; f.items = parseTestList('New test', []); }
+  sec.fields.push(f);
+  layoutChanged();
+  flash('Added. Change its text in the box under it.');
+}
+
+function builderTools(t){
+  return h('div', {class:'builder'},
+    h('button', {type:'button', class:'btn', text:'+ Add section', onclick:() => { L.sections.push({ id:uid('s'), tab:t, title:'New section', fields:[] }); layoutChanged(); }}),
+    h('button', {type:'button', class:'btn', text:'Export layout', onclick:exportLayout}),
+    h('button', {type:'button', class:'btn', text:'Import layout', onclick:importLayout}),
+    h('button', {type:'button', class:'btn danger', text:'Reset to default', onclick:() => sheet({
+      title:'Reset the layout?', body:['This puts back the original fields, checklist and office steps. Your office list stays. Answers in fields the original layout doesn’t have are cleared.'],
+      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); renderAll(); flash('Layout reset'); }}, {label:'Cancel'} ] })}));
+}
+
+function copyPlain(text, okMsg){
+  const fallback = () => { if(legacyCopy(text)) flash(okMsg); else flash('Copy was blocked. Press and hold the text to copy it', 'bad'); };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(() => flash(okMsg), fallback); return; }
+  }catch(e){}
+  fallback();
+}
+
+function exportLayout(){
+  const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
+  ta.value = JSON.stringify(L);
+  sheet({ title:'Export layout', body:['Your form layout, with no patient information in it. Keep a copy in Notes as a backup, or paste it into Import on another device.', ta],
+    buttons:[ {label:'Copy layout', kind:'primary', keepOpen:true, on:() => copyPlain(ta.value, 'Layout copied')}, {label:'Close'} ] });
+}
+
+function importLayout(){
+  const ta = h('textarea', {class:'inp mono', rows:'8', placeholder:'Paste an exported layout here'});
+  const err = h('div', {class:'err', role:'alert'});
+  let parsed = null;
+  sheet({ title:'Import layout', body:['This replaces your current layout. Your office list stays. Answers in fields the imported layout doesn’t have are cleared.', ta, err],
+    buttons:[ {label:'Replace my layout', kind:'primary', validate:() => {
+                try{ parsed = JSON.parse(ta.value); }catch(e){ parsed = null; }
+                if(!validLayout(parsed)){ err.textContent = 'That doesn’t look like an exported layout.'; return false; }
+                return true; },
+              on:() => { L = parsed; saveLayout(); renderAll(); flash('Layout imported'); }},
+              {label:'Cancel'} ] });
+}
+
+/* ---------- wiring ---------- */
+
+function bind(){
+  for(const t of TABS) $('#tab-' + t).addEventListener('click', () => setTab(t));
+  $('#editBtn').addEventListener('click', () => {
+    editing = !editing;
+    renderAll();
+    flash(editing ? 'Editing the layout' : 'Done editing');
+  });
+  $('#newBtn').addEventListener('click', () => newPatient());
+  $('#selectBtn').addEventListener('click', () => {
+    setTab('visit');
+    const o = $('#output');
+    if(!o) return;
+    o.scrollIntoView({block:'center'});
+    try{ o.focus({preventScroll:true}); o.setSelectionRange(0, o.value.length); }catch(e){}
+    flash('Message selected');
+  });
+  $('#copyBtn').addEventListener('click', onCopy);
+  window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); } });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && sheetOpen && sheetDismiss) sheetDismiss(); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden) saveDraft(); });
+  window.addEventListener('pagehide', saveDraft);
+}
+
+function start(){
+  loadLayout();
+  loadOffice();
+  bind();
+  renderAll();
+  const d = readJSON('session', DRAFT_KEY);
+  if(d && d.vals && typeof d.vals === 'object' && hasContent(d.vals) && d.t && (Date.now() - d.t) < MAX_DRAFT_AGE){
+    draftHold = true;
+    offerRestore(d);
+  } else if(d){
+    dropKey('session', DRAFT_KEY);
+  }
+  if(pendingUpdate) sheet(updateSheet());
+}
+
+start();
+})();
+</script>
+<script>
+(() => {
+  const context = document.modelContext;
+  if (!context || typeof context.registerTool !== 'function') return;
+  const lifecycle = new AbortController();
+  window.addEventListener('pagehide', () => lifecycle.abort(), { once: true });
+  try {
+    Promise.resolve(context.registerTool({
+      name: 'open_note_builder_tab',
+      title: 'Open note builder tab',
+      description: 'Open the existing Visit, Checklist, or Office tab in the note builder.',
+      inputSchema: {type: 'object', properties: {tab: {type: 'string', enum: ['visit', 'check', 'office']}}, required: ['tab'], additionalProperties: false},
+      annotations: {readOnlyHint: false, untrustedContentHint: false},
+      execute(input) {
+        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1 || !['visit', 'check', 'office'].includes(input.tab)) throw new Error('Choose visit, check, or office.');
+        document.getElementById('tab-' + input.tab).click();
+        return {tab: input.tab, selected: document.getElementById('tab-' + input.tab).getAttribute('aria-selected') === 'true'};
+      }
+    }, {signal: lifecycle.signal})).catch(() => {});
+  } catch (_) {}
+})();
+</script>
+</body>
+</html>
