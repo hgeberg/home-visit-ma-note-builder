@@ -1,0 +1,1876 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Note Builder">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Home Visit MA Note Builder</title>
+<style>
+:root{
+  --bg:#f1f4f8; --card:#ffffff; --ink:#15202b; --muted:#5b6b7b; --line:#d5dde6;
+  --field:#ffffff; --field-line:#c2ccd7;
+  --accent:#1769e0; --accent-text:#1461cf; --accent-ink:#ffffff; --accent-soft:rgba(23,105,224,.14);
+  --chip:#e8eef5; --chip-ink:#23364a; --chip-line:#c8d3de;
+  --ok:#0a7442; --ok-soft:#e7f5ed; --ok-line:#a6d8bb;
+  --warn:#835400; --warn-soft:#fff4d9; --warn-line:#eccf88;
+  --danger:#b3261e; --danger-soft:#fdecea; --danger-line:#f0c0bb;
+  --pos:#c0342b; --neg:#0b7a47; --fill-ink:#ffffff;
+  --out-bg:#0f1822; --out-ink:#eaf0f6;
+  --tab-on:#ffffff; --bar:rgba(255,255,255,.95); --scrim:rgba(10,18,26,.55); --shadow:0 18px 44px rgba(10,18,26,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0c1219; --card:#151d27; --ink:#e3eaf1; --muted:#95a5b5; --line:#253140;
+    --field:#0f1720; --field-line:#33414f;
+    --accent:#2f6ee0; --accent-text:#8fb5ff; --accent-ink:#ffffff; --accent-soft:rgba(110,160,255,.20);
+    --chip:#1c2733; --chip-ink:#d5dfe9; --chip-line:#33414f;
+    --ok:#6fd49c; --ok-soft:#10251a; --ok-line:#22583a;
+    --warn:#f0c46a; --warn-soft:#282010; --warn-line:#5a481c;
+    --danger:#ff8e84; --danger-soft:#2b1513; --danger-line:#6b2b25;
+    --pos:#b8352c; --neg:#1d7a4c; --fill-ink:#ffffff;
+    --out-bg:#070b10; --out-ink:#e3eaf1;
+    --tab-on:#2b3a4b; --bar:rgba(21,29,39,.95); --scrim:rgba(0,0,0,.62); --shadow:0 18px 44px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0c1219; --card:#151d27; --ink:#e3eaf1; --muted:#95a5b5; --line:#253140;
+  --field:#0f1720; --field-line:#33414f;
+  --accent:#2f6ee0; --accent-text:#8fb5ff; --accent-ink:#ffffff; --accent-soft:rgba(110,160,255,.20);
+  --chip:#1c2733; --chip-ink:#d5dfe9; --chip-line:#33414f;
+  --ok:#6fd49c; --ok-soft:#10251a; --ok-line:#22583a;
+  --warn:#f0c46a; --warn-soft:#282010; --warn-line:#5a481c;
+  --danger:#ff8e84; --danger-soft:#2b1513; --danger-line:#6b2b25;
+  --pos:#b8352c; --neg:#1d7a4c; --fill-ink:#ffffff;
+  --out-bg:#070b10; --out-ink:#e3eaf1;
+  --tab-on:#2b3a4b; --bar:rgba(21,29,39,.95); --scrim:rgba(0,0,0,.62); --shadow:0 18px 44px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.42 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit}
+a{color:var(--accent-text)}
+:focus-visible{outline:2px solid var(--accent-text);outline-offset:2px}
+.app{max-width:760px;margin-inline:auto;padding:14px 16px 40px}
+.patient{margin-top:24px;padding-top:20px;border-top:3px solid var(--line);scroll-margin-top:12px}
+.patient .top h2{margin:0;font-size:20px;line-height:1.3;overflow-wrap:anywhere}
+.patient .top>div{min-width:0}
+.patient-actions{display:grid;gap:10px;margin-top:12px}
+.add-patient{width:100%;min-height:48px;border:1px dashed var(--accent);color:var(--accent-text);background:var(--accent-soft)}
+.patient-caption{margin:0;color:var(--muted);font-size:13px}
+.office-section{margin-top:20px;scroll-margin-top:16px}
+.workspace-tools{display:flex;align-items:center;gap:10px;margin-top:16px}
+.workspace-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;background:var(--chip);border:1px solid var(--chip-line);border-radius:12px;padding:4px}
+.workspace-tools>.btn{flex:none}
+dialog.sheet{border:1px solid var(--line);margin:auto;width:calc(100% - 24px);max-width:560px}
+dialog.sheet::backdrop{background:var(--scrim)}
+.office-section h2{margin:0;font-size:21px}
+.office-patient .visit-head{grid-template-columns:1fr}
+.overnight-tests{margin:4px 0 12px;font-weight:720;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.office-reference-list{margin:0;padding:0 16px 16px 38px;display:grid;gap:10px}
+.office-reference-list .small{margin-top:2px}
+.office-summary{margin:8px 0;color:var(--muted)}
+.patient-status{min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
+.patient-status.bad{color:var(--danger)}
+.patient-status.warn{color:var(--warn)}
+.draft-warning{position:sticky;top:0;z-index:50}
+
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.top h1{margin:0;font-size:21px;line-height:1.2;font-weight:780;text-wrap:balance}
+.sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+.privacy{margin:10px 0 0;color:var(--muted);font-size:12.5px;line-height:1.45}
+
+.btn{
+  appearance:none;border:1px solid var(--chip-line);background:var(--card);color:var(--ink);
+  border-radius:10px;padding:9px 13px;font-weight:680;cursor:pointer;min-height:42px;line-height:1.2
+}
+[data-local-id="editBtn"]{white-space:nowrap;flex:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger);border-color:var(--danger-line)}
+.btn.solid.danger{background:var(--pos);border-color:var(--pos);color:var(--fill-ink)}
+.btn.small{min-height:36px;padding:7px 11px;font-size:14px}
+.btn:active{transform:translateY(1px)}
+
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:10px 8px;margin-top:6px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:12px;background:var(--chip);border:1px solid var(--chip-line)}
+.tab{
+  appearance:none;border:0;background:transparent;color:var(--muted);font-weight:720;font-size:15px;
+  padding:8px 4px;border-radius:9px;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;gap:6px
+}
+.tab[aria-selected="true"]{background:var(--tab-on);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.badge{font-size:12px;font-weight:760;padding:1px 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line);font-variant-numeric:tabular-nums}
+.badge:empty{display:none}
+.badge.complete{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-line)}
+
+.banner{margin:6px 0 10px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:620;line-height:1.4}
+.banner.ok{background:var(--ok-soft);border:1px solid var(--ok-line);color:var(--ok)}
+.banner.warn{background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn)}
+.banner.info{background:var(--chip);border:1px solid var(--chip-line);color:var(--chip-ink)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-block:12px}
+.sec-title{margin:0;padding:14px 16px 2px;font-size:16px;font-weight:760;text-wrap:balance}
+.grid{display:grid;grid-template-columns:1fr;gap:14px;padding:12px 16px 16px}
+@media (min-width:640px){.grid{grid-template-columns:1fr 1fr}.full{grid-column:1/-1}}
+.pad{padding:0 16px 14px}
+.pad-x{padding-inline:16px}
+.small{font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.4}
+
+.flabel{display:block;font-size:13px;font-weight:720;margin-bottom:6px}
+.inp{
+  width:100%;border:1px solid var(--field-line);border-radius:10px;padding:11px 12px;
+  font:inherit;font-size:16px;background:var(--field);color:var(--ink);outline:none
+}
+textarea.inp{min-height:84px;resize:vertical}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.inp::placeholder{color:var(--muted);opacity:.85}
+.inp.detail{margin-top:8px}
+.inp.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.flabel + .chips{margin-top:0}
+.chip{
+  border:1px solid var(--chip-line);background:var(--chip);color:var(--chip-ink);border-radius:999px;
+  padding:7px 12px;font-size:14px;font-weight:650;cursor:pointer;min-height:36px;line-height:1.2
+}
+.chip[aria-pressed="true"],.chip[aria-checked="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.pos[aria-checked="true"]{background:var(--pos);border-color:var(--pos);color:var(--fill-ink)}
+.chip.neg[aria-checked="true"]{background:var(--neg);border-color:var(--neg);color:var(--fill-ink)}
+
+.checkrow{
+  display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid var(--field-line);
+  border-radius:10px;background:var(--field);cursor:pointer;font-weight:620;line-height:1.35
+}
+.checkrow input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
+.checkrow.done{background:var(--ok-soft);border-color:var(--ok-line);color:var(--ok)}
+.checkrow.remind:not(.done){background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.checkrow.template{cursor:default;color:var(--muted)}
+.checkrow .box{width:20px;height:20px;border:2px solid var(--field-line);border-radius:5px;flex:none}
+
+.note{padding:11px 12px;border-radius:10px;background:var(--chip);border:1px solid var(--chip-line);color:var(--chip-ink);font-size:14px;font-weight:600;line-height:1.4}
+
+.tests{display:grid;gap:9px}
+.testrow{border:1px solid var(--field-line);border-radius:12px;background:var(--field);padding:10px 12px}
+.testrow.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.thead{display:flex;align-items:center;gap:12px;font-weight:680;cursor:pointer;min-height:30px}
+.thead input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
+.tkind{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted)}
+.testrow .res,.testrow .sub{margin-top:10px;align-items:center}
+.subchoice{margin-top:10px;align-items:center}
+.sublabel{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
+.hint{font-size:12.5px;font-weight:650;color:var(--warn);margin:6px 0 0 34px}
+
+.tagline{margin:10px 16px 0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn);font-size:14px;font-weight:650;line-height:1.4}
+.output{
+  display:block;width:100%;min-height:150px;border:0;border-radius:10px;padding:13px;resize:none;
+  background:var(--out-bg);color:var(--out-ink);font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+}
+.out-wrap{padding:12px 16px 16px}
+
+.visit-head{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:14px 16px 4px;align-items:center}
+.visit-name{font-weight:760;font-size:16px}
+.visit-meta{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.pill{grid-column:2;grid-row:1 / span 2;border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:760;white-space:nowrap}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
+.steps{display:grid;gap:8px;padding:8px 16px 12px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.empty{padding:6px 16px 16px;color:var(--muted)}
+
+.editor{margin-top:10px;padding:10px;border:1px dashed var(--field-line);border-radius:10px;background:var(--bg);display:grid;gap:7px}
+.elabel{font-size:12px;font-weight:700;color:var(--muted);line-height:1.35}
+.sec-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:0 16px 12px}
+.sec-tools .inp{flex:1 1 180px;min-width:0;padding:8px 10px}
+.addmenu{padding:0 16px 16px}
+.builder{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block:12px}
+
+.actions{margin-top:12px}
+.actions-inner{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:8px}
+.actions .btn{min-height:48px;border-radius:12px;font-weight:760;padding-inline:8px}
+
+.scrim{
+  position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px))
+}
+@media (min-width:640px){.scrim{align-items:center}}
+.sheet{width:min(100%,560px);max-height:86vh;overflow:auto;background:var(--card);color:var(--ink);border-radius:16px;padding:18px 16px 16px;box-shadow:var(--shadow)}
+.sheet h3{margin:0 0 8px;font-size:18px;line-height:1.25;text-wrap:balance}
+.sheet p{margin:0 0 10px;color:var(--muted)}
+.sheet .flabel{margin-top:10px}
+.sheet .btns{display:grid;gap:8px;margin-top:14px}
+.sheet .btns .btn{min-height:46px}
+.steplist{margin:4px 0 8px;padding-left:20px;display:grid;gap:4px}
+.preview{margin:0 0 6px;padding:10px 12px;border-radius:10px;background:var(--out-bg);color:var(--out-ink);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.err{color:var(--danger);font-size:13px;font-weight:650;min-height:18px;margin-top:6px}
+@media (prefers-reduced-motion:no-preference){
+  .sheet{animation:rise .16s ease-out}
+  @keyframes rise{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+<meta name="description" content="Build home visit MA notes, follow visit checklists, and track office follow-up tasks.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%231769e0%22%2F%3E%3Cpath%20d%3D%22M10%207h12v18H10z%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M13%2012h6M13%2016h6M13%2020h4%22%20stroke%3D%22%231769e0%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<main class="app">
+  <header class="top"><div>
+    <h1>Home Visit MA Note Builder</h1>
+    <p class="sub"><b>v8.10</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
+  </div></header>
+  <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
+  <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
+  <div id="shiftClearWarning" class="banner warn" role="alert" hidden>
+    <p>Patient forms have been cleared, but some saved information could not be deleted. Retry before closing this page.</p>
+    <button type="button" class="btn" id="retryShiftClear">Retry clearing saved data</button>
+  </div>
+  <div class="workspace-tools">
+    <nav class="workspace-tabs" role="tablist" aria-label="Workspace">
+      <button type="button" class="tab" role="tab" id="view-patients" aria-controls="patients" aria-selected="true">Patients</button>
+      <button type="button" class="tab" role="tab" id="view-office" aria-controls="officeSection" aria-selected="false" tabindex="-1">Office</button>
+    </nav>
+    <button type="button" class="btn danger" id="clearShiftBtn">Clear shift</button>
+  </div>
+  <p id="shiftStatus" class="small" role="status" aria-live="polite"></p>
+  <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
+  <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
+    <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
+    <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
+    <div id="officeSaveWarning" class="banner warn" role="alert" hidden>
+      <p>The office list could not be saved in this browser. Keep this page open until saving succeeds.</p>
+      <button type="button" class="btn" id="retryOfficeSave">Retry save</button>
+    </div>
+    <div id="officeContent"></div>
+  </section>
+</main>
+<div id="dialogHosts"></div>
+<dialog class="sheet" id="clearShiftDialog" aria-labelledby="clearShiftTitle">
+  <h3 id="clearShiftTitle">Clear everything for this shift?</h3>
+  <p>This removes every patient form, saved draft and Office entry, including unfinished information. It starts one blank patient for your next shift. Your layout settings stay.</p>
+  <p>Other tabs running this version in the same browser will also reset. This cannot be undone.</p>
+  <div id="clearShiftError" class="err" role="alert"></div>
+  <div class="btns">
+    <button type="button" class="btn" id="cancelClearShift" autofocus>Cancel</button>
+    <button type="button" class="btn solid danger" id="confirmClearShift">Clear everything</button>
+  </div>
+</dialog>
+<template id="patientTemplate">
+  <section class="patient">
+    <header class="top">
+      <div><h2 id="patientTitle"></h2><p class="sub">Complete this patient at your own pace. Other patients stay on the page.</p></div>
+      <button type="button" class="btn" id="editBtn">Edit layout</button>
+    </header>
+    <nav class="tabs" aria-label="Patient sections">
+      <div class="seg" role="tablist">
+        <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
+        <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist <span class="badge" id="badge-check"></span></button>
+        <button type="button" class="tab" role="tab" id="tab-office" aria-controls="panel-office" aria-selected="false">Office <span class="badge" id="badge-office"></span></button>
+      </div>
+    </nav>
+    <div id="editBanner" class="banner info" hidden></div>
+    <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
+    <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden></div>
+    <div id="panel-office" role="tabpanel" aria-labelledby="tab-office" hidden></div>
+    <div class="actions">
+      <div class="actions-inner">
+        <button type="button" class="btn" id="newBtn">Clear this patient</button>
+        <button type="button" class="btn" id="selectBtn">Select text</button>
+        <button type="button" class="btn primary" id="copyBtn">Copy message</button>
+      </div>
+      <div id="status" class="patient-status" role="status" aria-live="polite"></div>
+    </div>
+    <div class="patient-actions">
+      <button type="button" class="btn add-patient" id="addPatientBtn">+ Add another patient</button>
+      <p class="patient-caption">Adds a blank patient below this one. Everything entered above stays here.</p>
+    </div>
+    <div id="sheetHost"></div>
+  </section>
+</template>
+
+<script>
+(() => {
+"use strict";
+
+// Each patient owns the original form in a separate closure. Only the layout,
+// office list and whole-page draft are shared; no patient field state is global.
+function mountPatient(root, seed, page){
+const prefix = root.id + '_';
+const localSelector = sel => sel.replace(/#([\w-]+)/g, (_, id) => '#' + prefix + id);
+const lifecycle = new AbortController();
+function namespaceElement(node){
+  if(node.id){ node.dataset.localId = node.id; node.id = prefix + node.id; }
+  for(const attr of ['for', 'aria-labelledby', 'aria-controls', 'aria-describedby']){
+    if(node.hasAttribute(attr)) node.setAttribute(attr, node.getAttribute(attr).split(/\s+/).map(id => prefix + id).join(' '));
+  }
+}
+root.querySelectorAll('*').forEach(namespaceElement);
+root.setAttribute('aria-labelledby', prefix + 'patientTitle');
+const dialogHost = root.querySelector('[data-local-id="sheetHost"]');
+page.dialogHosts.append(dialogHost);
+
+const LAYOUT_KEY = 'hvnb_layout';
+const OFFICE_KEY = 'hvnb_office';
+const DEFAULT_BASE = 12;
+// iOS Safari copies text that starts like "Symptoms: ..." as a web address, and Teams then pastes it
+// as Symptoms:%20Sore%20throat... An invisible zero-width space in front stops it looking like one.
+const COPY_PREFIX = '\u200B';
+const TABS = ['visit', 'check', 'office'];
+
+/* ---------- helpers ---------- */
+
+const $ = (sel, scope) => !scope && sel === '#sheetHost' ? dialogHost : (scope || root).querySelector(localSelector(sel));
+const $$ = (sel, scope) => Array.from((scope || root).querySelectorAll(localSelector(sel)));
+
+function h(tag, attrs, ...kids){
+  const n = document.createElement(tag);
+  if(attrs){
+    for(const k of Object.keys(attrs)){
+      const v = attrs[k];
+      if(v === null || v === undefined || v === false) continue;
+      if(k === 'class') n.className = v;
+      else if(k === 'text') n.textContent = v;
+      else if(k === 'value') n.value = v;
+      else if(k === 'data') Object.assign(n.dataset, v);
+      else if(k.slice(0, 2) === 'on' && typeof v === 'function') n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+  }
+  namespaceElement(n);
+  for(const kid of kids.flat()){
+    if(kid === null || kid === undefined || kid === false) continue;
+    n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return n;
+}
+
+function uid(p){ return (p || 'x') + Math.random().toString(36).slice(2, 9); }
+function norm(s){ return String(s == null ? '' : s).trim().toLowerCase(); }
+function fmtTime(t){ try{ return new Date(t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }catch(e){ return ''; } }
+function fmtDayTime(t){
+  try{
+    const d = new Date(t);
+    const today = d.toDateString() === new Date().toDateString();
+    return (today ? 'Today ' : d.toLocaleDateString([], {weekday:'short', month:'numeric', day:'numeric'}) + ', ') + fmtTime(t);
+  }catch(e){ return ''; }
+}
+
+function store(kind){ try{ return kind === 'local' ? window.localStorage : window.sessionStorage; }catch(e){ return null; } }
+function readJSON(kind, key){
+  const s = store(kind); if(!s) return null;
+  try{ const raw = s.getItem(key); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function writeJSON(kind, key, val){
+  const s = store(kind); if(!s) return false;
+  try{ s.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; }
+}
+function dropKey(kind, key){ const s = store(kind); if(!s) return; try{ s.removeItem(key); }catch(e){} }
+
+function chips(str){
+  return String(str || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+    const add = s.charAt(0) === '+';
+    return { v: add ? s.slice(1).trim() : s, m: add ? 'add' : 'fill' };
+  }).filter(c => c.v);
+}
+function chipsText(list){ return (list || []).map(c => (c.m === 'add' ? '+' : '') + c.v).join(', '); }
+function listItems(v){ return String(v || '').split(',').map(x => x.trim()).filter(Boolean); }
+function listHas(v, item){ const t = norm(item); return listItems(v).some(x => norm(x) === t); }
+function listToggle(v, item){
+  const items = listItems(v).filter(x => norm(x) !== 'none');
+  const i = items.findIndex(x => norm(x) === norm(item));
+  if(i >= 0) items.splice(i, 1); else items.push(item);
+  return items.join(', ');
+}
+
+function maskDob(v){
+  if(/[a-z]/i.test(v)) return v;
+  if(/[\/.\-]/.test(v)){
+    const parts = v.split(/[\/.\-]/);
+    v = parts.map((p, i) => { p = p.replace(/\D/g, ''); return (i < 2 && i < parts.length - 1 && p.length === 1) ? '0' + p : p; }).join('');
+  }
+  const d = v.replace(/\D/g, '').slice(0, 8);
+  if(d.length <= 2) return d;
+  if(d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
+  return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
+}
+
+function parseTestList(str, old){
+  const byName = new Map((old || []).map(it => [norm(it.n), it]));
+  const used = new Set();
+  const out = String(str || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+    let kind = 'posneg';
+    if(/\(done\)/i.test(s)){ kind = 'done'; s = s.replace(/\(done\)/ig, '').trim(); }
+    let sub = null;
+    const m = s.match(/\[(.*)\]\s*$/);
+    if(m){ sub = m[1].split('|').map(x => x.trim()).filter(Boolean); s = s.slice(0, m.index).trim(); }
+    if(!s) return null;
+    const prev = byName.get(norm(s));
+    const id = prev && !used.has(prev.id) ? prev.id : uid('t');
+    used.add(id);
+    const it = { id, n: s, kind };
+    if(kind === 'posneg' && sub && sub.length) it.sub = sub;
+    if(prev && prev.hint) it.hint = prev.hint;
+    return it;
+  }).filter(Boolean);
+  if(old && old.length === out.length){
+    out.forEach((it, i) => {
+      const o = old[i];
+      if(norm(o.n) === norm(it.n)) return;
+      if(out.some(x => x.id === o.id)) return;
+      it.id = o.id;
+      if(o.hint && !it.hint) it.hint = o.hint;
+    });
+  }
+  return out;
+}
+function testListText(items){
+  return (items || []).map(it => it.n + (it.kind === 'done' ? ' (done)' : '') + (it.sub && it.sub.length ? '[' + it.sub.join('|') + ']' : '')).join(', ');
+}
+
+/* ---------- default layout ---------- */
+
+function defaultLayout(){
+  return { v: 4, base: DEFAULT_BASE, sections: [
+    { id:'s_door', tab:'visit', title:'At the door', fields:[
+      { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
+      { id:'dob', type:'dob', label:'DOB', req:true },
+      { id:'inspic', type:'check', remind:true, label:'Took a pic of the insurance card, even if they say they sent it' },
+      { id:'added', type:'check', label:'Patient added at the house' },
+      { id:'correction', type:'text', label:'Correction', ph:'Only if something was wrong, like spelling or DOB' }
+    ]},
+    { id:'s_hx', tab:'visit', title:'Symptoms & history', fields:[
+      { id:'symptoms', type:'textarea', label:'Symptoms', ph:'Type symptoms or tap common ones',
+        chips: chips('+Sore throat, +Cough, +Congestion, +Fever, +Headache, +Ear pain, +Ear pulling, +Nausea/vomiting, +Diarrhea, +Rash') },
+      { id:'duration', type:'text', label:'Duration', ph:'2 days', chips: chips('1 day, 2 days, 3 days, 1 week') },
+      { id:'exposure', type:'choice', label:'Exposure', opts:['No','Yes','Unknown'], detail:{ id:'exposureto', on:'Yes', ph:'Exposed to what?' } },
+      { id:'allergies', type:'text', label:'Medication allergies', ph:'Medication or food allergy', chips: chips('NKDA, None') },
+      { id:'abx', type:'text', label:'Recent antibiotics', ph:'Name and dates', chips: chips('No, None') },
+      { id:'history', type:'textarea', label:'Medical history', ph:'Relevant history', chips: chips('None') },
+      { id:'meds', type:'text', label:'Daily medications', ph:'Medication list', chips: chips('None') },
+      { id:'preg', type:'choice', label:'Nursing / pregnant', opts:['No','Yes','N/A'],
+        sub:{ id:'pregtype', on:'Yes', label:'Which?', opts:['Nursing','Pregnant','Both'], out:{ Both:'Nursing and pregnant' } } }
+    ]},
+    { id:'s_vitals', tab:'visit', title:'Vitals', fields:[
+      { id:'temp', type:'text', label:'Temp', ph:'98.7 °F', im:'decimal' },
+      { id:'o2', type:'text', label:'O2', ph:'98%', im:'numeric' },
+      { id:'hr', type:'text', label:'HR', ph:'72 bpm', im:'numeric' },
+      { id:'bp', type:'text', label:'BP', ph:'Only if the provider asks', chips: chips('N/A') },
+      { id:'weight', type:'text', label:'Weight', ph:'Peds or under 100 lb', im:'decimal', chips: chips('N/A') }
+    ]},
+    { id:'s_rx', tab:'visit', title:'Pharmacy', fields:[
+      { id:'pharmacy', type:'text', label:'Pharmacy', ph:'Pharmacy name', chips: chips('Madison') },
+      { id:'formpref', type:'choice', label:'Pills or liquid', opts:['Pill','Liquid','Either','N/A'] }
+    ]},
+    { id:'s_tests', tab:'visit', title:'Tests', fields:[
+      { id:'tests', type:'tests', label:'Tap each test you did', items:[
+        { id:'strep', n:'Rapid strep', kind:'posneg', hint:'No strep under 2 yrs' },
+        { id:'flu', n:'Rapid flu', kind:'posneg', sub:['A','B'] },
+        { id:'covid', n:'Rapid COVID', kind:'posneg' },
+        { id:'ears', n:'Ears', kind:'done' },
+        { id:'urine', n:'Urine dip', kind:'done' }
+      ]},
+      { id:'aware', type:'choice', label:'Patient aware of positive', opts:['Aware','Unaware'], when:'anyPositive', req:true, underPositive:true },
+      { id:'overnights', type:'text', label:'Overnights sent', ph:'Overnights and samples that went out',
+        chips: chips('None, +4plex, +Strep throat PCR, +RPP, +Strep culture, +Urine culture, +Blood') },
+      { id:'bloodreason', type:'text', label:'Reason for blood work', ph:'Why the blood work was ordered', when:'blood', req:true }
+    ]},
+    { id:'s_ins', tab:'visit', title:'Insurance', fields:[
+      { id:'polholder', type:'dob', label:'Policy holder DOB', ph:'Family plan only', chips: chips('N/A') }
+    ]},
+    { id:'s_notes', tab:'visit', title:'Notes', fields:[
+      { id:'notes', type:'textarea', label:'Notes', ph:'Anything else for the office', keepLines:true, chips: chips('None') }
+    ]},
+
+    { id:'k_before', tab:'check', title:'Before you leave', fields:[
+      { id:'k_wipes', type:'note', label:'Clean catch wipes are in the supply closet.' }
+    ]},
+    { id:'k_door', tab:'check', title:'At the door', fields:[
+      { id:'k_confirm', type:'check', label:'Confirmed name, DOB, spelling and phone number' },
+      { id:'k_inspic', type:'mirror', of:'inspic' },
+      { id:'k_polholder', type:'check', label:'Family plan: got the policy holder’s birthday' }
+    ]},
+    { id:'k_visit', tab:'check', title:'During the visit', fields:[
+      { id:'k_pa', type:'check', label:'PA video call done' },
+      { id:'k_strep2', type:'note', label:'No strep under 2 yrs.' },
+      { id:'k_label', type:'check', label:'LABEL EVERYTHING' },
+      { id:'k_script', type:'check', label:'Took a pic of the blood work script', when:'blood' }
+    ]},
+    { id:'k_post', tab:'check', title:'When you post', fields:[
+      { id:'k_posted', type:'check', label:'Posted the message with the insurance pic' },
+      { id:'k_scriptpost', type:'check', label:'Posted the script pic', when:'blood' },
+      { id:'k_tagcorr', type:'check', label:'Correction: tagged the person who posted the stop', when:'correction' },
+      { id:'k_tagadd', type:'check', label:'Added patient: tagged the person who posted the stop', when:'added' },
+      { id:'k_tagprov', type:'check', label:'Positive: tagged the provider', when:'anyPositive' },
+      { id:'k_tagunaware', type:'check', label:'Patient unaware: tagged the person who posted the stop', when:'positiveUnaware' },
+      { id:'k_who', type:'note', label:'Tag people at office: Chaya Baila 9-5, Mary Grace 9am-8pm, Tzvi 9-3/4.' }
+    ]},
+    { id:'k_help', tab:'check', title:'Office closed or after 8', fields:[
+      { id:'k_after', type:'note', label:'“If office closed/after 8 and you have any issues text/call me, Chayala or Yaakov.”' }
+    ]},
+
+    { id:'o_steps', tab:'office', title:'Requisition and follow-up reminders', fields:[
+      { id:'o_reqtests', type:'check', label:'Req: all tests done are checked off, and the provider', when:'anyTest' },
+      { id:'o_4plex', type:'check', label:'Req: overnight viral / flu / COVID PCR has 4plex checked, unless the provider ordered RPP', when:'viralPcr' },
+      { id:'o_strep', type:'check', label:'Req: strep throat PCR checked, unless the provider ordered a culture', when:'strep' },
+      { id:'o_match', type:'check', label:'Req: name, spelling and DOB match', when:'anyTest' },
+      { id:'o_corr', type:'check', label:'Req: the correction is fixed on the req too. If not, cross out and write it out', when:['correction', 'anyTest'] },
+      { id:'o_date', type:'check', label:'Req: collection date is correct', when:'anyTest' },
+      { id:'o_blood', type:'check', label:'Blood req: tests filled in and the patient’s provider checked at the bottom. If not, fill in from the script pic', when:'blood' },
+      { id:'o_dip', type:'check', label:'Dipstick pic uploaded to Teams under the patient, and the provider tagged', when:'urine' },
+      { id:'o_ears', type:'check', label:'Provider posted the ear check results. If not, tag the provider under the patient', when:'ears' }
+    ]},
+    { id:'o_ref', tab:'office', title:'Req didn’t print?', fields:[
+      { id:'o_blank', type:'note', label:'There should be blank reqs. Fill in all the info off Teams, and the insurance info off the pic you took.' }
+    ]}
+  ]};
+}
+
+const WHEN_TEXT = {
+  added:'“Patient added at the house” is ticked',
+  correction:'a correction is typed',
+  anyPositive:'a test is marked Positive',
+  positiveUnaware:'a test is positive and the patient is unaware',
+  blood:'Blood is in overnights sent',
+  viralPcr:'4plex or RPP is in overnights sent',
+  strep:'a strep test was done or sent',
+  ears:'Ears is ticked',
+  urine:'Urine dip is ticked',
+  anyTest:'any test was done or sent'
+};
+function whenText(w){ return (Array.isArray(w) ? w : [w]).map(k => WHEN_TEXT[k] || k).join(' and '); }
+
+function validLayout(t){
+  return !!t && Array.isArray(t.sections) && t.sections.every(s =>
+    s && typeof s.id === 'string' && TABS.indexOf(s.tab) >= 0 && typeof s.title === 'string' && Array.isArray(s.fields) &&
+    s.fields.every(f => f && typeof f.id === 'string' && typeof f.type === 'string'));
+}
+
+/* ---------- state ---------- */
+
+let L = null;            // layout
+let V = seed.vals || {};              // this visit's values
+let M = Object.assign(freshMeta(), seed.meta || {});     // this visit's copy/office status
+let office = [];         // saved visits waiting on office steps
+let officeBaseline = []; // last storage snapshot, before any unsaved local changes
+let tab = TABS.includes(seed.tab) && seed.tab !== 'office' ? seed.tab : 'visit';
+let editing = false;
+let layoutTimer = null;
+let pendingUpdate = false;
+
+function freshMeta(){ return { sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
+
+function secsOf(t){ return L.sections.filter(s => s.tab === t); }
+function fieldById(id){ for(const s of L.sections) for(const f of s.fields) if(f.id === id) return f; return null; }
+
+function loadLayout(){
+  const saved = seed.layout || readJSON('local', LAYOUT_KEY);
+  if(saved && validLayout(saved)){ L = saved; pendingUpdate = (saved.base || 0) < DEFAULT_BASE; }
+  else L = defaultLayout();
+}
+function saveLayout(){
+  clearTimeout(layoutTimer);
+  layoutTimer = null;
+  if(!writeJSON('local', LAYOUT_KEY, L)) flash('Couldn’t save the layout on this device', 'bad');
+  page.layoutChanged(root, L);
+  renderOfficePanel();
+}
+function saveLayoutSoon(){ clearTimeout(layoutTimer); layoutTimer = setTimeout(saveLayout, 400); }
+function layoutChanged(){ saveLayout(); renderAll(); }
+
+let officeWritable = true;
+function loadOffice(){
+  if(!officeWritable || !store('local')) return;
+  const o = readJSON('local', OFFICE_KEY);
+  office = Array.isArray(o) ? o.filter(v => v && typeof v.id === 'string' && Array.isArray(v.steps) && page.matchesShift(v)) : [];
+  officeBaseline = JSON.parse(JSON.stringify(office));
+}
+function saveOffice(){
+  if(lifecycle.signal.aborted || !page.isCurrentShift()) return false;
+  // Apply only this page's changes to the newest stored list. A failed save may
+  // be retried after another tab has added, edited or removed other patients.
+  const baseline = new Map(officeBaseline.map(o => [o.id, o]));
+  const current = new Map(office.map(o => [o.id, o]));
+  const removed = new Set(officeBaseline.filter(o => !current.has(o.id)).map(o => o.id));
+  const changed = office.filter(o => JSON.stringify(o) !== JSON.stringify(baseline.get(o.id)));
+  try{
+    const storage = store('local');
+    if(!storage) throw new Error('Storage unavailable');
+    const raw = storage.getItem(OFFICE_KEY);
+    const latest = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(latest)) throw new Error('Invalid stored office list');
+    const valid = latest.filter(o => o && typeof o.id === 'string' && Array.isArray(o.steps) && page.matchesShift(o));
+    const merged = new Map(valid.filter(o => !removed.has(o.id)).map(o => [o.id, o]));
+    changed.forEach(o => merged.set(o.id, o));
+    office = Array.from(merged.values());
+    officeBaseline = JSON.parse(JSON.stringify(valid));
+    storage.setItem(OFFICE_KEY, JSON.stringify(office));
+    officeBaseline = JSON.parse(JSON.stringify(office));
+    officeWritable = true;
+  }catch(e){ officeWritable = false; }
+  if(!officeWritable) flash('Couldn’t save the office list in this browser', 'bad');
+  return officeWritable;
+}
+function mutateOffice(fn){
+  if(lifecycle.signal.aborted || !page.isCurrentShift()) return;
+  loadOffice();
+  const r = fn();
+  saveOffice();
+  if(lifecycle.signal.aborted) return;
+  renderOfficePanel();
+  updateBadges();
+  page.officeChanged(root, office);
+  return r;
+}
+
+function hasContent(vals){
+  vals = vals || {};
+  for(const sec of L.sections){
+    if(sec.tab === 'office') continue;
+    for(const f of sec.fields){
+      const v = vals[f.id];
+      if(f.type === 'tests'){ if(v && (f.items || []).some(it => v[it.id] && v[it.id].on)) return true; }
+      else if(f.type === 'check'){ if(v) return true; }
+      else if(typeof v === 'string' && v.trim()) return true;
+    }
+  }
+  return false;
+}
+
+function pruneValues(){
+  const keep = new Set();
+  for(const sec of L.sections) for(const f of sec.fields){ keep.add(f.id); if(f.detail) keep.add(f.detail.id); if(f.sub) keep.add(f.sub.id); }
+  for(const k of Object.keys(V)) if(!keep.has(k)) delete V[k];
+}
+
+/* ---------- what applies ---------- */
+
+function context(vals){
+  const ticked = [], positive = [];
+  for(const sec of secsOf('visit')) for(const f of sec.fields){
+    if(f.type !== 'tests') continue;
+    const tv = vals[f.id] || {};
+    for(const it of f.items || []){
+      const s = tv[it.id];
+      if(!s || !s.on) continue;
+      ticked.push(it);
+      if(it.kind !== 'done' && s.r === 'Positive') positive.push(it);
+    }
+  }
+  let lab = norm(vals.overnights);
+  if(/^(none|no|n\/?a|nothing|-+)\.?$/.test(lab)) lab = '';
+  const did = (id, re) => ticked.some(it => it.id === id || re.test(it.n));
+  const anyPositive = positive.length > 0;
+  return {
+    added: !!vals.added,
+    correction: !!String(vals.correction || '').trim(),
+    anyPositive,
+    positiveUnaware: anyPositive && vals.aware === 'Unaware',
+    blood: /blood/.test(lab),
+    viralPcr: /4\s*-?\s*plex|\brpp\b|(flu|covid|viral)[^,]*pcr/.test(lab),
+    strep: did('strep', /strep/i) || /strep/.test(lab),
+    ears: did('ears', /\bears?\b/i),
+    urine: did('urine', /urine|dip/i),
+    anyTest: ticked.length > 0 || lab !== ''
+  };
+}
+function whenOK(w, ctx){
+  if(!w) return true;
+  return (Array.isArray(w) ? w : [w]).every(k => (k in ctx) ? !!ctx[k] : true);
+}
+
+function buildOutput(vals){
+  // The message only ever holds what was entered. Anything missing goes into `issues`,
+  // which the "Before you copy" sheet shows. Nothing like NOT MARKED is ever printed.
+  const ctx = context(vals);
+  const lines = [], issues = [];
+  let aware = '';   // printed in capitals under each positive test
+  for(const sec of secsOf('visit')) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
+  for(const sec of secsOf('visit')) for(const f of sec.fields){
+    if(!whenOK(f.when, ctx)) continue;
+    const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
+    if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
+      let v = String(vals[f.id] || '').trim();
+      if(v){
+        if(!f.keepLines) v = v.replace(/\s*\n+\s*/g, '; ');
+        lines.push(name + ': ' + v);
+      } else if(f.req) issues.push(name + ': not entered');
+    } else if(f.type === 'choice' && f.underPositive){
+      if(!vals[f.id] && f.req) issues.push(name + ': not marked');
+    } else if(f.type === 'choice'){
+      const v = vals[f.id];
+      if(v){
+        let line = name + ': ' + v;
+        if(f.detail && v === f.detail.on){
+          const d = String(vals[f.detail.id] || '').trim().replace(/^to\s+/i, '').replace(/\s*\n+\s*/g, '; ');
+          if(d) line += ', to ' + d;
+          else issues.push(name + ': exposed to what?');
+        }
+        if(f.sub && v === f.sub.on){
+          const sv = vals[f.sub.id];
+          if(sv) line = name + ': ' + ((f.sub.out && f.sub.out[sv]) || sv);
+          else {
+            const o = (f.sub.opts || []).map(x => x.toLowerCase());
+            issues.push(name + ': ' + (o.length > 1 ? o.slice(0, -1).join(', ') + ' or ' + o[o.length - 1] : o.join('')) + '?');
+          }
+        }
+        lines.push(line);
+      } else if(f.req) issues.push(name + ': not marked');
+    } else if(f.type === 'tests'){
+      const tv = vals[f.id] || {};
+      for(const it of f.items || []){
+        const s = tv[it.id];
+        if(!s || !s.on) continue;
+        if(it.kind === 'done'){ lines.push(it.n + ': Done'); continue; }
+        if(!s.r){ issues.push(it.n + ': result not marked'); continue; }
+        const needsType = s.r === 'Positive' && it.sub && it.sub.length;
+        lines.push(it.n + ': ' + s.r.toUpperCase() + (needsType && s.s ? ' (' + s.s + ')' : ''));
+        if(s.r === 'Positive' && aware) lines.push('PATIENT ' + String(aware).toUpperCase());
+        if(needsType && !s.s) issues.push(it.n + ': ' + it.sub.join(' or ') + ' not marked');
+      }
+    }
+  }
+  if(!lines.length) return { text: '', issues: [], ctx };
+  return { text: lines.join('\n'), issues, ctx };
+}
+
+function officeSteps(vals){
+  const ctx = context(vals);
+  const out = [];
+  for(const sec of secsOf('office')) for(const f of sec.fields){
+    if(f.type === 'check' && whenOK(f.when, ctx)) out.push({ id: f.id, label: f.label });
+  }
+  return out;
+}
+function overnightText(vals){
+  const text = String(vals.overnights || '').trim();
+  return /^(none|no|n\/?a|nothing|-+)\.?$/i.test(text) ? '' : text;
+}
+function officeDetails(vals){
+  return {overnights:overnightText(vals), bloodreason:context(vals).blood ? String(vals.bloodreason || '').trim() : ''};
+}
+function officeOrder(){
+  const ids = [];
+  for(const sec of secsOf('office')) for(const f of sec.fields) if(f.type === 'check') ids.push(f.id);
+  return ids;
+}
+
+/* ---------- drafts ---------- */
+
+function saveDraft(){ page.saveDraft(); }
+function saveDraftSoon(){ page.saveDraftSoon(); }
+
+/* ---------- status + sheets ---------- */
+
+let flashTimer = null;
+function flash(msg, kind){
+  const s = $('#status');
+  s.textContent = msg;
+  s.className = 'patient-status ' + (kind || '');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { s.textContent = ''; s.className = 'patient-status'; }, 2800);
+}
+
+let sheetOpen = false;
+let sheetDismiss = null;
+const sheetQueue = [];
+function sheet(opts){ if(lifecycle.signal.aborted) return; if(sheetOpen) sheetQueue.push(opts); else openSheet(opts); }
+function openSheet(opts){
+  if(lifecycle.signal.aborted) return;
+  sheetOpen = true;
+  const host = $('#sheetHost');
+  host.textContent = '';
+  const card = h('div', {class:'sheet', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'sheetTitle'});
+  card.append(h('h3', {id:'sheetTitle', text:opts.title}));
+  for(const b of opts.body || []){ if(b) card.append(typeof b === 'string' ? h('p', {text:b}) : b); }
+  const btns = h('div', {class:'btns'});
+  for(const b of opts.buttons || []){
+    btns.append(h('button', {type:'button', class:'btn ' + (b.kind || ''), text:b.label, onclick:() => {
+      if(b.keepOpen){ if(b.on) b.on(); return; }
+      if(b.validate && b.validate() === false) return;
+      closeSheet();
+      if(b.on) b.on();
+      drainSheets();
+    }}));
+  }
+  card.append(btns);
+  sheetDismiss = opts.dismissable === false ? null : () => { closeSheet(); if(opts.onDismiss) opts.onDismiss(); drainSheets(); };
+  const scrim = h('div', {class:'scrim', onclick:(e) => { if(e.target === scrim && sheetDismiss) sheetDismiss(); }}, card);
+  host.append(scrim);
+  setTimeout(() => {
+    if(lifecycle.signal.aborted) return;
+    const target = opts.focus ? card.querySelector(localSelector(opts.focus)) : null;
+    try{ (target || card.querySelector('.btn')).focus({preventScroll:true}); }catch(e){}
+  }, 30);
+}
+function closeSheet(){ $('#sheetHost').textContent = ''; sheetOpen = false; sheetDismiss = null; }
+function drainSheets(){ if(!lifecycle.signal.aborted && !sheetOpen && sheetQueue.length) openSheet(sheetQueue.shift()); }
+
+/* ---------- rendering ---------- */
+
+function renderAll(){
+  pruneValues();
+  for(const t of TABS){
+    const p = $('#panel-' + t);
+    p.textContent = '';
+    if(t === 'visit') renderVisit(p);
+    else if(t === 'check') renderCheck(p);
+    else renderOfficeTab(p);
+  }
+  const eb = $('#editBanner');
+  eb.hidden = !editing;
+  eb.textContent = editing ? 'Editing the layout on every tab. Changes save on this device as you make them. Tap Done when you’re finished.' : '';
+  $('#editBtn').textContent = editing ? 'Done' : 'Edit layout';
+  for(const t of TABS){
+    $('#panel-' + t).hidden = t !== tab;
+    $('#tab-' + t).setAttribute('aria-selected', t === tab ? 'true' : 'false');
+  }
+  configureOfficeLink();
+  renderOfficePanel();
+  refresh();
+}
+
+function renderVisit(p){
+  p.append(h('div', {id:'sentBanner', class:'banner ok', hidden:true}));
+  for(const sec of secsOf('visit')) p.append(renderSection(sec));
+  if(editing) p.append(builderTools('visit'));
+  p.append(h('section', {class:'card'},
+    h('h2', {class:'sec-title', text:'Teams message'}),
+    h('div', {id:'tagLine', class:'tagline', hidden:true}),
+    h('div', {class:'out-wrap'},
+      h('textarea', {id:'output', class:'output', readonly:true, 'aria-label':'Teams message'}),
+      h('p', {class:'small', text:'Checklist and Office items never appear here. If Copy is ever blocked, press and hold in this box, Select All, then Copy.'}))));
+}
+
+function renderCheck(p){
+  for(const sec of secsOf('check')) p.append(renderSection(sec));
+  if(editing) p.append(builderTools('check'));
+}
+
+function renderOfficeTab(p){
+  if(editing){
+    p.append(h('div', {class:'banner info', text:'Edit the shared Office checklist shown below the saved patients in the Office section.'}));
+    for(const sec of secsOf('office')) p.append(renderSection(sec));
+    p.append(builderTools('office'));
+  }
+}
+function renderOfficePanel(){
+  if(!page.isOfficeOwner(root)) return;
+  const p = page.officeContent;
+  p.textContent = '';
+  page.officeSaveWarning.hidden = officeWritable;
+  const ordered = office.filter(o => typeof o.overnights === 'string' && overnightText(o));
+  const legacy = office.filter(o => typeof o.overnights !== 'string');
+  p.append(h('p', {class:'office-summary', text:ordered.length + (ordered.length === 1 ? ' patient with overnight tests.' : ' patients with overnight tests.') + ' Saved in this browser only.'}));
+  if(!office.length){
+    p.append(h('div', {class:'banner info', text:'No overnight tests saved yet. Enter a patient’s overnight tests in the Visit form, then press Copy message.'}));
+  }
+  ordered.sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
+  if(legacy.length){
+    p.append(h('h3', {text:'Earlier saved patients'}), h('p', {class:'office-summary', text:'The previous version saved these patients without the test names. Edit each entry to add its tests, or copy its completed visit again.'}));
+    legacy.sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
+  }
+  const reference = h('section', {class:'card', data:{officeReference:'true'}},
+    h('h3', {class:'sec-title', text:'Office checklist — reference'}),
+    h('p', {class:'small pad-x', text:'Use these reminders for the patients they apply to. This checklist is shared across the full list.'}));
+  for(const sec of secsOf('office')){
+    const fields = sec.fields.filter(f => f.type === 'check' || f.type === 'note');
+    if(!fields.length) continue;
+    reference.append(h('h4', {class:'sec-title', text:sec.title}));
+    const list = h('ul', {class:'office-reference-list'});
+    fields.forEach(f => list.append(h('li', {}, h('span', {text:f.label}), f.when ? h('p', {class:'small', text:'Applies when ' + whenText(f.when) + '.'}) : null)));
+    reference.append(list);
+  }
+  p.append(reference);
+}
+
+function officeCard(o){
+  const card = h('section', {class:'card office-patient', data:{officeId:o.id}});
+  card.append(h('div', {class:'visit-head'},
+    h('div', {class:'visit-name', text:o.name || 'Name not entered'}),
+    h('div', {class:'visit-meta', text:(o.dob ? 'DOB ' + o.dob : 'DOB not entered') + ' · ' + fmtDayTime(o.t)})));
+  const details = h('div', {class:'pad'});
+  if(typeof o.overnights === 'string'){
+    details.append(h('p', {class:'small', text:'Overnight tests'}), h('p', {class:'overnight-tests', text:o.overnights}));
+    if(o.bloodreason) details.append(h('p', {class:'small', text:'Reason for blood work'}), h('p', {class:'overnight-tests', text:o.bloodreason}));
+  }else details.append(h('p', {class:'banner warn', text:'Overnight test details were not saved in this older entry.'}));
+  card.append(details);
+  card.append(h('div', {class:'row pad'},
+    h('button', {type:'button', class:'btn small', text:'Edit saved entry', onclick:() => editOfficeVisit(o)}),
+    h('button', {type:'button', class:'btn small danger', text:'Remove', onclick:() => removeOfficeVisit(o)})));
+  return card;
+}
+
+function renderSection(sec){
+  const card = h('section', {class:'card', data:{sec:sec.id}});
+  card.append(h('h2', {class:'sec-title', text:sec.title, data:{secTitle:sec.id}}));
+  const grid = h('div', {class:'grid'});
+  sec.fields.forEach(f => grid.append(renderField(sec, f)));
+  if(!sec.fields.length && editing) grid.append(h('p', {class:'small', text:'Empty section. Add something below.'}));
+  card.append(grid);
+  if(editing) card.append(sectionTools(sec));
+  return card;
+}
+
+function renderField(sec, f){
+  const full = sec.tab !== 'visit' || ['textarea', 'check', 'note', 'tests', 'mirror'].indexOf(f.type) >= 0 || (f.type === 'choice' && (f.detail || f.sub));
+  const w = h('div', {class:'field' + (full ? ' full' : ''), data:{field:f.id}});
+  if(f.when) w.dataset.when = JSON.stringify(f.when);
+  if(sec.tab === 'office' && f.type === 'check'){
+    w.append(h('div', {class:'checkrow template'}, h('span', {class:'box', 'aria-hidden':'true'}), h('span', {text:f.label, data:{labelOf:f.id}})));
+  } else if(f.type === 'note'){
+    w.append(h('div', {class:'note', text:f.label, data:{labelOf:f.id}}));
+  } else if(f.type === 'check'){
+    w.append(checkRow(f.id, f.label, f.remind, 'f_' + f.id));
+  } else if(f.type === 'mirror'){
+    const src = fieldById(f.of);
+    if(src) w.append(checkRow(f.of, src.label, src.remind, 'm_' + f.id));
+    else if(editing) w.append(h('div', {class:'note', text:'This item pointed to a Visit tab box that was deleted.'}));
+    else w.hidden = true;
+  } else if(f.type === 'tests'){
+    w.append(...testsField(f));
+  } else if(f.type === 'choice'){
+    w.append(...choiceField(f));
+  } else {
+    w.append(...textField(f));
+  }
+  if(editing) w.append(fieldEditor(sec, f));
+  return w;
+}
+
+function checkRow(fid, label, remind, domId){
+  const cb = h('input', {type:'checkbox', id:domId, data:{fid}});
+  cb.addEventListener('change', () => {
+    if(cb.checked) V[fid] = true; else delete V[fid];
+    refresh({user:true});
+  });
+  return h('label', {class:'checkrow' + (remind ? ' remind' : ''), for:domId}, cb, h('span', {text:label, data:{labelOf:fid}}));
+}
+
+function textField(f){
+  const id = 'f_' + f.id;
+  const isArea = f.type === 'textarea';
+  const inp = h(isArea ? 'textarea' : 'input', {class:'inp', id, autocomplete:'off',
+    placeholder: f.ph || (f.type === 'dob' ? 'MM/DD/YYYY' : ''),
+    autocapitalize: f.type === 'dob' ? 'off' : (f.cap || 'sentences'),
+    spellcheck: f.cap === 'words' ? 'false' : null,
+    autocorrect: f.cap === 'words' ? 'off' : null});
+  if(!isArea) inp.type = 'text';
+  if(f.type === 'dob') inp.setAttribute('inputmode', 'numeric');
+  else if(f.im) inp.setAttribute('inputmode', f.im);
+  inp.value = V[f.id] || '';
+  inp.addEventListener('input', () => {
+    if(f.type === 'dob'){ const m = maskDob(inp.value); if(m !== inp.value) inp.value = m; }
+    V[f.id] = inp.value;
+    refresh({user:true});
+  });
+  const parts = [h('label', {class:'flabel', for:id, text:f.label, data:{labelOf:f.id}}), inp];
+  if(f.chips && f.chips.length){
+    const row = h('div', {class:'chips'});
+    for(const c of f.chips){
+      row.append(h('button', {type:'button', class:'chip', text:c.v, 'aria-pressed':'false', data:{for:f.id, v:c.v, mode:c.m}, onclick:() => {
+        const cur = String(V[f.id] || '');
+        V[f.id] = c.m === 'add' ? listToggle(cur, c.v) : (norm(cur) === norm(c.v) ? '' : c.v);
+        inp.value = V[f.id];
+        refresh({user:true});
+      }}));
+    }
+    parts.push(row);
+  }
+  return parts;
+}
+
+function choiceField(f){
+  const parts = [h('div', {class:'flabel', id:'l_' + f.id, text:f.label, data:{labelOf:f.id}})];
+  const group = h('div', {class:'chips', role:'radiogroup', 'aria-labelledby':'l_' + f.id});
+  (f.opts || []).forEach((opt, i) => {
+    group.append(h('button', {type:'button', class:'chip', role:'radio', id:'c_' + f.id + '_' + i, 'aria-checked':'false', data:{choice:f.id, v:opt}, text:opt, onclick:() => {
+      if(V[f.id] === opt) delete V[f.id]; else V[f.id] = opt;
+      refresh({user:true});
+    }}));
+  });
+  parts.push(group);
+  if(f.detail){
+    const d = f.detail;
+    const inp = h('input', {type:'text', class:'inp detail', id:'f_' + d.id, placeholder:d.ph || '', autocomplete:'off', data:{detailOf:f.id, detailOn:d.on}});
+    inp.value = V[d.id] || '';
+    inp.addEventListener('input', () => { V[d.id] = inp.value; refresh({user:true}); });
+    parts.push(inp);
+  }
+  if(f.sub){
+    const sb = f.sub;
+    const row = h('div', {class:'chips subchoice', role:'radiogroup', 'aria-label':f.label + ', which', data:{subOf:f.id, subOn:sb.on}},
+      h('span', {class:'sublabel', text:sb.label || 'Which?'}));
+    (sb.opts || []).forEach((opt, i) => {
+      row.append(h('button', {type:'button', class:'chip', role:'radio', id:'c_' + sb.id + '_' + i, 'aria-checked':'false', data:{choice:sb.id, v:opt}, text:opt, onclick:() => {
+        if(V[sb.id] === opt) delete V[sb.id]; else V[sb.id] = opt;
+        refresh({user:true});
+      }}));
+    });
+    parts.push(row);
+  }
+  return parts;
+}
+
+function testsField(f){
+  const box = h('div', {class:'tests'});
+  for(const it of f.items || []){
+    const cid = 't_' + f.id + '_' + it.id;
+    const cb = h('input', {type:'checkbox', id:cid});
+    cb.addEventListener('change', () => {
+      const tv = V[f.id] = Object.assign({}, V[f.id]);
+      if(cb.checked) tv[it.id] = { on:true }; else delete tv[it.id];
+      refresh({user:true});
+    });
+    const row = h('div', {class:'testrow', data:{fid:f.id, item:it.id}});
+    row.append(h('label', {class:'thead', for:cid}, cb, h('span', {text:it.n}),
+      it.kind === 'done' ? h('span', {class:'tkind', text:'no result to mark'}) : null));
+    if(it.hint) row.append(h('div', {class:'hint', text:it.hint}));
+    if(it.kind !== 'done'){
+      const res = h('div', {class:'chips res', role:'radiogroup', 'aria-label':it.n + ' result'});
+      for(const r of ['Positive', 'Negative']){
+        res.append(h('button', {type:'button', class:'chip ' + (r === 'Positive' ? 'pos' : 'neg'), role:'radio', 'aria-checked':'false', data:{r}, text:r, onclick:() => {
+          const tv = V[f.id] = Object.assign({}, V[f.id]);
+          const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
+          if(s.r === r){ delete s.r; delete s.s; }
+          else { s.r = r; if(r !== 'Positive') delete s.s; }
+          refresh({user:true});
+        }}));
+      }
+      row.append(res);
+      if(it.sub && it.sub.length){
+        const sub = h('div', {class:'chips sub', role:'radiogroup', 'aria-label':it.n + ' type'}, h('span', {class:'sublabel', text:'Type'}));
+        for(const sv of it.sub){
+          sub.append(h('button', {type:'button', class:'chip', role:'radio', 'aria-checked':'false', data:{s:sv}, text:sv, onclick:() => {
+            const tv = V[f.id] = Object.assign({}, V[f.id]);
+            const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
+            if(s.s === sv) delete s.s; else s.s = sv;
+            refresh({user:true});
+          }}));
+        }
+        row.append(sub);
+      }
+    }
+    box.append(row);
+  }
+  return [h('div', {class:'flabel', text:f.label, data:{labelOf:f.id}}), box];
+}
+
+/* ---------- refresh: everything that depends on the values ---------- */
+
+function refresh(opts){
+  opts = opts || {};
+  const res = buildOutput(V);
+  const ctx = res.ctx;
+
+  $$('[data-when]').forEach(el => {
+    let w = null; try{ w = JSON.parse(el.dataset.when); }catch(e){}
+    el.hidden = !editing && !whenOK(w, ctx);
+  });
+  $$('[data-detail-of]').forEach(inp => { inp.hidden = V[inp.dataset.detailOf] !== inp.dataset.detailOn; });
+  $$('[data-sub-of]').forEach(row => { row.hidden = V[row.dataset.subOf] !== row.dataset.subOn; });
+  $$('section.card[data-sec]').forEach(card => {
+    if(editing){ card.hidden = false; return; }
+    const kids = $$(':scope > .grid > .field', card);
+    card.hidden = kids.length > 0 && kids.every(k => k.hidden);
+  });
+  $$('.chip[data-for]').forEach(ch => {
+    const cur = String(V[ch.dataset.for] || '');
+    const on = ch.dataset.mode === 'add' ? listHas(cur, ch.dataset.v) : norm(cur) === norm(ch.dataset.v);
+    ch.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  $$('[data-choice]').forEach(b => b.setAttribute('aria-checked', V[b.dataset.choice] === b.dataset.v ? 'true' : 'false'));
+  $$('input[type="checkbox"][data-fid]').forEach(cb => {
+    const on = !!V[cb.dataset.fid];
+    cb.checked = on;
+    const row = cb.closest('.checkrow');
+    if(row) row.classList.toggle('done', on);
+  });
+  $$('.testrow').forEach(row => {
+    const s = (V[row.dataset.fid] || {})[row.dataset.item] || {};
+    const on = !!s.on;
+    row.classList.toggle('on', on);
+    const cb = row.querySelector('input[type="checkbox"]');
+    if(cb) cb.checked = on;
+    const r = row.querySelector('.res');
+    if(r){
+      r.hidden = !on;
+      r.querySelectorAll('[data-r]').forEach(b => b.setAttribute('aria-checked', s.r === b.dataset.r ? 'true' : 'false'));
+    }
+    const sub = row.querySelector('.sub');
+    if(sub){
+      sub.hidden = !(on && s.r === 'Positive');
+      sub.querySelectorAll('[data-s]').forEach(b => b.setAttribute('aria-checked', s.s === b.dataset.s ? 'true' : 'false'));
+    }
+  });
+
+  const out = $('#output');
+  if(out){ out.value = res.text ? COPY_PREFIX + res.text : ''; autoSize(out); }
+  renderTagLine(ctx);
+  renderSent(res.text);
+  updateBadges(ctx);
+  page.updateTitles();
+  saveDraftSoon();
+
+  if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard();
+}
+
+function autoSize(el){
+  if(!el || el.offsetParent === null) return;
+  el.style.height = 'auto';
+  el.style.height = Math.max(150, el.scrollHeight + 2) + 'px';
+}
+
+function renderTagLine(ctx){
+  const el = $('#tagLine');
+  if(!el) return;
+  const parts = [];
+  if(ctx.anyPositive) parts.push('the provider (positive result)');
+  const why = [];
+  if(ctx.positiveUnaware) why.push('patient unaware');
+  if(ctx.correction) why.push('correction');
+  if(ctx.added) why.push('added patient');
+  if(why.length) parts.push('the person who posted the stop (' + why.join(', ') + ')');
+  el.hidden = !parts.length;
+  el.textContent = parts.length ? 'Tag when you post: ' + parts.join(' and ') + '.' : '';
+}
+
+function renderSent(text){
+  const b = $('#sentBanner');
+  if(!b) return;
+  b.hidden = !M.sentAt;
+  if(!M.sentAt){ b.textContent = ''; return; }
+  const changed = text !== M.sentText;
+  b.className = 'banner ' + (changed ? 'warn' : 'ok');
+  b.textContent = changed
+    ? 'Copied at ' + fmtTime(M.sentAt) + ', but you changed it since. Copy it again before you post.'
+    : 'Copied at ' + fmtTime(M.sentAt) + '. Use Add another patient below for the next person.';
+}
+
+function updateBadges(ctx){
+  ctx = ctx || context(V);
+  let total = 0, done = 0;
+  for(const sec of secsOf('check')) for(const f of sec.fields){
+    if(f.type !== 'check' && f.type !== 'mirror') continue;
+    if(f.type === 'mirror' && !fieldById(f.of)) continue;
+    if(!whenOK(f.when, ctx)) continue;
+    total++;
+    if(V[f.type === 'mirror' ? f.of : f.id]) done++;
+  }
+  const bc = $('#badge-check');
+  bc.textContent = total ? done + '/' + total : '';
+  bc.classList.toggle('complete', total > 0 && done === total);
+  const waiting = office.filter(o => typeof o.overnights !== 'string' || overnightText(o)).length;
+  $('#badge-office').textContent = waiting ? String(waiting) : '';
+}
+
+/* ---------- tabs ---------- */
+
+function configureOfficeLink(){
+  const button = $('#tab-office');
+  button.setAttribute('role', editing ? 'tab' : 'button');
+  button.setAttribute('aria-controls', editing ? prefix + 'panel-office' : 'officeSection');
+  if(!editing) button.removeAttribute('aria-selected');
+}
+function setTab(t){
+  if(t === 'office' && !editing){ page.showOffice(); return; }
+  page.showPatients(false);
+  tab = t;
+  for(const x of TABS){
+    $('#panel-' + x).hidden = x !== t;
+    $('#tab-' + x).setAttribute('aria-selected', x === t ? 'true' : 'false');
+  }
+  configureOfficeLink();
+  if(t === 'visit') autoSize($('#output'));
+  root.scrollIntoView({block:'start'});
+  saveDraftSoon();
+}
+
+/* ---------- copy ---------- */
+
+function onCopy(){
+  const res = buildOutput(V);
+  if(!res.text){ flash('Nothing to copy yet', 'bad'); return; }
+  const warn = res.issues.slice();
+  if(fieldById('inspic') && !V.inspic) warn.unshift('Insurance pic box isn’t ticked');
+  if(warn.length){
+    sheet({ title:'Before you copy', body:['Check these first:', h('ul', {class:'steplist'}, warn.map(w => h('li', {text:w})))],
+      buttons:[ {label:'Go back', kind:'primary'}, {label:'Copy anyway', on:() => doCopy(buildOutput(V).text)} ] });
+    return;
+  }
+  doCopy(res.text);
+}
+
+function doCopy(text){
+  const copiedValues = JSON.parse(JSON.stringify(V));
+  const copiedMeta = M;
+  const payload = COPY_PREFIX + text;
+  let settled = false;
+  const stale = () => lifecycle.signal.aborted || copiedMeta !== M || !page.isCurrentShift();
+  const ok = () => { if(settled || stale()) return; settled = true; afterCopy(text, copiedValues, copiedMeta); };
+  const fail = () => { if(settled || stale()) return; settled = true; if(legacyCopy(payload)) afterCopy(text, copiedValues, copiedMeta); else manualCopy(text, copiedValues, copiedMeta); };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(payload).then(ok, fail); return; }
+  }catch(e){}
+  fail();
+}
+
+function legacyCopy(text){
+  const ta = h('textarea', {readonly:true, 'aria-hidden':'true'});
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;border:0;padding:0';
+  document.body.append(ta);
+  let ok = false;
+  try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  return ok;
+}
+
+function manualCopy(text, copiedValues, copiedMeta){
+  const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
+  ta.value = COPY_PREFIX + text;
+  sheet({ title:'Copy it by hand', body:['Copying was blocked. Press and hold in the box, Select All, then Copy.', ta],
+    buttons:[ {label:'I copied it', kind:'primary', on:() => afterCopy(text, copiedValues, copiedMeta)}, {label:'Cancel'} ] });
+  setTimeout(() => { if(lifecycle.signal.aborted) return; try{ ta.focus({preventScroll:true}); ta.setSelectionRange(0, ta.value.length); }catch(e){} }, 60);
+}
+
+function afterCopy(text, copiedValues = V, copiedMeta = M){
+  // A pending clipboard request must not mark a cleared form as copied.
+  if(lifecycle.signal.aborted || copiedMeta !== M || !page.isCurrentShift()) return;
+  M.sentAt = Date.now();
+  M.sentText = text;
+  M.sentVals = JSON.parse(JSON.stringify(copiedValues));
+  M.sentAck = false;
+  const steps = officeSteps(copiedValues);
+  loadOffice();
+  if(M.officeId && !office.some(o => o.id === M.officeId)) M.officeId = null;
+  let msg = 'Copied';
+  if(!overnightText(copiedValues)){
+    if(M.officeId){
+      const removedId = M.officeId;
+      mutateOffice(() => { office = office.filter(o => o.id !== removedId); });
+      M.officeId = null;
+      msg = 'Copied. No overnight tests — removed from Office';
+    }
+  }else if(M.officeId){
+    syncOfficeCard(steps, copiedValues);
+    msg = 'Copied. Overnight tests updated in Office';
+  }else{
+    const nm = String(copiedValues.name || '').trim(), db = String(copiedValues.dob || '').trim();
+    addToOffice(nm, db, copiedValues);
+    msg = 'Copied. Overnight tests saved to Office';
+  }
+  saveDraft();
+  refresh();
+  flash(officeWritable ? msg : 'Copied, but the office list could not be saved in this browser', officeWritable ? '' : 'bad');
+}
+
+function syncOfficeCard(steps, vals = V){
+  let changed = false;
+  mutateOffice(() => {
+    const ov = office.find(o => o.id === M.officeId);
+    if(!ov) return;
+    if(syncVisitSteps(ov, steps)) changed = true;
+    const details = officeDetails(vals);
+    if(ov.overnights !== details.overnights || ov.bloodreason !== details.bloodreason) changed = true;
+    Object.assign(ov, details);
+    ov.shift = page.generation();
+    const nm = String(vals.name || '').trim(), db = String(vals.dob || '').trim();
+    if(nm !== ov.name){ ov.name = nm; changed = true; }
+    if(db !== ov.dob){ ov.dob = db; changed = true; }
+  });
+  return changed;
+}
+
+function syncVisitSteps(ov, steps){
+  const want = new Set(steps.map(s => s.id));
+  let changed = false;
+  const kept = ov.steps.filter(s => { const keep = want.has(s.id) || s.done; if(!keep) changed = true; return keep; });
+  for(const s of steps){
+    if(!kept.some(k => k.id === s.id)){ kept.push({ id:s.id, label:s.label, done:false }); changed = true; }
+  }
+  const order = officeOrder();
+  const rank = id => { const i = order.indexOf(id); return i < 0 ? 999 : i; };
+  kept.sort((a, b) => rank(a.id) - rank(b.id));
+  ov.steps = kept;
+  return changed;
+}
+
+/* ---------- office list ---------- */
+
+function addToOffice(name, dob, vals = V){
+  const visit = { id: uid('v'), name, dob, t: Date.now(), shift:page.generation(), ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
+  mutateOffice(() => { office.push(visit); });
+  M.officeId = visit.id;
+  saveDraft();
+}
+
+function nameDobInputs(name, dob){
+  const nameIn = h('input', {class:'inp', type:'text', id:'sheet_name', autocomplete:'off', autocapitalize:'words', autocorrect:'off', spellcheck:'false', placeholder:'Patient name'});
+  const dobIn = h('input', {class:'inp', type:'text', id:'sheet_dob', autocomplete:'off', inputmode:'numeric', placeholder:'MM/DD/YYYY'});
+  nameIn.value = name || '';
+  dobIn.value = dob || '';
+  dobIn.addEventListener('input', () => { const m = maskDob(dobIn.value); if(m !== dobIn.value) dobIn.value = m; });
+  return { nameIn, dobIn, nodes: [h('label', {class:'flabel', for:'sheet_name', text:'Name'}), nameIn, h('label', {class:'flabel', for:'sheet_dob', text:'DOB'}), dobIn] };
+}
+
+function editOfficeVisit(o){
+  const f = nameDobInputs(o.name, o.dob);
+  const tests = h('textarea', {class:'inp', id:'sheet_overnights', value:o.overnights || '', rows:'3'});
+  const reason = h('input', {class:'inp', id:'sheet_bloodreason', value:o.bloodreason || '', type:'text'});
+  const err = h('div', {class:'err', role:'alert'});
+  sheet({ title:'Edit saved entry', focus:'#sheet_name', body:[
+    'Changes apply to this saved entry. Copying the patient again replaces it with the current visit details.', ...f.nodes,
+    h('label', {class:'flabel', for:'sheet_overnights', text:'Overnight tests'}), tests,
+    h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason, err],
+    buttons:[ {label:'Save changes', kind:'primary', validate:() => {
+                  if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
+                  if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the overnight tests, or cancel and remove this entry if no tests were sent.'; return false; }
+                  return true; },
+                on:() => {
+                  const nm = f.nameIn.value.trim(), db = f.dobIn.value.trim();
+                  mutateOffice(() => { const v = office.find(x => x.id === o.id); if(v){ v.name = nm; v.dob = db; v.overnights = tests.value.trim(); v.bloodreason = reason.value.trim(); } });
+                  flash(officeWritable ? 'Saved changes' : 'Changes could not be saved. Keep this page open', officeWritable ? '' : 'bad'); }},
+              {label:'Cancel'} ] });
+}
+
+function removeOfficeVisit(o){
+  const doit = () => { mutateOffice(() => { office = office.filter(x => x.id !== o.id); }); flash(officeWritable ? 'Removed ' + (o.name || 'the entry') : 'Removal could not be saved. Keep this page open', officeWritable ? '' : 'bad'); };
+  sheet({ title:'Remove ' + (o.name || 'this saved entry') + '?', body:['This removes the saved Office entry. Patient forms stay on the page. Copying that patient again will add their overnight tests back.'],
+    buttons:[ {label:'Remove', kind:'solid danger', on:doit}, {label:'Cancel'} ] });
+}
+
+/* ---------- new patient ---------- */
+
+function newPatient(opts){
+  opts = opts || {};
+  if(!hasContent(V)){ clearVisit('This patient is blank'); return; }
+  const changed = !!M.sentAt && buildOutput(V).text !== M.sentText;
+  if(changed && !opts.confirmed){
+    sheet({ title:'Clear this patient?',
+      body:['You changed this patient after copying at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied. All other patients stay on the page.'],
+      buttons:[ {label:'Copy it again first', kind:'primary', on:onCopy},
+                {label:'Clear this patient', kind:'solid danger', on:() => newPatient({confirmed:true})},
+                {label:'Cancel'} ] });
+    return;
+  }
+  if(opts.confirmed || (M.sentAt && !changed)){ clearVisit(); return; }
+  sheet({ title:'Clear this patient?',
+    body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied.' : 'This clears only this patient’s Visit tab and checklist. All other patients and the office list stay.' ],
+    buttons:[ changed ? {label:'Copy it again first', kind:'primary', on:() => onCopy()} : null,
+              {label:'Clear this patient', kind:'solid danger', on:() => clearVisit()},
+              {label:'Cancel'} ].filter(Boolean) });
+}
+
+function clearVisit(msg){
+  V = {};
+  M = freshMeta();
+  renderAll();
+  saveDraft();
+  setTab('visit');
+  if(msg !== false) flash(msg || 'This patient was cleared');
+}
+
+function sentGuard(){
+  sheet({ title:'You already copied this visit', dismissable:false,
+    body:['You copied it at ' + fmtTime(M.sentAt) + '. Is this still the same patient?'],
+    buttons:[ {label:'Same patient, keep editing', kind:'primary', on:() => { M.sentAck = true; saveDraft(); }},
+              {label:'No, undo this edit and add a patient', on:() => {
+                if(M.sentVals) V = JSON.parse(JSON.stringify(M.sentVals));
+                renderAll();
+                page.addPatient(root);
+              }} ] });
+}
+
+/* ---------- restore + layout updates ---------- */
+
+function offerRestore(d){
+  const count = d.patients.length;
+  sheet({ title:count === 1 ? 'Unfinished patient in this tab' : count + ' patients saved in this tab', dismissable:false,
+    body:['Last change at ' + fmtTime(d.t) + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards these drafts; the office list stays.'],
+    buttons:[ {label:count === 1 ? 'Restore this visit' : 'Restore all ' + count + ' patients', kind:'primary', on:() => page.restore(d)},
+              {label:'Start fresh', kind:'danger', on:() => page.startFresh()} ] });
+}
+
+function updateSheet(){
+  return { title:'Updated form available', dismissable:false,
+    body:['The default form changed since you edited yours. Switch to the new form, or keep your edited one? Your office list stays either way. Answers in fields the new form doesn’t have are cleared.'],
+    buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); page.layoutChanged(root, L); pendingUpdate = false; renderAll(); flash('Switched to the new form'); }},
+              {label:'Keep mine', on:() => { L.base = DEFAULT_BASE; saveLayout(); pendingUpdate = false; flash('Kept your form'); }} ] };
+}
+
+/* ---------- layout editing ---------- */
+
+const ADD_TYPES = {
+  visit: [['Short text', 'text'], ['Long text', 'textarea'], ['DOB', 'dob'], ['Yes / No / N/A', 'yesno'], ['Custom choices', 'choice'], ['Checkbox (not copied)', 'check'], ['Reminder note', 'note'], ['Test panel', 'tests']],
+  check: [['Checklist item', 'check'], ['Reminder note', 'note']],
+  office: [['Office step', 'check'], ['Reminder note', 'note']]
+};
+
+function sectionTools(sec){
+  const wrap = h('div', {});
+  const ti = h('input', {class:'inp', type:'text', id:'e_sec_' + sec.id, value:sec.title, 'aria-label':'Section name'});
+  ti.addEventListener('input', () => {
+    sec.title = ti.value;
+    const t = $('[data-sec-title="' + sec.id + '"]');
+    if(t) t.textContent = sec.title;
+    saveLayoutSoon();
+  });
+  ti.addEventListener('change', () => { if(!sec.title.trim()){ sec.title = 'Untitled section'; ti.value = sec.title; } saveLayout(); });
+  wrap.append(h('div', {class:'sec-tools'}, ti,
+    h('button', {type:'button', class:'btn small', text:'▲', 'aria-label':'Move section up', onclick:() => moveSection(sec, -1)}),
+    h('button', {type:'button', class:'btn small', text:'▼', 'aria-label':'Move section down', onclick:() => moveSection(sec, 1)}),
+    h('button', {type:'button', class:'btn small danger', text:'Delete section', onclick:() => sheet({
+      title:'Delete “' + sec.title + '”?', body:['This removes the section and everything in it from the layout.'],
+      buttons:[ {label:'Delete section', kind:'solid danger', on:() => { L.sections = L.sections.filter(s => s !== sec); layoutChanged(); }}, {label:'Cancel'} ] })})));
+  const menu = h('div', {class:'chips'});
+  for(const [label, type] of ADD_TYPES[sec.tab]) menu.append(h('button', {type:'button', class:'chip', text:'+ ' + label, onclick:() => addField(sec, type)}));
+  wrap.append(h('div', {class:'addmenu'}, h('div', {class:'elabel', text:'Add to this section'}), menu));
+  return wrap;
+}
+
+function fieldEditor(sec, f){
+  const box = h('div', {class:'editor'});
+  if(f.type === 'mirror'){
+    const src = fieldById(f.of);
+    box.append(h('div', {class:'elabel', text: src ? 'Same box as on the Visit tab. Change its text there.' : 'Its Visit tab box was deleted.'}));
+  } else {
+    const isNote = f.type === 'note';
+    box.append(h('label', {class:'elabel', for:'e_label_' + f.id, text: isNote ? 'Reminder text' : (f.type === 'check' ? 'Item text' : 'Field name (also used in the message)')}));
+    const li = h(isNote ? 'textarea' : 'input', {class:'inp', id:'e_label_' + f.id});
+    if(!isNote) li.type = 'text';
+    li.value = f.label;
+    li.addEventListener('input', () => {
+      f.label = li.value;
+      $$('[data-label-of="' + f.id + '"]').forEach(n => { n.textContent = f.label; });
+      saveLayoutSoon();
+    });
+    li.addEventListener('change', () => {
+      if(!f.label.trim()){ f.label = 'Untitled'; li.value = f.label; $$('[data-label-of="' + f.id + '"]').forEach(n => { n.textContent = f.label; }); }
+      saveLayout();
+      refresh();
+    });
+    box.append(li);
+  }
+  if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
+    box.append(h('label', {class:'elabel', for:'e_chips_' + f.id, text:'Quick buttons, separated by commas. Put + in front of ones that add to a list instead of replacing.'}));
+    const ci = h('input', {class:'inp', type:'text', id:'e_chips_' + f.id, placeholder:'None, +Strep, +Flu'});
+    ci.value = chipsText(f.chips);
+    ci.addEventListener('change', () => { f.chips = chips(ci.value); rerenderField(sec, f); });
+    box.append(ci);
+    box.append(h('label', {class:'elabel', for:'e_ph_' + f.id, text:'Gray hint inside the box'}));
+    const pi = h('input', {class:'inp', type:'text', id:'e_ph_' + f.id});
+    pi.value = f.ph || '';
+    pi.addEventListener('input', () => { f.ph = pi.value; const inp = $('#f_' + f.id); if(inp) inp.placeholder = f.ph; saveLayoutSoon(); });
+    box.append(pi);
+  }
+  if(f.type === 'choice'){
+    box.append(h('label', {class:'elabel', for:'e_opts_' + f.id, text:'Choices, separated by commas'}));
+    const oi = h('input', {class:'inp', type:'text', id:'e_opts_' + f.id});
+    oi.value = (f.opts || []).join(', ');
+    oi.addEventListener('change', () => {
+      const list = oi.value.split(',').map(s => s.trim()).filter(Boolean);
+      if(!list.length){ oi.value = (f.opts || []).join(', '); return; }
+      const old = f.opts || [];
+      const cur = V[f.id];
+      if(cur !== undefined && list.indexOf(cur) < 0){
+        const i = old.indexOf(cur);
+        if(i >= 0 && list.length === old.length) V[f.id] = list[i]; else delete V[f.id];
+      }
+      for(const k of ['detail', 'sub']){
+        const o = f[k];
+        if(o && list.indexOf(o.on) < 0 && list.length === old.length && old.indexOf(o.on) >= 0) o.on = list[old.indexOf(o.on)];
+      }
+      f.opts = list;
+      rerenderField(sec, f);
+    });
+    box.append(oi);
+  }
+  if(f.type === 'tests'){
+    box.append(h('label', {class:'elabel', for:'e_tests_' + f.id, text:'Tests, separated by commas. Add (done) for ones with no result, like Ears (done). Add [A|B] for choices that show when it’s positive.'}));
+    const tt = h('input', {class:'inp', type:'text', id:'e_tests_' + f.id});
+    tt.value = testListText(f.items);
+    tt.addEventListener('change', () => {
+      const list = parseTestList(tt.value, f.items);
+      if(list.length) f.items = list; else tt.value = testListText(f.items);
+      rerenderField(sec, f);
+    });
+    box.append(tt);
+  }
+  if(f.when) box.append(h('div', {class:'elabel', text:'Shows only when ' + whenText(f.when) + '.'}));
+  if(f.underPositive) box.append(h('div', {class:'elabel', text:'Prints in capitals under each positive test, not as its own line.'}));
+  box.append(h('div', {class:'row'},
+    h('button', {type:'button', class:'btn small', text:'▲ Up', onclick:() => moveField(sec, f, -1)}),
+    h('button', {type:'button', class:'btn small', text:'▼ Down', onclick:() => moveField(sec, f, 1)}),
+    h('button', {type:'button', class:'btn small danger', text:'Delete', onclick:() => sheet({
+      title:'Delete “' + (f.type === 'mirror' ? ((fieldById(f.of) || {}).label || 'this item') : f.label) + '”?', body:['This removes it from the layout.'],
+      buttons:[ {label:'Delete', kind:'solid danger', on:() => { sec.fields = sec.fields.filter(x => x !== f); layoutChanged(); }}, {label:'Cancel'} ] })})));
+  return box;
+}
+
+function rerenderField(sec, f){
+  saveLayout();
+  const old = $('[data-field="' + f.id + '"]');
+  if(old) old.replaceWith(renderField(sec, f));
+  refresh();
+}
+
+function moveSection(sec, dir){
+  const list = secsOf(sec.tab);
+  const i = list.indexOf(sec), j = i + dir;
+  if(j < 0 || j >= list.length) return;
+  const a = L.sections.indexOf(list[i]), b = L.sections.indexOf(list[j]);
+  const tmp = L.sections[a]; L.sections[a] = L.sections[b]; L.sections[b] = tmp;
+  layoutChanged();
+}
+
+function moveField(sec, f, dir){
+  const list = secsOf(sec.tab);
+  const si = list.indexOf(sec);
+  const fi = sec.fields.indexOf(f);
+  if(fi < 0) return;
+  if(dir < 0 && fi === 0){
+    if(si <= 0) return;
+    sec.fields.splice(fi, 1); list[si - 1].fields.push(f);
+  } else if(dir > 0 && fi === sec.fields.length - 1){
+    if(si >= list.length - 1) return;
+    sec.fields.splice(fi, 1); list[si + 1].fields.unshift(f);
+  } else {
+    sec.fields.splice(fi, 1); sec.fields.splice(fi + dir, 0, f);
+  }
+  layoutChanged();
+}
+
+function addField(sec, type){
+  const f = { id: uid('f'), type, label: 'New field' };
+  if(type === 'yesno'){ f.type = 'choice'; f.opts = ['Yes', 'No', 'N/A']; }
+  else if(type === 'choice') f.opts = ['Option 1', 'Option 2'];
+  else if(type === 'text' || type === 'textarea' || type === 'dob'){ f.chips = []; f.ph = type === 'dob' ? 'MM/DD/YYYY' : ''; }
+  else if(type === 'check'){ f.label = sec.tab === 'office' ? 'New office step' : 'New item'; if(sec.tab === 'office') f.when = 'anyTest'; }
+  else if(type === 'note') f.label = 'New reminder';
+  else if(type === 'tests'){ f.label = 'Tap each test you did'; f.items = parseTestList('New test', []); }
+  sec.fields.push(f);
+  layoutChanged();
+  flash('Added. Change its text in the box under it.');
+}
+
+function builderTools(t){
+  return h('div', {class:'builder'},
+    h('button', {type:'button', class:'btn', text:'+ Add section', onclick:() => { L.sections.push({ id:uid('s'), tab:t, title:'New section', fields:[] }); layoutChanged(); }}),
+    h('button', {type:'button', class:'btn', text:'Export layout', onclick:exportLayout}),
+    h('button', {type:'button', class:'btn', text:'Import layout', onclick:importLayout}),
+    h('button', {type:'button', class:'btn danger', text:'Reset to default', onclick:() => sheet({
+      title:'Reset the layout?', body:['This puts back the original fields, checklist and office steps. Your office list stays. Answers in fields the original layout doesn’t have are cleared.'],
+      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); dropKey('local', LAYOUT_KEY); page.layoutChanged(root, L); renderAll(); flash('Layout reset'); }}, {label:'Cancel'} ] })}));
+}
+
+function copyPlain(text, okMsg){
+  const fallback = () => { if(legacyCopy(text)) flash(okMsg); else flash('Copy was blocked. Press and hold the text to copy it', 'bad'); };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(() => flash(okMsg), fallback); return; }
+  }catch(e){}
+  fallback();
+}
+
+function exportLayout(){
+  const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
+  ta.value = JSON.stringify(L);
+  sheet({ title:'Export layout', body:['Your form layout, with no patient information in it. Keep a copy in Notes as a backup, or paste it into Import on another device.', ta],
+    buttons:[ {label:'Copy layout', kind:'primary', keepOpen:true, on:() => copyPlain(ta.value, 'Layout copied')}, {label:'Close'} ] });
+}
+
+function importLayout(){
+  const ta = h('textarea', {class:'inp mono', rows:'8', placeholder:'Paste an exported layout here'});
+  const err = h('div', {class:'err', role:'alert'});
+  let parsed = null;
+  sheet({ title:'Import layout', body:['This replaces your current layout. Your office list stays. Answers in fields the imported layout doesn’t have are cleared.', ta, err],
+    buttons:[ {label:'Replace my layout', kind:'primary', validate:() => {
+                try{ parsed = JSON.parse(ta.value); }catch(e){ parsed = null; }
+                if(!validLayout(parsed)){ err.textContent = 'That doesn’t look like an exported layout.'; return false; }
+                return true; },
+              on:() => { L = parsed; saveLayout(); renderAll(); flash('Layout imported'); }},
+              {label:'Cancel'} ] });
+}
+
+/* ---------- wiring ---------- */
+
+function bind(){
+  for(const t of TABS) $('#tab-' + t).addEventListener('click', () => setTab(t));
+  $('#editBtn').addEventListener('click', () => {
+    editing = !editing;
+    if(!editing && tab === 'office') tab = 'visit';
+    renderAll();
+    flash(editing ? 'Editing the layout' : 'Done editing');
+  });
+  $('#newBtn').addEventListener('click', () => newPatient());
+  $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
+  $('#selectBtn').addEventListener('click', () => {
+    setTab('visit');
+    const o = $('#output');
+    if(!o) return;
+    o.scrollIntoView({block:'center'});
+    try{ o.focus({preventScroll:true}); o.setSelectionRange(0, o.value.length); }catch(e){}
+    flash('Message selected');
+  });
+  $('#copyBtn').addEventListener('click', onCopy);
+  window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); } }, {signal:lifecycle.signal});
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && sheetOpen && sheetDismiss) sheetDismiss(); }, {signal:lifecycle.signal});
+
+}
+
+function start(){
+  loadLayout();
+  loadOffice();
+  bind();
+  renderAll();
+  if(pendingUpdate && !page.hasPatients()) sheet(updateSheet());
+}
+
+start();
+return {
+  root,
+  serialize:() => ({id:root.id, vals:V, meta:M, tab}),
+  hasContent:() => hasContent(V),
+  title:(number) => {
+    const name = String(V.name || '').trim();
+    $('#patientTitle').textContent = 'Patient ' + number + (name ? ' · ' + name : '');
+    const label = 'Patient ' + number + (name ? ', ' + name : '');
+    $('#output').setAttribute('aria-label', label + ' Teams message');
+    $('#copyBtn').setAttribute('aria-label', 'Copy message for ' + label);
+    $('#newBtn').setAttribute('aria-label', 'Clear ' + label);
+    $('#addPatientBtn').setAttribute('aria-label', 'Add another patient after ' + label);
+  },
+  focus:() => { root.scrollIntoView({block:'start'}); const input = $('#panel-visit input'); if(input) input.focus({preventScroll:true}); },
+  offerRestore,
+  applyOffice:(values, writable, baseline) => { office = values; officeWritable = writable; officeBaseline = baseline; renderOfficePanel(); updateBadges(); },
+  getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline}),
+  renderOffice:renderOfficePanel,
+  retryOffice:() => { saveOffice(); if(lifecycle.signal.aborted) return; renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
+  getLayout:() => L,
+  flushLayout:() => { if(layoutTimer) saveLayout(); },
+  resize:() => autoSize($('#output')),
+  applyLayout:(layout) => {
+    // Preserve selected choices when another patient's layout editor renames them.
+    for(const sec of layout.sections) for(const field of sec.fields){
+      const old = fieldById(field.id);
+      if(field.type !== 'choice' || !old || !Array.isArray(field.opts) || !Array.isArray(old.opts)) continue;
+      const value = V[field.id];
+      if(value !== undefined && !field.opts.includes(value)){
+        const i = old.opts.indexOf(value);
+        if(i >= 0 && field.opts.length === old.opts.length) V[field.id] = field.opts[i]; else delete V[field.id];
+      }
+    }
+    L = layout; renderAll();
+  },
+  destroy:() => { lifecycle.abort(); clearTimeout(flashTimer); clearTimeout(layoutTimer); sheetQueue.length = 0; dialogHost.remove(); M = freshMeta(); }
+};
+}
+
+function createPatientPage(){
+  const host = document.querySelector('#patients');
+  const officeSection = document.querySelector('#officeSection');
+  const template = document.querySelector('#patientTemplate');
+  const warning = document.querySelector('#draftWarning');
+  const key = 'hvnb_draft';
+  const shiftKey = 'hvnb_shift_generation';
+  const clearDialog = document.querySelector('#clearShiftDialog');
+  const clearError = document.querySelector('#clearShiftError');
+  const clearWarning = document.querySelector('#shiftClearWarning');
+  const status = document.querySelector('#shiftStatus');
+  let patients = [], timer = null, held = false, serial = 0;
+  let generation = 'initial', resetting = false;
+  const readGeneration = () => { try{ return window.localStorage.getItem(shiftKey) || 'initial'; }catch(e){ return generation; } };
+  generation = readGeneration();
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const page = {
+    dialogHosts:document.querySelector('#dialogHosts'),
+    officeContent:document.querySelector('#officeContent'),
+    officeSaveWarning:document.querySelector('#officeSaveWarning'),
+    generation:() => generation,
+    matchesShift:value => !!value && (value.shift === generation || (!value.shift && generation === 'initial')),
+    isCurrentShift:() => {
+      if(resetting) return true;
+      const latest = readGeneration();
+      if(latest === generation) return true;
+      page.resetShift(latest, 'Shift cleared in another tab. Ready for the next patient.');
+      return false;
+    },
+    isOfficeOwner:root => !patients.length || patients[0].root === root,
+    showOffice:() => {
+      if(!page.isCurrentShift()) return;
+      if(patients.length) patients[0].renderOffice();
+      page.setView('office');
+      document.querySelector('#officeHeading').focus({preventScroll:true});
+    },
+    showPatients:(scroll = true) => { page.setView('patients', scroll); patients.forEach(p => p.resize()); },
+    setView:(view, scroll = true) => {
+      host.hidden = view !== 'patients';
+      officeSection.hidden = view !== 'office';
+      for(const name of ['patients', 'office']){
+        const button = document.querySelector('#view-' + name);
+        button.setAttribute('aria-selected', name === view ? 'true' : 'false');
+        button.tabIndex = name === view ? 0 : -1;
+      }
+      if(scroll) window.scrollTo(0, 0);
+    },
+    hasPatients:() => patients.length > 0,
+    updateTitles:() => patients.forEach((p, i) => p.title(i + 1)),
+    saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
+    saveDraft:() => {
+      clearTimeout(timer);
+      if(held) return;
+      if(!page.isCurrentShift()) return;
+      try{
+        if(patients.length === 1 && !patients[0].hasContent()) window.sessionStorage.removeItem(key);
+        else window.sessionStorage.setItem(key, JSON.stringify({version:2, shift:generation, t:Date.now(), patients:patients.map(p => p.serialize())}));
+        warning.hidden = true;
+      }catch(e){
+        warning.textContent = 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
+        warning.hidden = false;
+      }
+    },
+    addPatient:(after, seed = {}, focus = true) => {
+      const previous = patients.find(p => p.root === after) || patients[0];
+      if(previous) seed = Object.assign({}, seed, {layout:clone(previous.getLayout())});
+      const root = template.content.firstElementChild.cloneNode(true);
+      const savedId = typeof seed.id === 'string' && /^patient-[a-z0-9-]+$/.test(seed.id) ? seed.id : '';
+      root.id = savedId && !patients.some(p => p.root.id === savedId) ? savedId : 'patient-' + Date.now().toString(36) + '-' + (++serial);
+      const index = after ? patients.findIndex(p => p.root === after) + 1 : patients.length;
+      if(after) after.after(root); else host.append(root);
+      const patient = mountPatient(root, seed, page);
+      if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable, clone(state.baseline)); }
+      patients.splice(index, 0, patient);
+      page.updateTitles();
+      page.saveDraft();
+      if(focus) patient.focus();
+      return patient;
+    },
+    layoutChanged:(source, layout) => patients.forEach(p => { if(p.root !== source) p.applyLayout(clone(layout)); }),
+    officeChanged:(source, values) => {
+      const owner = patients.find(p => p.root === source);
+      if(!owner) return;
+      const state = owner.getOffice();
+      patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline)); });
+    },
+    restore:(draft) => {
+      if(!page.isCurrentShift() || !page.matchesShift(draft)) return;
+      held = true;
+      patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      for(const seed of draft.patients) page.addPatient(null, seed, false);
+      held = false; page.saveDraft();
+      page.showPatients(false);
+      if(patients.length) patients[0].root.scrollIntoView({block:'start'});
+    },
+    startFresh:() => { held = false; page.saveDraft(); },
+    cleanupSavedData:() => {
+      let cleared = true;
+      // Delete only records from the cleared shift: another tab may already
+      // have started entering patients for the new shift.
+      try{
+        if(generation !== 'initial'){
+          const raw = window.localStorage.getItem('hvnb_office');
+          if(raw){
+            let list; try{ list = JSON.parse(raw); }catch(e){ list = []; }
+            const keep = Array.isArray(list) ? list.filter(o => object(o) && page.matchesShift(o)) : [];
+            if(!keep.length) window.localStorage.removeItem('hvnb_office');
+            else if(!Array.isArray(list) || keep.length !== list.length) window.localStorage.setItem('hvnb_office', JSON.stringify(keep));
+          }
+        }
+      }catch(e){ cleared = false; }
+      try{
+        const raw = window.sessionStorage.getItem(key);
+        if(raw){
+          let draft; try{ draft = JSON.parse(raw); }catch(e){}
+          if(!page.matchesShift(draft)) window.sessionStorage.removeItem(key);
+        }
+      }catch(e){ cleared = false; }
+      clearWarning.hidden = cleared;
+      return cleared;
+    },
+    resetShift:(nextGeneration, message) => {
+      resetting = true; held = true; clearTimeout(timer);
+      patients.forEach(p => p.flushLayout());
+      const layout = patients.length ? clone(patients[0].getLayout()) : null;
+      patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      generation = nextGeneration;
+      if(clearDialog.open) clearDialog.close();
+      const cleared = page.cleanupSavedData();
+      page.addPatient(null, layout ? {layout} : {}, false);
+      held = false; resetting = false;
+      warning.hidden = true;
+      page.showPatients();
+      status.textContent = cleared ? message : 'Patient forms cleared. Saved-data removal still needs a retry.';
+    },
+    clearShift:() => {
+      const nextGeneration = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+      try{ window.localStorage.setItem(shiftKey, nextGeneration); }
+      catch(e){ clearError.textContent = 'Couldn’t clear this shift because browser storage is unavailable. Nothing was cleared. Try again.'; return; }
+      page.resetShift(nextGeneration, 'Shift cleared. Ready for the next patient.');
+    }
+  };
+  let draft = null;
+  try{ draft = JSON.parse(window.sessionStorage.getItem(key)); }catch(e){}
+  if(draft && object(draft.vals) && !draft.patients) draft.patients = [{vals:draft.vals, meta:draft.meta}];
+  if(draft && page.matchesShift(draft) && Array.isArray(draft.patients) && draft.patients.length && draft.patients.every(p => object(p) && object(p.vals)) && draft.t && Date.now() - draft.t < 8 * 60 * 60 * 1000){
+    held = true;
+  }else draft = null;
+  if(generation !== 'initial') page.cleanupSavedData();
+  const first = page.addPatient(null, {}, false);
+  if(draft) first.offerRestore(draft);
+  document.querySelector('#retryOfficeSave').addEventListener('click', () => { if(patients.length) patients[0].retryOffice(); });
+  document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
+  document.querySelector('#view-office').addEventListener('click', page.showOffice);
+  document.querySelector('.workspace-tabs').addEventListener('keydown', e => {
+    if(!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const office = e.key === 'End' || (e.key !== 'Home' && document.activeElement.id === 'view-patients');
+    const button = document.querySelector(office ? '#view-office' : '#view-patients');
+    button.click(); button.focus();
+  });
+  document.querySelector('#clearShiftBtn').addEventListener('click', () => { clearError.textContent = ''; clearDialog.showModal(); });
+  document.querySelector('#cancelClearShift').addEventListener('click', () => clearDialog.close());
+  document.querySelector('#confirmClearShift').addEventListener('click', page.clearShift);
+  document.querySelector('#retryShiftClear').addEventListener('click', () => {
+    if(page.isCurrentShift() && page.cleanupSavedData()) status.textContent = 'Saved information from the cleared shift was removed.';
+  });
+  window.addEventListener('storage', e => { if(e.key === shiftKey || e.key === null) page.isCurrentShift(); });
+  window.addEventListener('focus', page.isCurrentShift);
+  window.addEventListener('pageshow', page.isCurrentShift);
+  document.addEventListener('visibilitychange', () => { if(document.hidden) page.saveDraft(); else page.isCurrentShift(); });
+  window.addEventListener('pagehide', page.saveDraft);
+}
+
+createPatientPage();
+})();
+</script>
+<script>
+(() => {
+  const context = document.modelContext;
+  if (!context || typeof context.registerTool !== 'function') return;
+  const lifecycle = new AbortController();
+  window.addEventListener('pagehide', () => lifecycle.abort(), { once: true });
+  try {
+    Promise.resolve(context.registerTool({
+      name: 'open_note_builder_tab',
+      title: 'Open note builder tab',
+      description: 'Open the first patient’s Visit or Checklist tab, or the separate Office overnight-test view.',
+      inputSchema: {type: 'object', properties: {tab: {type: 'string', enum: ['visit', 'check', 'office']}}, required: ['tab'], additionalProperties: false},
+      annotations: {readOnlyHint: false, untrustedContentHint: false},
+      execute(input) {
+        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1 || !['visit', 'check', 'office'].includes(input.tab)) throw new Error('Choose visit, check, or office.');
+        const button = document.querySelector('.patient [data-local-id="tab-' + input.tab + '"]');
+        button.click();
+        return {tab: input.tab, selected: input.tab === 'office' ? document.activeElement === document.getElementById('officeHeading') : button.getAttribute('aria-selected') === 'true'};
+      }
+    }, {signal: lifecycle.signal})).catch(() => {});
+  } catch (_) {}
+})();
+</script>
+</body>
+</html>
+

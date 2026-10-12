@@ -1,5 +1,15 @@
 # Home Visit MA Note Builder versions
 
+## v8.11 — full code audit and reliability fixes (October 11, 2026)
+
+A fresh review of the complete application found and fixed copy-ordering races, failed-read duplicates, overwritten concurrent Office edits, malformed stored data, invalid layout imports, stale choice/test values after layout changes, ISO DOB conversion, and keyboard/modal/mobile issues. Patient drafts now retain their own validated layout snapshot so another tab's layout changes cannot silently remove unfinished custom-field answers on restore. Pending layout edits are flushed before leaving the page.
+
+The patient workflow remains the same: **Copy message** saves overnight orders, **Office** is a separate view, and **Clear shift** clears the whole shift after confirmation. A copy already in progress temporarily disables other Copy message buttons until it finishes or is canceled.
+
+See `CODE-AUDIT-2026-10-11.md` for reproductions, repairs, verification, and testing limits. New regression suites are `data-audit-checks.cjs`, `layout-audit-checks.cjs`, `browser-audit-checks.cjs`, and `quality-audit-checks.cjs`.
+
+The unchanged v8.10 source is preserved in `backups/before-code-audit-2026-10-11/index.html` and on [codex/backup-before-code-audit-2026-10-11](https://github.com/hgeberg/home-visit-ma-note-builder/tree/codex/backup-before-code-audit-2026-10-11), commit `e999349f1a0f05ad904dc773cf8125649798c91e`.
+
 ## v8.10 — separate Office view and end-of-shift clearing (October 11, 2026)
 
 Use the **Patients** and **Office** tabs at the top to switch views. Office contains the saved overnight-test list and its single shared reference checklist; it is hidden while entering patient information. Each patient's Office button opens the same Office view. Copy-only saving is unchanged.

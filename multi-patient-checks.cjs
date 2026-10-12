@@ -47,7 +47,7 @@ async function markTest(root, id, result, subtype) {
 async function flushDraft(page, names) {
   await page.waitForFunction(expected => {
     const saved = JSON.parse(sessionStorage.getItem('hvnb_draft') || 'null');
-    return saved && saved.version === 2 && Array.isArray(saved.patients) &&
+    return saved && saved.version === 3 && Array.isArray(saved.patients) &&
       JSON.stringify(saved.patients.map(p => p.vals.name || '')) === JSON.stringify(expected);
   }, names);
   return draft(page);
@@ -324,7 +324,8 @@ test('the original single-patient draft restores and migrates to the aggregate f
   await local(patient(legacy, 0), 'tab-check').click();
   assert.equal(await local(patient(legacy, 0), 'f_k_confirm').isChecked(), true);
   const saved = await flushDraft(legacy, ['TEST LEGACY']);
-  assert.equal(saved.version, 2);
+  assert.equal(saved.version, 3);
+  assert.ok(Array.isArray(saved.layout.sections), 'Migrated drafts retain their form layout');
 });
 
 (async () => {
