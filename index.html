@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Basic visitor analytics: no form values, notes, query strings or referrers. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-QS3D1HYNH0"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-QS3D1HYNH0', {
+  page_location: 'https://hgeberg.github.io/home-visit-ma-note-builder/',
+  page_title: 'Home Visit MA Note Builder',
+  page_referrer: '',
+  allow_google_signals: false,
+  allow_ad_personalization_signals: false
+});
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -247,7 +261,7 @@ dialog.scrim::backdrop{background:transparent}
     <p class="sub"><b>v8.13</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
-  <p class="privacy">Nothing is sent anywhere. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information.</p>
+  <p class="privacy">Basic visit statistics are sent to Google Analytics using analytics cookies. Patient details, notes and anything entered into the forms are not included. Patient drafts stay in this browser tab and can be restored after a refresh for up to 8 hours. The office list is saved in this browser only. Closing the tab or clearing browser data may remove saved information. <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">About Google Analytics data</a>.</p>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
   <div id="storageSetupWarning" class="banner warn" role="alert" hidden><p>Saved information could not be moved to this version’s separate storage. Your previous data is unchanged. Retry to open the app.</p><button type="button" class="btn" id="retryStorageSetup">Retry storage setup</button></div>
   <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
@@ -2490,4 +2504,3 @@ openCurrentApp();
 </script>
 </body>
 </html>
-
