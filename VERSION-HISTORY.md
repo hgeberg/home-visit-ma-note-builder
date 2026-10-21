@@ -1,5 +1,15 @@
 # Home Visit MA Note Builder versions
 
+## v8.17 — conditional recent-antibiotic history (October 21, 2026)
+
+Recent antibiotics now offers No and Yes. Yes reveals Which antibiotic? and When? with editable text and shortcuts for Amoxicillin, Penicillin V, Cephalexin and Zpack. The first three are strep treatment options listed in [CDC guidance](https://www.cdc.gov/group-a-strep/hcp/clinical-guidance/strep-throat.html); this is not a prescribing-frequency ranking. These controls record reported history and do not select a treatment or dosage.
+
+The extra fields and shortcuts are hidden unless Yes is selected. Selecting No excludes earlier antibiotic details from the generated message while retaining them for subsequent editing. Copy warns about missing antibiotic names or dates when Yes is selected. Selecting Yes or a shortcut does not automatically open a text field.
+
+Saved and imported layouts gain the updated workflow while retaining unrelated customization. Previous No/None entries become No. Other free-text entries are retained under Preserved answers and prefilled into Which antibiotic? when Yes is selected; no positive antibiotic history is inferred from text such as Unknown. Previous dates embedded in free text are retained verbatim rather than parsed or guessed. Draft recovery keeps each patient's choice, drug and dates separate.
+
+Validation: six antibiotic-workflow cases, 11 house cases, seven layout-regression cases and 17 improvement cases passed (41 browser checks), plus JavaScript syntax checks and 320/390/1280px visual inspection. One copy-check expectation initially used the input label rather than the message label; it was corrected and passed. Physical mobile keyboards remain untested.
+
 ## v8.16 — additional pharmacy shortcuts (October 21, 2026)
 
 Added Westgate, Maple and Refuah alongside Madison. Older saved or imported layouts gain the three new shortcuts while retaining custom pharmacy choices and entered values. The layout records the preset update so later user edits to the shortcuts are respected.

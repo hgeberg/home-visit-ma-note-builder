@@ -270,7 +270,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.16</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.17</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -534,7 +534,7 @@ function testListText(items){
 /* ---------- default layout ---------- */
 
 function defaultLayout(){
-  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, sections: [
+  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, sections: [
     { id:'s_door', tab:'visit', title:'At the door', fields:[
       { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
       { id:'dob', type:'dob', label:'DOB', req:true },
@@ -548,7 +548,7 @@ function defaultLayout(){
       { id:'duration', type:'text', label:'Duration', ph:'2 days', chips: chips('1 day, 2 days, 3 days, 1 week') },
       { id:'exposure', type:'choice', label:'Exposure', opts:['No','Yes','Unknown'], detail:{ id:'exposureto', on:'Yes', ph:'Exposed to what?' } },
       { id:'allergies', type:'text', label:'Medication allergies', ph:'Medication or food allergy', chips: chips('NKDA, None') },
-      { id:'abx', type:'text', label:'Recent antibiotics', ph:'Name and dates', chips: chips('No, None') },
+      ...recentAntibioticFields(),
       { id:'history', type:'textarea', label:'Medical history', ph:'Relevant history', chips: chips('None') },
       { id:'meds', type:'text', label:'Daily medications', ph:'Medication list', chips: chips('None') },
       { id:'preg', type:'choice', label:'Nursing / pregnant', opts:['No','Yes','N/A'],
@@ -629,7 +629,17 @@ function defaultLayout(){
   ]};
 }
 
+function recentAntibioticFields(){
+  return [
+    {id:'abx', type:'choice', label:'Recent antibiotics', opts:['No','Yes']},
+    {id:'abx_name', type:'text', label:'Which antibiotic?', out:'Recent antibiotic', ph:'Antibiotic name', when:'recentAntibiotics', req:true,
+      chips:chips('Amoxicillin, Penicillin V, Cephalexin, Zpack')},
+    {id:'abx_when', type:'text', label:'When?', out:'When taken', ph:'Dates taken, or how long ago', when:'recentAntibiotics', req:true}
+  ];
+}
+
 const WHEN_TEXT = {
+  recentAntibiotics:'Recent antibiotics is Yes',
   added:'“Patient added at the house” is ticked',
   correction:'a correction is typed',
   anyPositive:'a test is marked Positive',
@@ -733,6 +743,17 @@ function loadLayout(){
   committedLayout = clone(L);
 }
 function normalizeLayout(){
+  if(L.recentAntibioticsVersion !== 1){
+    for(const section of L.sections){
+      const index = section.fields.findIndex(f => f.id === 'abx' && ['text', 'textarea'].includes(f.type));
+      if(index < 0) continue;
+      const fields = recentAntibioticFields();
+      fields[0] = {...section.fields[index], ...fields[0]};
+      delete fields[0].chips;
+      section.fields.splice(index, 1, ...fields.filter(f => f.id === 'abx' || !fieldById(f.id)));
+    }
+    L.recentAntibioticsVersion = 1;
+  }
   if(L.pharmacyPresetsVersion !== 1){
     const pharmacy = fieldById('pharmacy');
     if(pharmacy && ['text', 'textarea'].includes(pharmacy.type)){
@@ -743,6 +764,20 @@ function normalizeLayout(){
   }
   const aware = fieldById('aware');
   if(aware && aware.type === 'choice' && aware.unawareValue === undefined && aware.opts.includes('Unaware')) aware.unawareValue = 'Unaware';
+  migrateRecentAntibioticValues(V, true);
+  if(M.sentVals) migrateRecentAntibioticValues(M.sentVals);
+}
+function migrateRecentAntibioticValues(values, keepReference = false){
+  const field = fieldById('abx');
+  if(!field || field.type !== 'choice' || !fieldById('abx_name') || !fieldById('abx_when')) return;
+  const value = values.abx;
+  if(typeof value !== 'string' || !value.trim() || field.opts.includes(value)) return;
+  if(/^(no|none)$/i.test(value.trim())){ values.abx = 'No'; return; }
+  if(/^yes$/i.test(value.trim())){ values.abx = 'Yes'; return; }
+  if(!values.abx_name) values.abx_name = value;
+  const label = 'Recent antibiotics — previous entry';
+  if(keepReference && !preservedAnswers.some(a => a.label === label && a.value === value)) preservedAnswers.push({label, value});
+  delete values.abx;
 }
 function saveLayout(migrations){
   clearTimeout(layoutTimer);
@@ -954,6 +989,7 @@ function context(vals){
   const anyPositive = positive.length > 0;
   const awareness = fieldById('aware');
   return {
+    recentAntibiotics: vals.abx === 'Yes',
     added: !!vals.added,
     correction: !!String(vals.correction || '').trim(),
     anyPositive,
@@ -2159,6 +2195,8 @@ return {
   applyLayout:(layout, migrations) => {
     preserveLayoutAnswers(layout, migrations);
     L = layout;
+    migrateRecentAntibioticValues(V, true);
+    if(M.sentVals) migrateRecentAntibioticValues(M.sentVals);
     committedLayout = clone(layout);
     pruneValues(migrations);
     renderAll();
