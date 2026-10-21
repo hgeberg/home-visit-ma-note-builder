@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v8.15 — wait for a field tap before typing (October 21, 2026)
+
+Adding another patient or reopening a patient scrolls to the form and places focus on its heading. No text field is selected automatically, so the mobile keyboard is not requested until a field is tapped. New house continues to open at the house heading.
+
+Validation: all 11 house browser checks passed, including both Add patient controls, explicit name-field selection, and reopening earlier patients. Inline scripts and the service worker passed syntax checks. Physical mobile keyboard behavior remains untested.
+
 ## v8.14 — separate house pages and patient history (October 21, 2026)
 
 **Add patient in this house** keeps additional household members on the current page. **New house** opens a fresh house page and retains all earlier patients. New-house buttons are available above the forms and below each patient's message.

@@ -270,7 +270,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.14</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.15</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -323,7 +323,7 @@ dialog.scrim::backdrop{background:transparent}
 <template id="patientTemplate">
   <section class="patient">
     <header class="top">
-      <div><h2 id="patientTitle"></h2><p class="sub">Other patients in this house stay on this page. Open earlier houses from Patients today.</p></div>
+      <div><h2 id="patientTitle" tabindex="-1"></h2><p class="sub">Other patients in this house stay on this page. Open earlier houses from Patients today.</p></div>
       <div class="patient-heading-actions"><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button><button type="button" class="btn" id="editBtn">Edit layout</button></div>
     </header>
     <div id="saveState" class="save-state" role="status"></div>
@@ -2133,7 +2133,7 @@ return {
     $('#newBtn').setAttribute('aria-label', 'Clear ' + label);
     $('#addPatientBtn').setAttribute('aria-label', 'Add another patient after ' + label);
   },
-  focus:() => { setCollapsed(false); root.scrollIntoView({block:'start'}); const input = $('#panel-visit input'); if(input) input.focus({preventScroll:true}); },
+  focus:() => { setCollapsed(false); root.scrollIntoView({block:'start'}); $('#patientTitle').focus({preventScroll:true}); },
   offerRestore,
   applyOffice:(values, writable, baseline, readFailed = false) => { office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = readFailed; renderOfficePanel(); updateBadges(); renderSaveState(); },
   getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline, readFailed:officeReadFailed}),

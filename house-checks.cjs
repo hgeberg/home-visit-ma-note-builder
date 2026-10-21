@@ -19,12 +19,17 @@ async function openPatient(p, name){
 async function restore(p){await p.getByRole('button',{name:/^Restore (this visit|all)/}).click();}
 async function copy(p,n=0){await field(p,'copyBtn',n).click();await field(p,'sentBanner',n).waitFor({state:'visible'});}
 
-test('Patient list starts collapsed; same-house controls add separate forms on the same page',async p=>{
+test('Patient list starts collapsed; adding patients waits for a field tap before typing',async p=>{
   assert.equal(await p.locator('#patientNavigator').evaluate(el=>el.open),false);
   assert.equal(await p.locator('#patientJumps').isVisible(),false);
   await seed(p,'SYNTHETIC ALPHA');
-  await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC BETA',1);
+  await p.locator('#appendPatient').click();
+  assert.equal(await p.evaluate(()=>document.activeElement.matches('input,textarea,[contenteditable="true"]')),false);
+  await field(p,'f_name',1).click();
+  assert.equal(await field(p,'f_name',1).evaluate(el=>el===document.activeElement),true);
+  await seed(p,'SYNTHETIC BETA',1);
   await field(p,'addPatientBtn',1).click();
+  assert.equal(await p.evaluate(()=>document.activeElement.matches('input,textarea,[contenteditable="true"]')),false);
   assert.equal(await visibleCount(p),3);
   assert.equal(await p.locator('#houseHeading').innerText(),'House 1');
   assert.equal(await field(p,'f_name',2).inputValue(),'');
@@ -42,6 +47,7 @@ test('New house opens a blank page and history reopens the correct house and pat
   assert.equal(await field(p,'f_name',2).inputValue(),'');
   await seed(p,'SYNTHETIC GAMMA',2);
   await openPatient(p,'2. SYNTHETIC BETA');
+  assert.equal(await p.evaluate(()=>document.activeElement.matches('input,textarea,[contenteditable="true"]')),false);
   assert.equal(await visibleCount(p),2);assert.equal(await patient(p,2).isVisible(),false);
   assert.equal(await field(p,'f_symptoms',1).inputValue(),'SYNTHETIC BETA symptoms');
   assert.equal(await p.locator('#patientNavigator').evaluate(el=>el.open),false);
