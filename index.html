@@ -108,6 +108,18 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .patient-navigator{margin-top:14px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:12px}
 .patient-navigator summary{font-weight:700;cursor:pointer}
 .patient-navigator .row{margin-top:10px}
+.patient-group{width:100%;min-width:0}
+.patient-group h3{margin:8px 0 6px;font-size:14px;color:var(--muted)}
+.patient-navigator>#patientJumps{display:block;max-height:min(50vh,360px)}
+.patient-group .patient-jumps{margin-top:0;max-height:none;overflow:visible}
+.patient-jumps .btn[aria-current="page"]{border-color:var(--accent);background:var(--accent-soft)}
+.house-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:18px}
+.house-toolbar h2{margin:0;font-size:20px}
+.house-toolbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
+.house-controls,.patient-actions .house-controls{display:flex;flex-wrap:wrap;gap:8px}
+.house-controls>.btn{flex:1;min-height:44px}
+.patient-actions .house-controls .add-patient{width:auto}
+@media(max-width:420px){.house-toolbar>.house-controls{width:100%}.house-controls>.btn{white-space:normal}}
 .undo-notice{position:fixed;z-index:60;bottom:12px;left:50%;transform:translateX(-50%);width:min(728px,calc(100% - 24px));box-shadow:var(--shadow);display:flex;align-items:center;gap:10px}
 .undo-notice span{flex:1;min-width:0;overflow-wrap:anywhere}
 .change-details,.preserved-answers{margin:10px 0;padding:10px 12px;border:1px solid var(--warn-line);border-radius:10px;background:var(--warn-soft)}
@@ -258,7 +270,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.13</b> · Multiple patients, one page. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.14</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -280,11 +292,15 @@ dialog.scrim::backdrop{background:transparent}
     <p>Office save pending or unavailable. A copied message does not confirm an Office save. Keep this page open and retry.</p>
     <button type="button" class="btn" id="retryOfficeSave">Retry save</button>
   </div>
-  <details id="patientNavigator" class="patient-navigator" open>
-    <summary id="patientNavSummary">Patients</summary>
-    <nav id="patientJumps" class="patient-jumps" aria-label="Jump to patient"></nav>
-    <div class="row"><button class="btn small" type="button" id="collapsePatients">Collapse all</button><button class="btn small" type="button" id="expandPatients">Expand all</button><button class="btn small" type="button" id="appendPatient">+ Add patient</button></div>
+  <details id="patientNavigator" class="patient-navigator">
+    <summary id="patientNavSummary">Patients today</summary>
+    <nav id="patientJumps" class="patient-jumps" aria-label="Open a patient’s house"></nav>
   </details>
+  <section id="houseToolbar" class="house-toolbar" aria-label="Current house">
+    <div><h2 id="houseHeading" tabindex="-1">House 1</h2><p id="houseSummary">Patients in this house share this page.</p></div>
+    <div class="house-controls"><button class="btn" type="button" id="appendPatient">+ Add patient in this house</button><button class="btn primary" type="button" id="newHouseBtn">New house →</button></div>
+    <div class="row"><button class="btn small" type="button" id="collapsePatients">Collapse all</button><button class="btn small" type="button" id="expandPatients">Expand all</button></div>
+  </section>
   <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
   <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
@@ -307,7 +323,7 @@ dialog.scrim::backdrop{background:transparent}
 <template id="patientTemplate">
   <section class="patient">
     <header class="top">
-      <div><h2 id="patientTitle"></h2><p class="sub">Complete this patient at your own pace. Other patients stay on the page.</p></div>
+      <div><h2 id="patientTitle"></h2><p class="sub">Other patients in this house stay on this page. Open earlier houses from Patients today.</p></div>
       <div class="patient-heading-actions"><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button><button type="button" class="btn" id="editBtn">Edit layout</button></div>
     </header>
     <div id="saveState" class="save-state" role="status"></div>
@@ -332,8 +348,8 @@ dialog.scrim::backdrop{background:transparent}
       <div id="status" class="patient-status" role="status" aria-live="polite"></div>
     </div>
     <div class="patient-actions">
-      <button type="button" class="btn add-patient" id="addPatientBtn">+ Add another patient</button>
-      <p class="patient-caption">Adds a blank patient below this one. Everything entered above stays here.</p>
+      <div class="house-controls"><button type="button" class="btn add-patient" id="addPatientBtn">+ Add another patient in this house</button><button type="button" class="btn primary" id="nextHouseBtn">New house →</button></div>
+      <p class="patient-caption">Add a patient here for the same house, or open a fresh page for a new house. Earlier patients stay in Patients today.</p>
     </div>
     </div>
     <div id="sheetHost"></div>
@@ -2066,6 +2082,7 @@ function bind(){
   $('#collapseBtn').addEventListener('click', () => setCollapsed(!collapsed));
   $('#newBtn').addEventListener('click', () => newPatient());
   $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
+  $('#nextHouseBtn').addEventListener('click', page.newHouse);
   $('#selectBtn').addEventListener('click', () => {
     setTab('visit');
     const o = $('#output');
@@ -2160,6 +2177,7 @@ function createPatientPage(){
   const clearWarning = document.querySelector('#shiftClearWarning');
   const status = document.querySelector('#shiftStatus');
   let patients = [], timer = null, held = false, serial = 0;
+  let activeHouseId = 'house-1';
   let activeCopy = null;
   let replayingOffice = false;
   let generation = 'initial', resetting = false;
@@ -2236,10 +2254,34 @@ function createPatientPage(){
       page.setView('office');
       document.querySelector('#officeHeading').focus({preventScroll:true});
     },
-    showPatients:(scroll = true) => { page.setView('patients', scroll); patients.forEach(p => p.resize()); },
+    houseIds:() => [...new Set(patients.map(p => p.root.dataset.houseId))],
+    housePatients:() => patients.filter(p => p.root.dataset.houseId === activeHouseId),
+    showHouse:(houseId, scroll = true) => {
+      if(!page.isCurrentShift() || !page.houseIds().includes(houseId)) return;
+      activeHouseId = houseId;
+      patients.forEach(p => { p.root.hidden = p.root.dataset.houseId !== activeHouseId; });
+      page.updateTitles();
+      page.showPatients(scroll);
+      page.saveDraft();
+    },
+    openPatient:patient => {
+      page.showHouse(patient.root.dataset.houseId, false);
+      document.querySelector('#patientNavigator').open = false;
+      patient.focus();
+    },
+    newHouse:() => {
+      if(!page.isCurrentShift()) return;
+      const patient = page.addPatient(null, {houseId:'house-' + Date.now().toString(36) + '-' + (++serial)}, false);
+      if(!patient) return;
+      document.querySelector('#patientNavigator').open = false;
+      page.showHouse(patient.root.dataset.houseId);
+      document.querySelector('#houseHeading').focus({preventScroll:true});
+    },
+    showPatients:(scroll = true) => { page.setView('patients', scroll); page.housePatients().forEach(p => p.resize()); },
     setView:(view, scroll = true) => {
       host.hidden = view !== 'patients';
       document.querySelector('#patientNavigator').hidden = view !== 'patients';
+      document.querySelector('#houseToolbar').hidden = view !== 'patients';
       officeSection.hidden = view !== 'office';
       for(const name of ['patients', 'office']){
         const button = document.querySelector('#view-' + name);
@@ -2251,16 +2293,28 @@ function createPatientPage(){
     hasPatients:() => patients.length > 0,
     updateTitles:() => {
       patients.forEach((p, i) => p.title(i + 1));
-      const signature = JSON.stringify(patients.map(p => [p.root.id, p.name()]));
+      const houses = page.houseIds();
+      const count = page.housePatients().length;
+      document.querySelector('#houseHeading').textContent = 'House ' + (houses.indexOf(activeHouseId) + 1);
+      document.querySelector('#houseSummary').textContent = count + (count === 1 ? ' patient' : ' patients') + ' in this house · Only this house is shown.';
+      const signature = JSON.stringify([activeHouseId, patients.map(p => [p.root.id, p.name(), p.root.dataset.houseId])]);
       if(signature === navSignature) return;
       navSignature = signature;
-      document.querySelector('#patientNavSummary').textContent = 'Patients (' + patients.length + ')';
+      document.querySelector('#patientNavSummary').textContent = 'Patients today (' + patients.length + ')';
       const jumps = document.querySelector('#patientJumps'); jumps.replaceChildren();
+      const groups = new Map();
+      houses.forEach((id, i) => {
+        const group = document.createElement('section'); group.className = 'patient-group';
+        const heading = document.createElement('h3'); heading.textContent = 'House ' + (i + 1) + (id === activeHouseId ? ' · Current' : '');
+        const list = document.createElement('div'); list.className = 'patient-jumps';
+        group.append(heading, list); jumps.append(group); groups.set(id, list);
+      });
       patients.forEach((p, i) => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn small';
         button.textContent = (i + 1) + '. ' + (p.name() || 'Unnamed patient');
-        button.addEventListener('click', () => { page.showPatients(false); p.focus(); });
-        jumps.append(button);
+        if(p.root.dataset.houseId === activeHouseId) button.setAttribute('aria-current', 'page');
+        button.addEventListener('click', () => page.openPatient(p));
+        groups.get(p.root.dataset.houseId).append(button);
       });
     },
     saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
@@ -2273,7 +2327,7 @@ function createPatientPage(){
         const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
         const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
         if(patients.length === 1 && !patients[0].hasContent() && !pending) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, JSON.stringify({version:3, shift:generation, t:Date.now(), layout:patients[0].getLayout(), patients:patients.map(p => p.serialize()), ...(officeRecovery ? {officeRecovery} : {})}));
+        else window.sessionStorage.setItem(key, JSON.stringify({version:3, shift:generation, t:Date.now(), activeHouseId, layout:patients[0].getLayout(), patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId})), ...(officeRecovery ? {officeRecovery} : {})}));
         warning.hidden = true;
       }catch(e){
         warning.textContent = 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
@@ -2281,9 +2335,12 @@ function createPatientPage(){
       }
     },
     addPatient:(after, seed = {}, focus = true) => {
-      const previous = patients.find(p => p.root === after) || patients[0];
+      if(!page.isCurrentShift()) return;
+      const previous = patients.find(p => p.root === after) || page.housePatients().at(-1) || patients[0];
       if(previous) seed = Object.assign({}, seed, {layout:clone(previous.getLayout())});
       const root = template.content.firstElementChild.cloneNode(true);
+      root.dataset.houseId = typeof seed.houseId === 'string' && /^house-[a-z0-9-]+$/.test(seed.houseId) ? seed.houseId : (previous ? previous.root.dataset.houseId : activeHouseId);
+      root.hidden = root.dataset.houseId !== activeHouseId;
       const savedId = typeof seed.id === 'string' && /^patient-[a-z0-9-]+$/.test(seed.id) ? seed.id : '';
       root.id = savedId && !patients.some(p => p.root.id === savedId) ? savedId : 'patient-' + Date.now().toString(36) + '-' + (++serial);
       const index = after ? patients.findIndex(p => p.root === after) + 1 : patients.length;
@@ -2295,7 +2352,7 @@ function createPatientPage(){
       page.updateOfficeStatus();
       page.updateCopyButtons();
       page.saveDraft();
-      if(focus) patient.focus();
+      if(focus) page.openPatient(patient);
       return patient;
     },
     layoutChanged:(source, layout, migrations) => patients.forEach(p => { if(p.root !== source) p.applyLayout(clone(layout), migrations); }),
@@ -2322,11 +2379,13 @@ function createPatientPage(){
       const layout = patients.length && patients[0].acceptsLayout(draft.layout) ? clone(draft.layout) : null;
       held = true;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      activeHouseId = 'house-1';
       for(const seed of draft.patients) page.addPatient(null, layout ? {...seed, layout} : seed, false);
       page.restoreOfficeRecovery(draft);
-      held = false; page.saveDraft();
-      page.showPatients(false);
-      if(patients.length) patients[0].root.scrollIntoView({block:'start'});
+      held = false;
+      document.querySelector('#patientNavigator').open = false;
+      page.showHouse(page.houseIds().includes(draft.activeHouseId) ? draft.activeHouseId : page.houseIds()[0], false);
+      document.querySelector('#houseHeading').scrollIntoView({block:'start'});
     },
     startFresh:() => {
       // Starting new forms must not discard already-copied Office work.
@@ -2368,6 +2427,8 @@ function createPatientPage(){
       patients.forEach(p => p.flushLayout());
       const layout = patients.length ? clone(patients[0].getLayout()) : null;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      activeHouseId = 'house-1';
+      document.querySelector('#patientNavigator').open = false;
       generation = nextGeneration;
       if(clearDialog.open) clearDialog.close();
       const cleared = page.cleanupSavedData();
@@ -2400,9 +2461,10 @@ function createPatientPage(){
   });
   document.querySelector('#undoAction').addEventListener('click', page.undoLast);
   document.querySelector('#dismissUndo').addEventListener('click', page.clearUndo);
-  document.querySelector('#collapsePatients').addEventListener('click', () => patients.forEach(p => p.collapse(true)));
-  document.querySelector('#expandPatients').addEventListener('click', () => patients.forEach(p => p.collapse(false)));
-  document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(patients.at(-1).root));
+  document.querySelector('#collapsePatients').addEventListener('click', () => page.housePatients().forEach(p => p.collapse(true)));
+  document.querySelector('#expandPatients').addEventListener('click', () => page.housePatients().forEach(p => p.collapse(false)));
+  document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(page.housePatients().at(-1).root));
+  document.querySelector('#newHouseBtn').addEventListener('click', page.newHouse);
   document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
   document.querySelector('#view-office').addEventListener('click', page.showOffice);
   document.querySelector('.workspace-tabs').addEventListener('keydown', e => {
@@ -2488,12 +2550,12 @@ openCurrentApp();
     Promise.resolve(context.registerTool({
       name: 'open_note_builder_tab',
       title: 'Open note builder tab',
-      description: 'Open the first patient’s Visit or Checklist tab, or the separate Office overnight-test view.',
+      description: 'Open the current house’s first patient Visit or Checklist tab, or the separate Office overnight-test view.',
       inputSchema: {type: 'object', properties: {tab: {type: 'string', enum: ['visit', 'check', 'office']}}, required: ['tab'], additionalProperties: false},
       annotations: {readOnlyHint: false, untrustedContentHint: false},
       execute(input) {
         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1 || !['visit', 'check', 'office'].includes(input.tab)) throw new Error('Choose visit, check, or office.');
-        const button = input.tab === 'office' ? document.getElementById('view-office') : document.querySelector('.patient [data-local-id="tab-' + input.tab + '"]');
+        const button = input.tab === 'office' ? document.getElementById('view-office') : document.querySelector('.patient:not([hidden]) [data-local-id="tab-' + input.tab + '"]');
         button.click();
         return {tab: input.tab, selected: input.tab === 'office' ? document.activeElement === document.getElementById('officeHeading') : button.getAttribute('aria-selected') === 'true'};
       }

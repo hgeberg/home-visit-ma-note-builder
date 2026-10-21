@@ -1,5 +1,17 @@
 # Home Visit MA Note Builder versions
 
+## v8.14 — separate house pages and patient history (October 21, 2026)
+
+**Add patient in this house** keeps additional household members on the current page. **New house** opens a fresh house page and retains all earlier patients. New-house buttons are available above the forms and below each patient's message.
+
+**Patients today** is collapsed by default at the top. Expand it to see every patient grouped by house; choosing a patient opens that house and expands the selected patient. Only the current house's forms are shown. Collapse all and Expand all apply to that house.
+
+Draft recovery retains house membership and the last-opened house, including a blank new house. Existing drafts without house information restore together as House 1. The Office list continues to collect copied overnight tests from all houses. Clear shift removes every house and resets to one blank patient with patient history collapsed.
+
+Validation: 67 browser checks passed using synthetic data (11 house workflow, 11 multi-patient, 17 draft/undo/offline improvement, 15 shift, and 13 Office checks). House cases cover navigation, inserting patients into earlier houses, refresh recovery, legacy/malformed house metadata, pending copies, shared Office, cross-tab clearing, focus/scroll behavior, and 320/390/1280px layouts. Inline scripts and the service worker passed syntax checks. Physical iPhone/iPad Safari remains untested.
+
+The previous deployed source is retained in Git commit `ed098498a4019c6e1adff1bdea348e240f19251b`.
+
 ## v8.11 — full code audit and reliability fixes (October 11, 2026)
 
 A fresh review of the complete application found and fixed copy-ordering races, failed-read duplicates, overwritten concurrent Office edits, malformed stored data, invalid layout imports, stale choice/test values after layout changes, ISO DOB conversion, and keyboard/modal/mobile issues. Patient drafts now retain their own validated layout snapshot so another tab's layout changes cannot silently remove unfinished custom-field answers on restore. Pending layout edits are flushed before leaving the page.
