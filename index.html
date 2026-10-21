@@ -270,7 +270,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.15</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.16</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -411,6 +411,7 @@ page.dialogHosts.append(dialogHost);
 const LAYOUT_KEY = 'hvnb_current_layout';
 const OFFICE_KEY = 'hvnb_current_office';
 const DEFAULT_BASE = 12;
+const PHARMACY_PRESETS = ['Madison', 'Westgate', 'Maple', 'Refuah'];
 // iOS Safari copies text that starts like "Symptoms: ..." as a web address, and Teams then pastes it
 // as Symptoms:%20Sore%20throat... An invisible zero-width space in front stops it looking like one.
 const COPY_PREFIX = '\u200B';
@@ -533,7 +534,7 @@ function testListText(items){
 /* ---------- default layout ---------- */
 
 function defaultLayout(){
-  return { v: 4, base: DEFAULT_BASE, sections: [
+  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, sections: [
     { id:'s_door', tab:'visit', title:'At the door', fields:[
       { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
       { id:'dob', type:'dob', label:'DOB', req:true },
@@ -561,7 +562,7 @@ function defaultLayout(){
       { id:'weight', type:'text', label:'Weight', ph:'Peds or under 100 lb', im:'decimal', chips: chips('N/A') }
     ]},
     { id:'s_rx', tab:'visit', title:'Pharmacy', fields:[
-      { id:'pharmacy', type:'text', label:'Pharmacy', ph:'Pharmacy name', chips: chips('Madison') },
+      { id:'pharmacy', type:'text', label:'Pharmacy', ph:'Pharmacy name', chips: chips(PHARMACY_PRESETS.join(', ')) },
       { id:'formpref', type:'choice', label:'Pills or liquid', opts:['Pill','Liquid','Either','N/A'] }
     ]},
     { id:'s_tests', tab:'visit', title:'Tests', fields:[
@@ -732,6 +733,14 @@ function loadLayout(){
   committedLayout = clone(L);
 }
 function normalizeLayout(){
+  if(L.pharmacyPresetsVersion !== 1){
+    const pharmacy = fieldById('pharmacy');
+    if(pharmacy && ['text', 'textarea'].includes(pharmacy.type)){
+      pharmacy.chips = pharmacy.chips || [];
+      for(const name of PHARMACY_PRESETS.slice(1)) if(!pharmacy.chips.some(c => norm(c.v) === norm(name))) pharmacy.chips.push({v:name, m:'fill'});
+    }
+    L.pharmacyPresetsVersion = 1;
+  }
   const aware = fieldById('aware');
   if(aware && aware.type === 'choice' && aware.unawareValue === undefined && aware.opts.includes('Unaware')) aware.unawareValue = 'Unaware';
 }
@@ -762,7 +771,7 @@ function commitLayout(migrations){
   renderOfficePanel();
 }
 function saveLayoutSoon(){ clearTimeout(layoutTimer); layoutTimer = setTimeout(saveLayout, 400); }
-function layoutChanged(){ saveLayout(); renderAll(); }
+function layoutChanged(){ normalizeLayout(); saveLayout(); renderAll(); }
 
 let officeWritable = true;
 let officeReadFailed = false;

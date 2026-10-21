@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v8.16 — additional pharmacy shortcuts (October 21, 2026)
+
+Added Westgate, Maple and Refuah alongside Madison. Older saved or imported layouts gain the three new shortcuts while retaining custom pharmacy choices and entered values. The layout records the preset update so later user edits to the shortcuts are respected.
+
+Validation: all 11 house browser checks passed. A separate disposable-browser check verified all four shortcuts populate the message, older layouts retain custom choices, and later shortcut edits and entered pharmacy details survive reload. Inline scripts and the service worker passed syntax checks.
+
 ## v8.15 — wait for a field tap before typing (October 21, 2026)
 
 Adding another patient or reopening a patient scrolls to the form and places focus on its heading. No text field is selected automatically, so the mobile keyboard is not requested until a field is tapped. New house continues to open at the house heading.
