@@ -247,6 +247,35 @@ textarea.inp{min-height:84px;resize:vertical}
 .actions-inner{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:8px}
 .actions .btn{min-height:48px;border-radius:12px;font-weight:760;padding-inline:8px}
 
+.visit-main,.message-rail{min-width:0}
+.message-card{margin-top:12px}
+.message-hint{margin-top:10px}
+@media(min-width:760px){
+  .app{max-width:1200px}
+  .visit-workspace{display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,30vw,350px);align-items:start;gap:24px}
+  .message-rail{
+    position:sticky;top:calc(var(--message-viewport-top,0px) + 12px + env(safe-area-inset-top,0px));
+    max-height:min(var(--message-room,100dvh),calc(var(--message-viewport-height,100dvh) - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+    display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:thin;
+  }
+  .message-card{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;margin:0;overflow:hidden}
+  .message-card>.sec-title,.message-card>.tagline,.message-hint,.message-rail>.actions{flex:none}
+  .message-card>.tagline{max-height:80px;overflow:auto}
+  .message-rail .out-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+  .message-rail .output{flex:1 1 auto;min-height:80px;overflow-y:auto;scrollbar-width:thin}
+  .message-rail .actions-inner{grid-template-columns:1fr 1fr}
+  .message-rail [data-local-id="copyBtn"]{grid-column:1/-1;grid-row:1}
+  .message-rail .actions .btn{font-size:14px}
+  :root[data-message-compact] .message-hint{display:none}
+  :root[data-message-compact] .message-card>.sec-title{padding-top:10px}
+  :root[data-message-compact] .message-rail .out-wrap{padding:8px 12px 12px}
+  :root[data-message-compact] .message-rail .output{min-height:64px}
+  :root[data-message-compact] .message-rail .actions{margin-top:8px}
+  :root[data-message-compact] .message-rail .actions .btn{min-height:40px}
+}
+@media(min-width:760px) and (max-width:1040px){.visit-main .grid{grid-template-columns:minmax(0,1fr)}.visit-main .full{grid-column:1}}
+@media print{.visit-workspace{display:block}.message-rail{position:static;max-height:none;overflow:visible}.message-card{display:block}.message-rail .out-wrap{display:block}.message-rail .output{max-height:none}}
+
 .scrim{
   position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
   padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px))
@@ -275,7 +304,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.19</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.20</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -333,6 +362,8 @@ dialog.scrim::backdrop{background:transparent}
     </header>
     <div id="saveState" class="save-state" role="status"></div>
     <div id="patientBody">
+    <div class="visit-workspace">
+    <div class="visit-main">
     <nav class="tabs" aria-label="Patient sections">
       <div class="seg" role="tablist">
         <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
@@ -344,6 +375,16 @@ dialog.scrim::backdrop{background:transparent}
     <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
     <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden></div>
     <div id="panel-office" role="tabpanel" aria-labelledby="tab-office" hidden></div>
+    </div>
+    <aside class="message-rail" aria-label="Teams message preview and actions">
+      <section class="card message-card">
+        <h2 class="sec-title">Teams message</h2>
+        <div id="tagLine" class="tagline" hidden></div>
+        <div class="out-wrap">
+          <textarea id="output" class="output" readonly aria-label="Teams message"></textarea>
+          <p class="small message-hint">Updates as you type. Checklist and Office items never appear here. If Copy is blocked, press and hold in this box, Select All, then Copy.</p>
+        </div>
+      </section>
     <div class="actions">
       <div class="actions-inner">
         <button type="button" class="btn" id="newBtn">Clear this patient</button>
@@ -351,6 +392,8 @@ dialog.scrim::backdrop{background:transparent}
         <button type="button" class="btn primary" id="copyBtn">Copy message</button>
       </div>
       <div id="status" class="patient-status" role="status" aria-live="polite"></div>
+    </div>
+    </aside>
     </div>
     <div class="patient-actions">
       <div class="house-controls"><button type="button" class="btn add-patient" id="addPatientBtn">+ Add another patient in this house</button><button type="button" class="btn primary" id="nextHouseBtn">New house →</button></div>
@@ -364,6 +407,36 @@ dialog.scrim::backdrop{background:transparent}
 <script>
 (() => {
 "use strict";
+
+// The keyboard can shrink and pan Safari's visual viewport without changing
+// the layout viewport. Keep the sticky preview inside the area actually visible.
+const messageViewport = window.visualViewport;
+let messageViewportFrame = 0;
+function updateMessageViewport(){
+  messageViewportFrame = 0;
+  const top = Math.max(0, messageViewport?.offsetTop || 0);
+  const height = messageViewport?.height || window.innerHeight;
+  const style = document.documentElement.style;
+  style.setProperty('--message-viewport-top', top + 'px');
+  style.setProperty('--message-viewport-height', height + 'px');
+  document.documentElement.toggleAttribute('data-message-compact', height < 430);
+  // Near the final field, the grid's bottom can otherwise push a tall sticky
+  // panel above its top boundary. Shrink the preview to the remaining form area.
+  const rooms = Array.from(document.querySelectorAll('.patient:not([hidden]) .message-rail'), rail => ({
+    rail,
+    height:Math.max(0, rail.previousElementSibling.getBoundingClientRect().bottom - (parseFloat(getComputedStyle(rail).top) || 0) - 1)
+  }));
+  for(const room of rooms) room.rail.style.setProperty('--message-room', room.height + 'px');
+}
+function scheduleMessageViewport(){
+  if(!messageViewportFrame) messageViewportFrame = requestAnimationFrame(updateMessageViewport);
+}
+messageViewport?.addEventListener('resize', scheduleMessageViewport);
+messageViewport?.addEventListener('scroll', scheduleMessageViewport);
+window.addEventListener('resize', scheduleMessageViewport);
+window.addEventListener('scroll', scheduleMessageViewport, {passive:true});
+window.addEventListener('pageshow', scheduleMessageViewport);
+updateMessageViewport();
 
 // Migrate once, then never read keys used by older versions again. Existing
 // old tabs cannot overwrite the current version's data after this handoff.
@@ -402,6 +475,9 @@ function mountPatient(root, seed, page){
 const prefix = root.id + '_';
 const localSelector = sel => sel.replace(/#([\w-]+)/g, (_, id) => '#' + prefix + id);
 const lifecycle = new AbortController();
+const messageMainObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(scheduleMessageViewport) : null;
+messageMainObserver?.observe(root.querySelector('.visit-main'));
+lifecycle.signal.addEventListener('abort', () => messageMainObserver?.disconnect(), {once:true});
 function namespaceElement(node){
   if(node.id){ node.dataset.localId = node.id; node.id = prefix + node.id; }
   for(const attr of ['for', 'aria-labelledby', 'aria-controls', 'aria-describedby']){
@@ -1236,12 +1312,6 @@ function renderVisit(p){
   }
   for(const sec of secsOf('visit')) p.append(renderSection(sec));
   if(editing) p.append(builderTools('visit'));
-  p.append(h('section', {class:'card'},
-    h('h2', {class:'sec-title', text:'Teams message'}),
-    h('div', {id:'tagLine', class:'tagline', hidden:true}),
-    h('div', {class:'out-wrap'},
-      h('textarea', {id:'output', class:'output', readonly:true, 'aria-label':'Teams message'}),
-      h('p', {class:'small', text:'Checklist and Office items never appear here. If Copy is ever blocked, press and hold in this box, Select All, then Copy.'}))));
 }
 
 function renderCheck(p){

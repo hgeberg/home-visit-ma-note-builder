@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v8.20 — Teams preview beside the form and keyboard-aware sizing (October 21, 2026)
+
+The live Teams message and its copy controls now sit beside each patient's form on tablet and desktop screens (760px and wider), following the current section while scrolling. Narrow phone screens retain a stacked layout. The message stays available when switching to Checklist, and each patient retains a separate preview.
+
+The preview uses the visual viewport's height and offset, including keyboard resize and pan events, to fit the area above the keyboard. Long messages scroll inside the box while the copy controls remain accessible. At the final field, the panel also fits the remaining form area so the bottom of the form cannot push it upward. Closing the keyboard restores the larger preview. The offline app cache is updated to v8.20.
+
+Validation: 33 browser scenarios passed (five message-preview, 11 house-navigation and 17 draft/copy/undo/offline scenarios), plus inline JavaScript and service-worker syntax checks. The new checks cover 768/810/1024/1280px side-by-side layouts, 320/390px phone layouts, exact copied text, separate patient previews, and simulated keyboard resizing/panning at middle and final fields, including keyboard closure. Physical iPad Safari keyboard behavior still requires device verification. The previous deployed source remains in Git commit `39a41a968e7d5c81302c5d24008bb35c495d70e7`.
+
 ## v8.19 — Home Screen app settings and durable shift recovery (October 21, 2026)
 
 Added a project-scoped web-app manifest with the name Note Builder, standalone launch mode, light/dark browser theme colors, an Apple Home Screen icon, and opaque 192px/512px app icons. The blue note mark matches the existing favicon. `create-app-icons.py` recreates the PNGs using Pillow; a matching vector copy is `icons/icon.svg`. Offline setup caches only the static HTML, manifest and three PNGs. Static responses are consumed sequentially during installation so uncached requests cannot stall asset installation.
