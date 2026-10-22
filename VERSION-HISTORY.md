@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v8.22 — refined dark-mode palette (October 21, 2026)
+
+Dark mode now pairs layered slate surfaces with soft teal actions, cool off-white text and clearer field outlines. Selected tabs have a teal underline. The Teams message uses a navy surface, while success, warning and danger states use muted green, amber and rose. Browser chrome follows the new background, and the offline app cache is updated to v8.22.
+
+Validation: reviewed phone, tablet and desktop screenshots at 390/810/1280px, including populated forms, the Teams preview, Office and the clear-shift dialog. Checked text and control contrast, saved theme selection, browser theme color and switching appearances. Inline scripts and the service worker passed syntax checks.
+
 ## v8.21 — saved dark-mode toggle (October 21, 2026)
 
 A Dark mode button at the top switches the whole app between dark and light appearances, including forms, Office, dialogs and the Teams preview. It follows the device appearance until a choice is made, then remembers that choice on this browser/device and applies it before the page paints. Open tabs stay in sync, and the browser theme color follows the chosen appearance. The toggle still works for the current session if preference storage is unavailable. The offline app cache is updated to v8.21.
