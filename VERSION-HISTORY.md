@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v8.23 — small header inset in the installed app (October 21, 2026)
+
+The installed web app adds 6px above the header, on top of its existing safe-area spacing. Installation is detected with the standalone display mode or Apple's standalone flag. The offline app cache is updated to v8.23.
+
 ## v8.22 — refined dark-mode palette (October 21, 2026)
 
 Dark mode now pairs layered slate surfaces with soft teal actions, cool off-white text and clearer field outlines. Selected tabs have a teal underline. The Teams message uses a navy surface, while success, warning and danger states use muted green, amber and rose. Browser chrome follows the new background, and the offline app cache is updated to v8.22.
