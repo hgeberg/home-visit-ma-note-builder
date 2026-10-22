@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v8.24 — additional installed-app header spacing (October 21, 2026)
+
+Increased the installed app's top padding from 20px to 32px, moving the header another 12px below the existing safe-area inset. The offline app cache is updated to v8.24.
+
 ## v8.23 — small header inset in the installed app (October 21, 2026)
 
 The installed web app adds 6px above the header, on top of its existing safe-area spacing. Installation is detected with the standalone display mode or Apple's standalone flag. The offline app cache is updated to v8.23.
