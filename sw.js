@@ -1,16 +1,24 @@
 'use strict';
-// Cache only the static app shell, never form contents or browser storage.
+// Cache only static app assets, never form contents or browser storage.
 const ROOT = new URL('./', self.location.href);
 const APP = new URL('index.html', ROOT).href;
 const PREFIX = 'hvnb-shell-' + ROOT.pathname + '-';
-const CACHE = PREFIX + 'v8.18';
+const CACHE = PREFIX + 'v8.19';
+const ASSETS = ['manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'].map(path => new URL(path, ROOT).href);
 const isApp = response => response.ok && response.headers.get('content-type')?.includes('text/html');
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const response = await fetch(APP, {cache:'reload'});
     if(!isApp(response) || !(await response.clone().text()).includes('<meta name="note-builder-app" content="shell">')) throw Error('App shell unavailable');
-    await (await caches.open(CACHE)).put(APP, response);
+    const cache = await caches.open(CACHE);
+    await cache.put(APP, response);
+    // Consume each response before opening another uncached asset request.
+    for(const url of ASSETS){
+      const asset = await fetch(url, {cache:'reload'});
+      if(!asset.ok) throw Error('App asset unavailable');
+      await cache.put(url, asset);
+    }
     await self.skipWaiting();
   })());
 });
@@ -22,6 +30,10 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+  if(event.request.method === 'GET' && ASSETS.includes(url.href)){
+    event.respondWith((async () => (await caches.match(url.href, {cacheName:CACHE})) || fetch(event.request))());
+    return;
+  }
   if(event.request.method !== 'GET' || event.request.mode !== 'navigate' || url.origin !== ROOT.origin || ![ROOT.pathname, ROOT.pathname + 'index.html'].includes(url.pathname)) return;
   event.respondWith((async () => {
     const controller = new AbortController();

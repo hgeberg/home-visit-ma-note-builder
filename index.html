@@ -20,6 +20,11 @@ gtag('config', 'G-QS3D1HYNH0', {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Note Builder">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f1f4f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1219" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
@@ -270,7 +275,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.18</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.19</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -1884,8 +1889,9 @@ function sentGuard(){
 
 function offerRestore(d){
   const count = d.patients.length;
-  sheet({ title:count === 1 ? 'Unfinished patient in this tab' : count + ' patients saved in this tab', dismissable:false,
-    body:['Last change at ' + fmtTime(d.t) + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards patient inputs; saved Office entries and pending Office saves are kept.'],
+  const savedAt = page.installedApp ? 'Saved on this device ' + new Date(d.t).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : 'Last change at ' + fmtTime(d.t);
+  sheet({ title:count === 1 ? (page.installedApp ? 'Saved patient on this device' : 'Unfinished patient in this tab') : count + (page.installedApp ? ' patients saved on this device' : ' patients saved in this tab'), dismissable:false,
+    body:[savedAt + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards patient inputs; saved Office entries and pending Office saves are kept.'],
     buttons:[ {label:count === 1 ? 'Restore this visit' : 'Restore all ' + count + ' patients', kind:'primary', on:() => page.restore(d)},
               {label:'Start fresh', kind:'danger', on:() => page.startFresh()} ] });
 }
@@ -2234,6 +2240,9 @@ function createPatientPage(){
   const template = document.querySelector('#patientTemplate');
   const warning = document.querySelector('#draftWarning');
   const key = 'hvnb_current_draft';
+  const appDraftKey = 'hvnb_current_app_draft';
+  const installedApp = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  let appDraftBaseline = null;
   const shiftKey = 'hvnb_current_shift_generation';
   const clearDialog = document.querySelector('#clearShiftDialog');
   const clearError = document.querySelector('#clearShiftError');
@@ -2250,6 +2259,7 @@ function createPatientPage(){
   const clone = value => JSON.parse(JSON.stringify(value));
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const page = {
+    installedApp,
     dialogHosts:document.querySelector('#dialogHosts'),
     officeContent:document.querySelector('#officeContent'),
     officeSaveWarning:document.querySelector('#officeSaveWarning'),
@@ -2385,17 +2395,35 @@ function createPatientPage(){
       clearTimeout(timer);
       if(held) return;
       if(!page.isCurrentShift()) return;
+      const state = patients[0].getOffice();
+      const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
+      const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
+      const empty = patients.length === 1 && !patients[0].hasContent() && !pending;
+      const serialized = empty ? null : JSON.stringify({version:3, shift:generation, t:Date.now(), activeHouseId, layout:patients[0].getLayout(), patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId})), ...(officeRecovery ? {officeRecovery} : {})});
+      let sessionSaved = false, appSaved = !installedApp, appConflict = false;
       try{
-        const state = patients[0].getOffice();
-        const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
-        const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
-        if(patients.length === 1 && !patients[0].hasContent() && !pending) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, JSON.stringify({version:3, shift:generation, t:Date.now(), activeHouseId, layout:patients[0].getLayout(), patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId})), ...(officeRecovery ? {officeRecovery} : {})}));
-        warning.hidden = true;
-      }catch(e){
-        warning.textContent = 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
-        warning.hidden = false;
+        if(serialized === null) window.sessionStorage.removeItem(key);
+        else window.sessionStorage.setItem(key, serialized);
+        sessionSaved = true;
+      }catch(e){}
+      if(installedApp){
+        try{
+          const current = window.localStorage.getItem(appDraftKey);
+          // An older app window must not overwrite a newer saved shift.
+          appConflict = current !== appDraftBaseline;
+          if(!appConflict){
+            if(serialized === null) window.localStorage.removeItem(appDraftKey);
+            else window.localStorage.setItem(appDraftKey, serialized);
+            appDraftBaseline = serialized;
+            appSaved = true;
+          }
+        }catch(e){}
       }
+      warning.hidden = installedApp ? appSaved : sessionSaved;
+      if(!warning.hidden) warning.textContent = appConflict
+        ? 'Another app window changed the saved shift. This window has not replaced it. Keep this page open and copy your messages before closing it.'
+        : installedApp ? 'This shift could not be saved for reopening. Keep this app open and copy your messages before closing it.'
+        : 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
     },
     addPatient:(after, seed = {}, focus = true) => {
       if(!page.isCurrentShift()) return;
@@ -2474,13 +2502,18 @@ function createPatientPage(){
           }
         }
       }catch(e){ cleared = false; }
-      try{
-        const raw = window.sessionStorage.getItem(key);
-        if(raw){
-          let draft; try{ draft = JSON.parse(raw); }catch(e){}
-          if(!page.matchesShift(draft)) window.sessionStorage.removeItem(key);
-        }
-      }catch(e){ cleared = false; }
+      for(const [kind, draftKey] of [['sessionStorage', key], ['localStorage', appDraftKey]]){
+        try{
+          const storage = window[kind], raw = storage.getItem(draftKey);
+          if(raw){
+            let draft; try{ draft = JSON.parse(raw); }catch(e){}
+            if(!page.matchesShift(draft)){
+              storage.removeItem(draftKey);
+              if(kind === 'localStorage') appDraftBaseline = null;
+            }
+          }
+        }catch(e){ cleared = false; }
+      }
       clearWarning.hidden = cleared;
       return cleared;
     },
@@ -2508,12 +2541,21 @@ function createPatientPage(){
       page.resetShift(nextGeneration, 'Shift cleared. Ready for the next patient.');
     }
   };
+  const usableDraft = value => {
+    if(!object(value)) return false;
+    if(object(value.vals) && !value.patients) value.patients = [{vals:value.vals, meta:value.meta}];
+    return page.matchesShift(value) && Array.isArray(value.patients) && value.patients.length && value.patients.every(p => object(p) && object(p.vals)) && Number.isFinite(value.t) && value.t > 0 && (installedApp || Date.now() - value.t < 8 * 60 * 60 * 1000);
+  };
   let draft = null;
-  try{ draft = JSON.parse(window.sessionStorage.getItem(key)); }catch(e){}
-  if(draft && object(draft.vals) && !draft.patients) draft.patients = [{vals:draft.vals, meta:draft.meta}];
-  if(draft && page.matchesShift(draft) && Array.isArray(draft.patients) && draft.patients.length && draft.patients.every(p => object(p) && object(p.vals)) && draft.t && Date.now() - draft.t < 8 * 60 * 60 * 1000){
-    held = true;
-  }else draft = null;
+  try{ const saved = JSON.parse(window.sessionStorage.getItem(key)); if(usableDraft(saved)) draft = saved; }catch(e){}
+  if(installedApp){
+    try{
+      appDraftBaseline = window.localStorage.getItem(appDraftKey);
+      const saved = JSON.parse(appDraftBaseline);
+      if(usableDraft(saved) && (!draft || saved.t >= draft.t)) draft = saved;
+    }catch(e){}
+  }
+  if(draft) held = true;
   if(generation !== 'initial') page.cleanupSavedData();
   const first = page.addPatient(null, {}, false);
   if(draft) first.offerRestore(draft);

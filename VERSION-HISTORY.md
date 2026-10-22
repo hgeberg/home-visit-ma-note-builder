@@ -1,5 +1,15 @@
 # Home Visit MA Note Builder versions
 
+## v8.19 — Home Screen app settings and durable shift recovery (October 21, 2026)
+
+Added a project-scoped web-app manifest with the name Note Builder, standalone launch mode, light/dark browser theme colors, an Apple Home Screen icon, and opaque 192px/512px app icons. The blue note mark matches the existing favicon. `create-app-icons.py` recreates the PNGs using Pillow; a matching vector copy is `icons/icon.svg`. Offline setup caches only the static HTML, manifest and three PNGs. Static responses are consumed sequentially during installation so uncached requests cannot stall asset installation.
+
+The installed web app saves a recovery copy on this device, including houses, patient inputs, checklists, copied-message state, layouts and pending Office saves. It offers recovery after closing/reopening or a browser restart, including offline opening after initial setup. Installed-app recovery has no eight-hour cutoff; Clear shift removes it and invalidates older copies in other app windows. The recovery prompt includes the saved date and time. Start fresh discards recovered forms while retaining copied Office work.
+
+Ordinary browser tabs keep their existing separate session drafts and eight-hour recovery window. The installed mode is detected using Apple's standalone flag or the standard standalone display-mode query. Durable-save failures remain visible even when the temporary session save succeeds. A stale app window cannot overwrite another window's newer recovery record. Data remains in this browser/app on this device; clearing website data can remove it.
+
+Validation: 15 installed-app cases cover icon dimensions and opacity, project-relative launch/scope URLs, full browser restart with a persistent profile, offline reopening, recovery older than eight hours, pending Office recovery, concurrent windows, failed writes/deletions, Clear shift and Start fresh. Existing shift and draft/offline checks also passed. The existing Office-edit case failed during the concurrent run and passed in isolation without an Office code change. Physical iPad installation, keyboards and Teams switching remain for device testing.
+
 ## v8.18 — full-width antibiotics question and one-line output (October 21, 2026)
 
 Recent antibiotics starts on its own full-width row below medication allergies. When Yes is selected, the generated message combines the antibiotic and timing as one line, for example `Recent antibiotics: Amoxicillin, a week ago`. It omits the separate Yes, Recent antibiotic and When taken lines. No continues to produce `Recent antibiotics: No`, and missing details still trigger the existing copy review.
