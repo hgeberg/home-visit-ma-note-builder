@@ -270,7 +270,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.17</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.18</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -1012,11 +1012,27 @@ function buildOutput(vals){
   // which the "Before you copy" sheet shows. Nothing like NOT MARKED is ever printed.
   const ctx = context(vals);
   const lines = [], issues = [];
+  const visitFields = secsOf('visit').flatMap(sec => sec.fields);
+  const antibioticChoice = visitFields.find(f => f.id === 'abx');
+  const antibioticFields = ['abx_name', 'abx_when'].map(id => visitFields.find(f => f.id === id));
+  const combineAntibiotics = antibioticChoice?.type === 'choice' && antibioticFields.every(f => f && ['text', 'textarea'].includes(f.type));
   let aware = '';   // printed in capitals under each positive test
   for(const sec of secsOf('visit')) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
   for(const sec of secsOf('visit')) for(const f of sec.fields){
     if(!whenOK(f.when, ctx)) continue;
     const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
+    if(combineAntibiotics && antibioticFields.includes(f)) continue;
+    if(combineAntibiotics && f === antibioticChoice && vals.abx === 'Yes'){
+      const details = [];
+      for(const detail of antibioticFields){
+        if(!whenOK(detail.when, ctx)) continue;
+        const value = String(vals[detail.id] || '').trim().replace(/\s*\n+\s*/g, '; ');
+        if(value) details.push(value);
+        else if(detail.req) issues.push((detail.out || detail.label) + ': not entered');
+      }
+      lines.push(name + ': ' + (details.join(', ') || 'Yes'));
+      continue;
+    }
     if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
       let v = String(vals[f.id] || '').trim();
       if(v){
@@ -1294,7 +1310,7 @@ function renderSection(sec){
 }
 
 function renderField(sec, f){
-  const full = sec.tab !== 'visit' || ['textarea', 'check', 'note', 'tests', 'mirror'].indexOf(f.type) >= 0 || (f.type === 'choice' && (f.detail || f.sub));
+  const full = sec.tab !== 'visit' || f.id === 'abx' || ['textarea', 'check', 'note', 'tests', 'mirror'].indexOf(f.type) >= 0 || (f.type === 'choice' && (f.detail || f.sub));
   const w = h('div', {class:'field' + (full ? ' full' : ''), data:{field:f.id}});
   if(f.when) w.dataset.when = JSON.stringify(f.when);
   if(sec.tab === 'office' && f.type === 'check'){

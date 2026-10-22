@@ -20,7 +20,7 @@ test('Yes reveals which and when with four shortcuts; No hides and excludes reta
   for(const name of ['Amoxicillin','Penicillin V','Cephalexin','Zpack']){
     await patient(p).locator('[data-field="abx_name"]').getByRole('button',{name,exact:true}).click();
     assert.equal(await field(p,'f_abx_name').inputValue(),name);
-    assert.match(await output(p),new RegExp('Recent antibiotic: '+name));
+    assert.match(await output(p),new RegExp('Recent antibiotics: '+name));
     assert.equal(await p.evaluate(()=>document.activeElement.matches('input,textarea')),false);
   }
   await field(p,'f_abx_when').fill('Finished October 10, 2026');
@@ -29,7 +29,8 @@ test('Yes reveals which and when with four shortcuts; No hides and excludes reta
   assert.equal(await field(p,'f_abx_name').isVisible(),false);assert.equal(await field(p,'f_abx_when').isVisible(),false);
   await choice(p,'Yes').click();assert.equal(await field(p,'f_abx_name').inputValue(),'Zpack');
   assert.equal(await field(p,'f_abx_when').inputValue(),'Finished October 10, 2026');
-  await p.reload();await restore(p);assert.match(await output(p),/Recent antibiotic: Zpack/);assert.match(await output(p),/When taken: Finished October 10, 2026/);
+  await p.reload();await restore(p);assert.match(await output(p),/Recent antibiotics: Zpack, Finished October 10, 2026/);
+  assert.doesNotMatch(await output(p),/Recent antibiotics: Yes|\nRecent antibiotic:|\nWhen taken:/);
 });
 
 test('Custom antibiotic text and dates copy exactly; missing Yes details prompt before copying',async p=>{
@@ -40,7 +41,8 @@ test('Custom antibiotic text and dates copy exactly; missing Yes details prompt 
   await field(p,'f_abx_name').fill('Other antibiotic, patient-reported');await field(p,'f_abx_when').fill('About 3 weeks ago');
   await field(p,'copyBtn').click();await field(p,'sentBanner').waitFor({state:'visible'});
   const copied=await p.evaluate(()=>window.copied);
-  assert.match(copied,/Recent antibiotics: Yes/);assert.match(copied,/Recent antibiotic: Other antibiotic, patient-reported/);assert.match(copied,/When taken: About 3 weeks ago/);
+  assert.deepEqual(copied.split('\n').filter(line=>line.startsWith('Recent antibiotics:')),['Recent antibiotics: Other antibiotic, patient-reported, About 3 weeks ago']);
+  assert.doesNotMatch(copied,/Recent antibiotics: Yes|\nRecent antibiotic:|\nWhen taken:/);
 });
 
 test('Antibiotic histories remain separate across patients, houses and draft recovery',async p=>{
@@ -86,6 +88,11 @@ test('Conditional fields and buttons fit mobile and desktop widths',async p=>{
   await seed(p);await choice(p,'Yes').click();fs.mkdirSync('qa/antibiotics',{recursive:true});
   for(const width of [320,390,1280]){
     await p.setViewportSize({width,height:1000});await patient(p).locator('[data-field="abx"]').scrollIntoViewIfNeeded();
+    const allergies=await patient(p).locator('[data-field="allergies"]').boundingBox();
+    const antibiotics=await patient(p).locator('[data-field="abx"]').boundingBox();
+    const symptoms=await patient(p).locator('[data-field="symptoms"]').boundingBox();
+    assert.ok(antibiotics.y>=allergies.y+allergies.height,'Antibiotics starts below the allergies row');
+    assert.ok(Math.abs(antibiotics.width-symptoms.width)<1,'Antibiotics spans the full form row');
     const size=await p.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));assert.ok(size.scroll<=size.width,JSON.stringify(size));
     await p.screenshot({path:'qa/antibiotics/'+width+'.png'});
   }

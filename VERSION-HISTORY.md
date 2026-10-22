@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v8.18 — full-width antibiotics question and one-line output (October 21, 2026)
+
+Recent antibiotics starts on its own full-width row below medication allergies. When Yes is selected, the generated message combines the antibiotic and timing as one line, for example `Recent antibiotics: Amoxicillin, a week ago`. It omits the separate Yes, Recent antibiotic and When taken lines. No continues to produce `Recent antibiotics: No`, and missing details still trigger the existing copy review.
+
+Validation: six antibiotic browser cases passed, including copied text, saved-history recovery, and confirmation that the antibiotics question occupies its own full-width row at 320/390/1280px. Inline JavaScript and the service worker passed syntax checks.
+
 ## v8.17 — conditional recent-antibiotic history (October 21, 2026)
 
 Recent antibiotics now offers No and Yes. Yes reveals Which antibiotic? and When? with editable text and shortcuts for Amoxicillin, Penicillin V, Cephalexin and Zpack. The first three are strep treatment options listed in [CDC guidance](https://www.cdc.gov/group-a-strep/hcp/clinical-guidance/strep-throat.html); this is not a prescribing-frequency ranking. These controls record reported history and do not select a treatment or dosage.
