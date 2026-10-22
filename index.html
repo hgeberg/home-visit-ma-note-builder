@@ -23,6 +23,13 @@ gtag('config', 'G-QS3D1HYNH0', {
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f1f4f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c1219" media="(prefers-color-scheme: dark)">
+<script>
+// Apply a saved appearance before the page paints.
+try {
+  const savedTheme = localStorage.getItem('hvnb_current_theme');
+  if(savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+} catch (_) {}
+</script>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
@@ -137,6 +144,11 @@ dialog.sheet::backdrop{background:var(--scrim)}
 
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .top h1{margin:0;font-size:21px;line-height:1.2;font-weight:780;text-wrap:balance}
+.app>.top>div{min-width:0;flex:1}
+.theme-toggle{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;flex:none}
+.theme-toggle svg{width:18px;height:18px;flex:none;fill:currentColor}
+.theme-toggle[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text)}
+@media(max-width:600px){.app>.top{flex-wrap:wrap}.app>.top>div{flex-basis:100%}}
 .sub{margin:4px 0 0;color:var(--muted);font-size:13px}
 .privacy{margin:10px 0 0;color:var(--muted);font-size:12.5px;line-height:1.45}
 
@@ -304,9 +316,9 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.20</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.21</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
-  </div></header>
+  </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
   <div id="storageSetupWarning" class="banner warn" role="alert" hidden><p>Saved information could not be moved to this version’s separate storage. Your previous data is unchanged. Retry to open the app.</p><button type="button" class="btn" id="retryStorageSetup">Retry storage setup</button></div>
   <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
@@ -407,6 +419,30 @@ dialog.scrim::backdrop{background:transparent}
 <script>
 (() => {
 "use strict";
+
+const themeKey = 'hvnb_current_theme';
+const themeSystem = window.matchMedia('(prefers-color-scheme: dark)');
+const themeToggle = document.querySelector('#themeToggle');
+let themePreference = document.documentElement.dataset.theme || null;
+function renderTheme(){
+  const dark = themePreference ? themePreference === 'dark' : themeSystem.matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  themeToggle.setAttribute('aria-pressed', String(dark));
+  themeToggle.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+  for(const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.content = dark ? '#0c1219' : '#f1f4f8';
+}
+themeToggle.addEventListener('click', () => {
+  themePreference = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  renderTheme();
+  try{ localStorage.setItem(themeKey, themePreference); }catch(_){}
+});
+themeSystem.addEventListener('change', () => { if(!themePreference) renderTheme(); });
+window.addEventListener('storage', event => {
+  if(event.key !== themeKey && event.key !== null) return;
+  themePreference = event.newValue === 'light' || event.newValue === 'dark' ? event.newValue : null;
+  renderTheme();
+});
+renderTheme();
 
 // The keyboard can shrink and pan Safari's visual viewport without changing
 // the layout viewport. Keep the sticky preview inside the area actually visible.

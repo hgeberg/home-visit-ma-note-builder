@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v8.21 — saved dark-mode toggle (October 21, 2026)
+
+A Dark mode button at the top switches the whole app between dark and light appearances, including forms, Office, dialogs and the Teams preview. It follows the device appearance until a choice is made, then remembers that choice on this browser/device and applies it before the page paints. Open tabs stay in sync, and the browser theme color follows the chosen appearance. The toggle still works for the current session if preference storage is unavailable. The offline app cache is updated to v8.21.
+
+Validation: five appearance checks passed for system appearance, saved overrides and reloads, cross-tab synchronization, mobile/desktop dark layouts and Office, and unavailable preference storage. Screenshots were inspected at 320px and 1280px; layouts also fit 390px and 810px. Inline scripts and the service worker passed syntax checks.
+
 ## v8.20 — Teams preview beside the form and keyboard-aware sizing (October 21, 2026)
 
 The live Teams message and its copy controls now sit beside each patient's form on tablet and desktop screens (760px and wider), following the current section while scrolling. Narrow phone screens retain a stacked layout. The message stays available when switching to Checklist, and each patient retains a separate preview.
