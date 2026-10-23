@@ -266,7 +266,7 @@ test('failed Office storage warns visibly, keeps copied records in memory, and r
   await local(patient(page), 'tab-office').click();
   assert.equal(await cards(page).count(), 2, 'Navigating to Office does not reload stale persisted data over unsaved records');
   await page.evaluate(() => { Storage.prototype.setItem = window.__originalStorageSetItem; });
-  await page.locator('#officeSection').getByRole('button', { name: /Retry save/i }).click();
+  await page.locator('#retryOfficeSave').click();
   await page.locator('#officeSaveWarning').waitFor({ state: 'hidden' });
   assert.deepEqual((await records(page)).map(item => item.name), ['TEST QUOTA OFFICE ALPHA', 'TEST QUOTA OFFICE BETA']);
   await page.reload();
