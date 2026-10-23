@@ -1,6 +1,6 @@
 /* Integration checks for v8.13; disposable browser contexts, dummy records. */
 const fs = require('node:fs'), http = require('node:http'), assert = require('node:assert/strict');
-const {chromium} = require('C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const tests = [], test = (name, run, offline = false) => tests.push({name, run, offline});
 const f = (p,id,n=0) => p.locator('.patient').nth(n).locator('[data-local-id="'+id+'"]');
 const stored = p => p.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
@@ -162,7 +162,7 @@ test('New controls fit mobile and desktop, including long names and collapsed pa
     res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store'});res.end(fs.readFileSync(file));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port+'/app/';
-  const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});let failed=0;
+  const browser=await chromium.launch(launchOptions);let failed=0;
   const selected=tests.filter(t=>!process.env.TEST_FILTER||t.name.includes(process.env.TEST_FILTER));
   try{for(const t of selected){const c=await browser.newContext({serviceWorkers:t.offline?'allow':'block'});await c.addInitScript(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.resolve()}}));const errors=[];c.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));const p=await c.newPage();p.setDefaultTimeout(10000);try{await p.goto(url);await t.run(p,c,url,state);assert.deepEqual(errors,[]);console.log('PASS '+t.name);}catch(e){failed++;console.error('FAIL '+t.name+'\n'+e.stack);}finally{await c.close();}}}
   finally{await browser.close();await new Promise(r=>server.close(r));}

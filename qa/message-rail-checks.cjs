@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./browser.cjs');
 const root = path.resolve(__dirname, '..');
 const checks = [];
 const test = (name, run, options = {}) => checks.push({ name, run, ...options });
@@ -144,7 +144,7 @@ test('Phone layouts stack the preview without horizontal clipping', async page =
   const server = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store' }); res.end(fs.readFileSync(path.join(root, 'index.html'))); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = 'http://127.0.0.1:' + server.address().port + '/';
-  const browser = await chromium.launch({ headless:true, executablePath:process.env.PLAYWRIGHT_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
+  const browser = await chromium.launch(launchOptions);
   let failed = 0;
   const selected = checks.filter(t => !process.env.TEST_FILTER || t.name.includes(process.env.TEST_FILTER));
   try {

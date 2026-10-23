@@ -2,14 +2,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const { chromium } = require('C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 
 const checks = [];
 const pass = name => { checks.push(name); console.log(`PASS ${name}`); };
 (async () => {
   const server = http.createServer((req,res) => { res.writeHead(200,{'Content-Type':'text/html'}); res.end(fs.readFileSync(path.join(__dirname,'index.html'))); });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser = await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+  const browser = await chromium.launch(launchOptions);
   const errors = [];
   try {
     const context = await browser.newContext({viewport:{width:390,height:844}});

@@ -3,13 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const playwrightPath = process.env.PLAYWRIGHT_MODULE ||
-  'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright';
-const { chromium } = require(playwrightPath);
-const executablePath = [process.env.PLAYWRIGHT_CHROME,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-].filter(Boolean).find(candidate => fs.existsSync(candidate));
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 const patients = page => page.locator('#patients .patient');
@@ -18,8 +12,8 @@ const local = (root, id) => root.locator(`[data-local-id="${id}"]`);
 const cards = page => page.locator('#officeContent .office-patient');
 const showOffice = page => page.locator('#view-office').click();
 const showPatients = page => page.locator('#view-patients').click();
-const records = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]'));
-const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_draft') || 'null'));
+const records = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
+const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || 'null'));
 const sheet = page => page.locator('#dialogHosts [role="dialog"]');
 
 async function fillPatient(page, name, overnights = '4plex', index = 0) {
@@ -39,7 +33,7 @@ async function addPatient(page, index = 0) {
 
 async function copyPatient(page, index = 0, count = 1) {
   await local(patient(page, index), 'copyBtn').click();
-  await page.waitForFunction(n => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === n, count);
+  await page.waitForFunction(n => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === n, count);
 }
 
 async function startClear(page) {
@@ -65,9 +59,9 @@ async function assertBlank(page) {
 }
 
 async function assertStoredEmpty(page) {
-  assert.equal(await page.evaluate(() => sessionStorage.getItem('hvnb_draft')), null);
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('hvnb_current_draft')), null);
   assert.deepEqual(await records(page), []);
-  assert.ok(await page.evaluate(() => localStorage.getItem('hvnb_shift_generation')), 'Clear records the new shift generation');
+  assert.ok(await page.evaluate(() => localStorage.getItem('hvnb_current_shift_generation')), 'Clear records the new shift generation');
 }
 
 async function fillTwoSaved(page) {
@@ -77,7 +71,7 @@ async function fillTwoSaved(page) {
   await addPatient(page);
   await fillPatient(page, 'TEST SHIFT BETA', 'Urine culture', 1);
   await copyPatient(page, 1, 2);
-  await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_draft') || '{}').patients?.length === 2);
+  await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || '{}').patients?.length === 2);
 }
 
 test('Office navigation hides patient forms and preserves patient inputs and checklist state', async ({ page }) => {
@@ -124,7 +118,7 @@ test('Office edit and removal dialogs work while patient inputs are hidden', asy
 test('canceling or escaping the shift confirmation preserves every patient and Office entry', async ({ page }) => {
   await fillTwoSaved(page);
   const before = await records(page);
-  const generation = await page.evaluate(() => localStorage.getItem('hvnb_shift_generation'));
+  const generation = await page.evaluate(() => localStorage.getItem('hvnb_current_shift_generation'));
   const dialog = await startClear(page);
   assert.match(await dialog.innerText(), /patient|draft/i);
   assert.match(await dialog.innerText(), /office/i);
@@ -138,7 +132,7 @@ test('canceling or escaping the shift confirmation preserves every patient and O
   assert.equal(await page.locator('#officeSection').isVisible(), true);
   assert.deepEqual(await records(page), before);
   assert.equal((await draft(page)).patients.length, 2);
-  assert.equal(await page.evaluate(() => localStorage.getItem('hvnb_shift_generation')), generation);
+  assert.equal(await page.evaluate(() => localStorage.getItem('hvnb_current_shift_generation')), generation);
 });
 
 test('confirmed shift clearing empties all patients and Office on reload while preserving the custom layout', async ({ page }) => {
@@ -146,7 +140,7 @@ test('confirmed shift clearing empties all patients and Office on reload while p
   await local(patient(page), 'editBtn').click();
   await local(patient(page), 'e_label_symptoms').fill('Current concerns');
   await local(patient(page), 'e_label_symptoms').blur();
-  await page.waitForFunction(() => (localStorage.getItem('hvnb_layout') || '').includes('Current concerns'));
+  await page.waitForFunction(() => (localStorage.getItem('hvnb_current_layout') || '').includes('Current concerns'));
   await local(patient(page), 'editBtn').click();
   await copyPatient(page);
   await addPatient(page);
@@ -154,12 +148,12 @@ test('confirmed shift clearing empties all patients and Office on reload while p
   await copyPatient(page, 1, 2);
   await addPatient(page, 1);
   await fillPatient(page, 'TEST SHIFT UNCOPIED', 'Urine culture', 2);
-  const layout = await page.evaluate(() => localStorage.getItem('hvnb_layout'));
+  const layout = await page.evaluate(() => localStorage.getItem('hvnb_current_layout'));
   await showOffice(page);
   await clearShift(page);
   await assertBlank(page);
   await assertStoredEmpty(page);
-  assert.equal(await page.evaluate(() => localStorage.getItem('hvnb_layout')), layout);
+  assert.equal(await page.evaluate(() => localStorage.getItem('hvnb_current_layout')), layout);
   await page.reload();
   await assertBlank(page);
   await assertStoredEmpty(page);
@@ -209,7 +203,7 @@ test('a stale pre-clear draft is never offered for restore in a newly loaded tab
   const stale = await draft(page);
   await clearShift(page);
   const second = await page.context().newPage();
-  await second.addInitScript(saved => sessionStorage.setItem('hvnb_draft', JSON.stringify(saved)), stale);
+  await second.addInitScript(saved => sessionStorage.setItem('hvnb_current_draft', JSON.stringify(saved)), stale);
   await second.goto(origin);
   await assertBlank(second);
   assert.equal(await second.getByRole('button', { name: /^Restore/i }).count(), 0);
@@ -220,7 +214,7 @@ test('a restore dialog open in another tab closes on clear and cannot restore th
   await fillTwoSaved(page);
   const stale = await draft(page);
   const second = await page.context().newPage();
-  await second.addInitScript(saved => sessionStorage.setItem('hvnb_draft', JSON.stringify(saved)), stale);
+  await second.addInitScript(saved => sessionStorage.setItem('hvnb_current_draft', JSON.stringify(saved)), stale);
   await second.goto(origin);
   await second.getByRole('button', { name: /^Restore/i }).first().waitFor();
   await clearShift(page);
@@ -235,7 +229,7 @@ test('failure to persist the shift marker leaves patient data intact and reports
   await page.evaluate(() => {
     window.__storageSet = Storage.prototype.setItem;
     Storage.prototype.setItem = function(key, value) {
-      if (this === localStorage && key === 'hvnb_shift_generation') throw new DOMException('Synthetic marker failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_shift_generation') throw new DOMException('Synthetic marker failure', 'QuotaExceededError');
       return window.__storageSet.call(this, key, value);
     };
   });
@@ -254,7 +248,7 @@ for (const storageName of ['localStorage', 'sessionStorage']) {
       window.__storageRemove = Storage.prototype.removeItem;
       Storage.prototype.removeItem = function(key) {
         const target = kind === 'localStorage' ? localStorage : sessionStorage;
-        if (this === target && (key === 'hvnb_office' || key === 'hvnb_draft')) throw new DOMException('Synthetic deletion failure', 'SecurityError');
+        if (this === target && (key === 'hvnb_current_office' || key === 'hvnb_current_draft')) throw new DOMException('Synthetic deletion failure', 'SecurityError');
         return window.__storageRemove.call(this, key);
       };
     }, storageName);
@@ -280,7 +274,7 @@ test('a pending failed Office save cannot resurrect copied records after shift c
   await page.evaluate(() => {
     window.__storageSet = Storage.prototype.setItem;
     Storage.prototype.setItem = function(key, value) {
-      if (this === localStorage && key === 'hvnb_office') throw new DOMException('Synthetic Office failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_office') throw new DOMException('Synthetic Office failure', 'QuotaExceededError');
       return window.__storageSet.call(this, key, value);
     };
   });
@@ -305,7 +299,7 @@ test('stale Office retry notices a new shift before a storage event and cannot r
   await page.evaluate(() => {
     window.__storageSet = Storage.prototype.setItem;
     Storage.prototype.setItem = function(key, value) {
-      if (this === localStorage && key === 'hvnb_office') throw new DOMException('Synthetic Office failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_office') throw new DOMException('Synthetic Office failure', 'QuotaExceededError');
       return window.__storageSet.call(this, key, value);
     };
   });
@@ -317,7 +311,7 @@ test('stale Office retry notices a new shift before a storage event and cannot r
     Storage.prototype.setItem = window.__storageSet;
     // The new marker and click occur in one task. No storage/focus event can
     // reset the app first: the retry itself must detect the new generation.
-    localStorage.setItem('hvnb_shift_generation', 'synthetic-new-shift-before-event');
+    localStorage.setItem('hvnb_current_shift_generation', 'synthetic-new-shift-before-event');
     document.querySelector('#retryOfficeSave').click();
   });
   await assertBlank(page);
@@ -343,7 +337,7 @@ test('an immediate shift clear preserves a layout edit before its delayed save r
     document.querySelector('#confirmClearShift').click();
   });
   await assertBlank(page);
-  assert.match(await page.evaluate(() => localStorage.getItem('hvnb_layout') || ''), /Latest shift concerns/);
+  assert.match(await page.evaluate(() => localStorage.getItem('hvnb_current_layout') || ''), /Latest shift concerns/);
   await page.reload();
   await assertBlank(page);
   await local(patient(page), 'f_symptoms').fill('Retained layout after reload');
@@ -380,7 +374,7 @@ test('separate Office and shift controls fit desktop and mobile screens', async 
   let failed = 0;
   const selected = tests.filter(entry => !process.env.TEST_FILTER || entry.name.includes(process.env.TEST_FILTER));
   try {
-    browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+    browser = await chromium.launch(launchOptions);
     for (const entry of selected) {
       const context = await browser.newContext();
       const errors = [];

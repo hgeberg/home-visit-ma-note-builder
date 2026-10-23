@@ -34,6 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
+<meta name="note-builder-version" content="v8.25">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -318,7 +319,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v8.24</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v8.25</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -750,7 +751,7 @@ function defaultLayout(){
 
 function recentAntibioticFields(){
   return [
-    {id:'abx', type:'choice', label:'Recent antibiotics', opts:['No','Yes']},
+    {id:'abx', type:'choice', label:'Recent antibiotics', opts:['No','Yes'], yesValue:'Yes'},
     {id:'abx_name', type:'text', label:'Which antibiotic?', out:'Recent antibiotic', ph:'Antibiotic name', when:'recentAntibiotics', req:true,
       chips:chips('Amoxicillin, Penicillin V, Cephalexin, Zpack')},
     {id:'abx_when', type:'text', label:'When?', out:'When taken', ph:'Dates taken, or how long ago', when:'recentAntibiotics', req:true}
@@ -758,7 +759,7 @@ function recentAntibioticFields(){
 }
 
 const WHEN_TEXT = {
-  recentAntibiotics:'Recent antibiotics is Yes',
+  recentAntibiotics:'Recent antibiotics indicates antibiotics were taken',
   added:'“Patient added at the house” is ticked',
   correction:'a correction is typed',
   anyPositive:'a test is marked Positive',
@@ -787,12 +788,13 @@ function validLayout(t){
       if(!obj(f) || !addId(f.id, valueIds) || !['text','textarea','dob','check','note','mirror','tests','choice'].includes(f.type)) return false;
       fields.set(f.id, f);
       if((f.type !== 'mirror' && typeof f.label !== 'string') || !condition(f.when)) return false;
-      if(!['ph','cap','im','out','unawareValue'].every(k => optional(f, k, 'string')) || !['req','remind','keepLines','underPositive'].every(k => optional(f, k, 'boolean'))) return false;
+      if(!['ph','cap','im','out','unawareValue','yesValue'].every(k => optional(f, k, 'string')) || !['req','remind','keepLines','underPositive'].every(k => optional(f, k, 'boolean'))) return false;
       if(f.outAlt !== undefined && (!obj(f.outAlt) || typeof f.outAlt.out !== 'string' || !condition(f.outAlt.when))) return false;
       if(f.chips !== undefined && (!Array.isArray(f.chips) || !f.chips.every(c => obj(c) && typeof c.v === 'string' && c.v.trim() && ['add','fill'].includes(c.m)))) return false;
       if(f.type === 'choice' && (!strings(f.opts) || !f.opts.length)) return false;
       if(f.opts !== undefined && !strings(f.opts)) return false;
       if(f.unawareValue !== undefined && (f.type !== 'choice' || !f.opts.includes(f.unawareValue))) return false;
+      if(f.yesValue !== undefined && (f.type !== 'choice' || !f.opts.includes(f.yesValue))) return false;
       for(const key of ['detail','sub']){
         if(f[key] === undefined) continue;
         const child = f[key];
@@ -883,6 +885,12 @@ function normalizeLayout(){
   }
   const aware = fieldById('aware');
   if(aware && aware.type === 'choice' && aware.unawareValue === undefined && aware.opts.includes('Unaware')) aware.unawareValue = 'Unaware';
+  const antibiotic = fieldById('abx');
+  if(antibiotic?.type === 'choice' && antibiotic.yesValue === undefined){
+    if(antibiotic.opts.includes('Yes')) antibiotic.yesValue = 'Yes';
+    // Older binary imports may have renamed Yes without storing its meaning.
+    else if(antibiotic.opts.length === 2 && antibiotic.opts.includes('No')) antibiotic.yesValue = antibiotic.opts.find(value => value !== 'No');
+  }
   migrateRecentAntibioticValues(V, true);
   if(M.sentVals) migrateRecentAntibioticValues(M.sentVals);
 }
@@ -891,8 +899,8 @@ function migrateRecentAntibioticValues(values, keepReference = false){
   if(!field || field.type !== 'choice' || !fieldById('abx_name') || !fieldById('abx_when')) return;
   const value = values.abx;
   if(typeof value !== 'string' || !value.trim() || field.opts.includes(value)) return;
-  if(/^(no|none)$/i.test(value.trim())){ values.abx = 'No'; return; }
-  if(/^yes$/i.test(value.trim())){ values.abx = 'Yes'; return; }
+  if(/^(no|none)$/i.test(value.trim()) && field.opts.includes('No')){ values.abx = 'No'; return; }
+  if(/^yes$/i.test(value.trim()) && field.yesValue){ values.abx = field.yesValue; return; }
   if(!values.abx_name) values.abx_name = value;
   const label = 'Recent antibiotics — previous entry';
   if(keepReference && !preservedAnswers.some(a => a.label === label && a.value === value)) preservedAnswers.push({label, value});
@@ -1108,7 +1116,7 @@ function context(vals){
   const anyPositive = positive.length > 0;
   const awareness = fieldById('aware');
   return {
-    recentAntibiotics: vals.abx === 'Yes',
+    recentAntibiotics: !!fieldById('abx')?.yesValue && vals.abx === fieldById('abx').yesValue,
     added: !!vals.added,
     correction: !!String(vals.correction || '').trim(),
     anyPositive,
@@ -1141,7 +1149,7 @@ function buildOutput(vals){
     if(!whenOK(f.when, ctx)) continue;
     const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
     if(combineAntibiotics && antibioticFields.includes(f)) continue;
-    if(combineAntibiotics && f === antibioticChoice && vals.abx === 'Yes'){
+    if(combineAntibiotics && f === antibioticChoice && ctx.recentAntibiotics){
       const details = [];
       for(const detail of antibioticFields){
         if(!whenOK(detail.when, ctx)) continue;
@@ -1995,7 +2003,16 @@ function sentGuard(){
 
 /* ---------- restore + layout updates ---------- */
 
-function offerRestore(d){
+function offerRestore(d, alternative){
+  if(alternative){
+    const device = page.isDeviceDraft(d) ? d : alternative;
+    const windowDraft = device === d ? alternative : d;
+    sheet({title:'Different saved shifts', dismissable:false,
+      body:['This window and this device have different unfinished work. Choose which shift to open. Opening this window’s shift keeps the device copy unchanged; copy its messages before closing the window.'],
+      buttons:[{label:'Restore saved device shift', kind:'primary', on:() => page.restore(device)},
+               {label:'Restore this window’s shift', on:() => page.restore(windowDraft)}]});
+    return;
+  }
   const count = d.patients.length;
   const savedAt = page.installedApp ? 'Saved on this device ' + new Date(d.t).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : 'Last change at ' + fmtTime(d.t);
   sheet({ title:count === 1 ? (page.installedApp ? 'Saved patient on this device' : 'Unfinished patient in this tab') : count + (page.installedApp ? ' patients saved on this device' : ' patients saved in this tab'), dismissable:false,
@@ -2092,9 +2109,9 @@ function fieldEditor(sec, f){
           else delete f[k];
         }
       }
-      if(f.unawareValue && !list.includes(f.unawareValue)){
-        const renamed = migrations.choices.find(c => c.from === f.unawareValue);
-        if(renamed) f.unawareValue = renamed.to; else delete f.unawareValue;
+      for(const semantic of ['unawareValue','yesValue']) if(f[semantic] && !list.includes(f[semantic])){
+        const renamed = migrations.choices.find(c => c.from === f[semantic]);
+        if(renamed) f[semantic] = renamed.to; else delete f[semantic];
       }
       f.opts = list;
       rerenderField(sec, f, migrations);
@@ -2351,6 +2368,8 @@ function createPatientPage(){
   const appDraftKey = 'hvnb_current_app_draft';
   const installedApp = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
   let appDraftBaseline = null;
+  let appDraftWriteBlocked = false;
+  let appDraftSourceBase = {revision:null};
   const shiftKey = 'hvnb_current_shift_generation';
   const clearDialog = document.querySelector('#clearShiftDialog');
   const clearError = document.querySelector('#clearShiftError');
@@ -2366,8 +2385,21 @@ function createPatientPage(){
   generation = readGeneration();
   const clone = value => JSON.parse(JSON.stringify(value));
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const parsedDraft = raw => { try{ return JSON.parse(raw); }catch(e){ return null; } };
+  const draftBase = raw => {
+    if(raw === null) return {revision:null};
+    const saved = parsedDraft(raw);
+    return typeof saved?.revision === 'string' ? {revision:saved.revision} : {legacy:raw};
+  };
+  const matchesBase = (base, raw) => JSON.stringify(base) === JSON.stringify(draftBase(raw));
+  const sameDraft = (a, b) => {
+    if(!object(a) || !object(b)) return false;
+    const contents = value => { const copy = {...value}; for(const key of ['t','revision','appDraftBase']) delete copy[key]; return JSON.stringify(copy); };
+    return contents(a) === contents(b);
+  };
   const page = {
     installedApp,
+    isDeviceDraft:value => sameDraft(value, parsedDraft(appDraftBaseline)),
     dialogHosts:document.querySelector('#dialogHosts'),
     officeContent:document.querySelector('#officeContent'),
     officeSaveWarning:document.querySelector('#officeSaveWarning'),
@@ -2507,26 +2539,28 @@ function createPatientPage(){
       const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
       const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
       const empty = patients.length === 1 && !patients[0].hasContent() && !pending;
-      const serialized = empty ? null : JSON.stringify({version:3, shift:generation, t:Date.now(), activeHouseId, layout:patients[0].getLayout(), patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId})), ...(officeRecovery ? {officeRecovery} : {})});
+      const snapshot = {version:4, revision:Date.now().toString(36) + '-' + Math.random().toString(36).slice(2), shift:generation, t:Date.now(), activeHouseId, layout:patients[0].getLayout(), patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId})), ...(officeRecovery ? {officeRecovery} : {})};
+      const serialized = empty ? null : JSON.stringify(snapshot);
       let sessionSaved = false, appSaved = !installedApp, appConflict = false;
-      try{
-        if(serialized === null) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, serialized);
-        sessionSaved = true;
-      }catch(e){}
       if(installedApp){
         try{
           const current = window.localStorage.getItem(appDraftKey);
           // An older app window must not overwrite a newer saved shift.
-          appConflict = current !== appDraftBaseline;
+          appConflict = appDraftWriteBlocked || current !== appDraftBaseline;
           if(!appConflict){
             if(serialized === null) window.localStorage.removeItem(appDraftKey);
             else window.localStorage.setItem(appDraftKey, serialized);
             appDraftBaseline = serialized;
+            appDraftSourceBase = draftBase(serialized);
             appSaved = true;
           }
         }catch(e){}
       }
+      try{
+        if(serialized === null) window.sessionStorage.removeItem(key);
+        else window.sessionStorage.setItem(key, installedApp ? JSON.stringify({...snapshot, appDraftBase:appDraftSourceBase}) : serialized);
+        sessionSaved = true;
+      }catch(e){}
       warning.hidden = installedApp ? appSaved : sessionSaved;
       if(!warning.hidden) warning.textContent = appConflict
         ? 'Another app window changed the saved shift. This window has not replaced it. Keep this page open and copy your messages before closing it.'
@@ -2575,6 +2609,11 @@ function createPatientPage(){
     },
     restore:(draft) => {
       if(!page.isCurrentShift() || !page.matchesShift(draft)) return;
+      if(installedApp){
+        const fromDevice = page.isDeviceDraft(draft);
+        appDraftSourceBase = fromDevice ? draftBase(appDraftBaseline) : (object(draft.appDraftBase) ? draft.appDraftBase : {revision:null});
+        appDraftWriteBlocked = !fromDevice && !matchesBase(appDraftSourceBase, appDraftBaseline);
+      }
       const layout = patients.length && patients[0].acceptsLayout(draft.layout) ? clone(draft.layout) : null;
       held = true;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
@@ -2627,6 +2666,7 @@ function createPatientPage(){
     },
     resetShift:(nextGeneration, message) => {
       page.clearUndo();
+      appDraftWriteBlocked = false;
       resetting = true; held = true; clearTimeout(timer);
       patients.forEach(p => p.flushLayout());
       const layout = patients.length ? clone(patients[0].getLayout()) : null;
@@ -2636,6 +2676,7 @@ function createPatientPage(){
       generation = nextGeneration;
       if(clearDialog.open) clearDialog.close();
       const cleared = page.cleanupSavedData();
+      appDraftSourceBase = draftBase(appDraftBaseline);
       page.addPatient(null, layout ? {layout} : {}, false);
       held = false; resetting = false;
       warning.hidden = true;
@@ -2654,19 +2695,24 @@ function createPatientPage(){
     if(object(value.vals) && !value.patients) value.patients = [{vals:value.vals, meta:value.meta}];
     return page.matchesShift(value) && Array.isArray(value.patients) && value.patients.length && value.patients.every(p => object(p) && object(p.vals)) && Number.isFinite(value.t) && value.t > 0 && (installedApp || Date.now() - value.t < 8 * 60 * 60 * 1000);
   };
-  let draft = null;
+  let draft = null, alternativeDraft = null;
   try{ const saved = JSON.parse(window.sessionStorage.getItem(key)); if(usableDraft(saved)) draft = saved; }catch(e){}
   if(installedApp){
     try{
       appDraftBaseline = window.localStorage.getItem(appDraftKey);
+      appDraftSourceBase = draftBase(appDraftBaseline);
       const saved = JSON.parse(appDraftBaseline);
-      if(usableDraft(saved) && (!draft || saved.t >= draft.t)) draft = saved;
+      if(usableDraft(saved)){
+        const diverged = draft && !sameDraft(draft, saved) && !matchesBase(draft.appDraftBase, appDraftBaseline);
+        if(!draft || saved.t >= draft.t){ if(diverged) alternativeDraft = draft; draft = saved; }
+        else if(diverged) alternativeDraft = saved;
+      }
     }catch(e){}
   }
   if(draft) held = true;
   if(generation !== 'initial') page.cleanupSavedData();
   const first = page.addPatient(null, {}, false);
-  if(draft) first.offerRestore(draft);
+  if(draft) first.offerRestore(draft, alternativeDraft);
   document.querySelector('#retryOfficeSave').addEventListener('click', () => {
     if(!patients.length) return;
     patients[0].retryOffice();

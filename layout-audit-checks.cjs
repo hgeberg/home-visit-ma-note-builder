@@ -1,7 +1,7 @@
 const fs = require('fs');
 const http = require('http');
 const assert = require('assert/strict');
-const { chromium } = require('C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const source = fs.readFileSync(require('path').join(__dirname, 'index.html'));
 const server = http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end(source)});
 const results=[];
@@ -10,7 +10,7 @@ const field=(id,type='text',extra={})=>({id,type,label:'Synthetic '+id,...extra}
 const layout=(fields,extra={})=>({base:12,v:4,sections:[{id:'s',tab:'visit',title:'Synthetic fields',fields}],...extra});
 async function main(){
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+ const browser=await chromium.launch(launchOptions);
  async function fresh(){const context=await browser.newContext();const page=await context.newPage();page.setDefaultTimeout(7000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port);return {context,page,errors};}
  async function run(name,test){const state=await fresh();try{await test(state);assert.deepEqual(state.errors,[]);results.push(name+' passed');console.log(name+' passed');}finally{await state.context.close();}}
  async function change(scope,id,value){await fid(scope,id).fill(value);await fid(scope,id).blur();}
@@ -65,11 +65,11 @@ async function main(){
     layout([field('a','choice',{opts:['Yes'],sub:{id:'child',on:'No',opts:['One']}})]),
     layout([field('foo_bar','tests',{items:[{id:'x',n:'One',kind:'done'}]}),field('foo','tests',{items:[{id:'bar_x',n:'Two',kind:'done'}]})])
    ];
-   for(const value of cases){await beginImport(page,value);assert.match(await page.getByRole('dialog').innerText(),/doesn’t look like an exported layout/);assert.equal(await page.evaluate(()=>localStorage.getItem('hvnb_layout')),null);await page.getByRole('button',{name:'Cancel',exact:true}).click();}
+   for(const value of cases){await beginImport(page,value);assert.match(await page.getByRole('dialog').innerText(),/doesn’t look like an exported layout/);assert.equal(await page.evaluate(()=>localStorage.getItem('hvnb_current_layout')),null);await page.getByRole('button',{name:'Cancel',exact:true}).click();}
   });
   await run('Stored corrupt layouts recover with visible warning',async({page})=>{
    for(const value of ['{broken',JSON.stringify(layout([field('a','choice',{opts:12})]))]){
-    await page.evaluate(value=>{localStorage.setItem('hvnb_layout',value);sessionStorage.clear()},value);await page.reload();
+    await page.evaluate(value=>{localStorage.setItem('hvnb_current_layout',value);sessionStorage.clear()},value);await page.reload();
     assert.match(await fid(page,'layoutWarning').innerText(),/saved layout could not be loaded/);assert.equal(await fid(page,'f_name').count(),1);
    }
    await fid(page,'editBtn').click();await beginImport(page,layout([field('safe')]));assert.equal(await page.getByRole('dialog').count(),0);

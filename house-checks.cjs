@@ -1,6 +1,6 @@
 /* House navigation: isolated Chrome contexts with synthetic patients only. */
 const fs = require('node:fs'), http = require('node:http'), assert = require('node:assert/strict');
-const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const tests = [], test = (name, run) => tests.push({name, run});
 const patient = (p, n=0) => p.locator('.patient').nth(n);
 const field = (p, id, n=0) => patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -184,7 +184,7 @@ test('House navigation and expanded history fit phone and desktop widths',async 
 (async()=>{
   const server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(fs.readFileSync('index.html'));});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port+'/';
-  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});let failed=0;
+  const browser=await chromium.launch(launchOptions);let failed=0;
   const selected=tests.filter(t=>!process.env.TEST_FILTER || t.name.includes(process.env.TEST_FILTER));
   try{for(const t of selected){
     const c=await browser.newContext({serviceWorkers:'block'}), errors=[];

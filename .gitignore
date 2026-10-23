@@ -1,0 +1,5 @@
+node_modules/
+qa/*.png
+qa/antibiotics/
+qa/houses/
+test-results/

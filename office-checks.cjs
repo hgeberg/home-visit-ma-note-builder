@@ -4,23 +4,15 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 
-const playwrightPath = process.env.PLAYWRIGHT_MODULE ||
-  'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright';
-const { chromium } = require(playwrightPath);
-const browserCandidates = [
-  process.env.PLAYWRIGHT_CHROME,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-].filter(Boolean);
-const executablePath = browserCandidates.find(candidate => fs.existsSync(candidate));
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 const local = (root, id) => root.locator(`[data-local-id="${id}"]`);
 const patients = page => page.locator('.patient');
 const patient = (page, index = 0) => patients(page).nth(index);
 const cards = page => page.locator('#officeContent .office-patient');
-const records = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]'));
-const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_draft') || 'null'));
+const records = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
+const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || 'null'));
 const dialog = root => root.page().locator('#dialogHosts [role="dialog"]');
 const showOffice = page => page.locator('#view-office').click();
 const showPatients = page => page.locator('#view-patients').click();
@@ -42,7 +34,7 @@ async function copyPatient(page, root, expectedCount) {
   await local(root, 'copyBtn').click();
   await local(root, 'sentBanner').waitFor({ state: 'visible' });
   if (expectedCount !== undefined) {
-    await page.waitForFunction(count => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === count, expectedCount);
+    await page.waitForFunction(count => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === count, expectedCount);
   }
 }
 
@@ -188,7 +180,7 @@ test('pending clipboard completion stores the exact patient snapshot taken at Co
   await local(root, 'f_bloodreason').fill('Changed while clipboard pending');
   assert.deepEqual(await records(page), []);
   await page.evaluate(() => { window.__resolveCopy(); });
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === 1);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   const saved = (await records(page))[0];
   assert.equal(saved.overnights, 'Blood: CBC, CMP');
   assert.equal(saved.bloodreason, 'Original blood reason');
@@ -205,7 +197,7 @@ test('Office persists across reload and new tabs while unfinished multi-patient 
   await fillPatient(patient(page, 2), 'TEST UNFINISHED', 'Blood');
   await local(patient(page, 2), 'f_bloodreason').fill('Not copied yet');
   const before = await records(page);
-  await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_draft') || '{}').patients?.length === 3);
+  await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || '{}').patients?.length === 3);
   await page.reload();
   assert.deepEqual(await records(page), before);
   assert.equal(await cards(page).count(), 2);
@@ -229,7 +221,7 @@ test('legacy Office entries retain identity and steps, disclose missing orders, 
     id: 'test-legacy-office', name: 'TEST LEGACY OFFICE', dob: '01/01/2000', t: 1700000000000,
     steps: [{ id: 'o_4plex', label: 'Req: overnight viral / flu / COVID PCR has 4plex checked, unless the provider ordered RPP', done: false }],
   };
-  await page.evaluate(value => localStorage.setItem('hvnb_office', JSON.stringify([value])), legacy);
+  await page.evaluate(value => localStorage.setItem('hvnb_current_office', JSON.stringify([value])), legacy);
   await page.reload();
   await showOffice(page);
   assert.equal(await cards(page).count(), 1);
@@ -260,7 +252,7 @@ test('failed Office storage warns visibly, keeps copied records in memory, and r
   await page.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (this === localStorage && key === 'hvnb_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
@@ -301,7 +293,7 @@ test('retrying a failed Copy save merges another tab\'s newly saved patient', as
   await page.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (this === localStorage && key === 'hvnb_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
@@ -338,7 +330,7 @@ test('retrying a failed removal keeps the deletion and another tab\'s newly save
   await page.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (this === localStorage && key === 'hvnb_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
@@ -396,7 +388,7 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
   let browser;
   let failed = 0;
   try {
-    browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+    browser = await chromium.launch(launchOptions);
     for (const entry of tests) {
       const context = await browser.newContext();
       const errors = [];
@@ -435,5 +427,6 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
   console.log(`\n${tests.length - failed}/${tests.length} Office browser checks passed.`);
   if (failed) process.exitCode = 1;
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
 
 

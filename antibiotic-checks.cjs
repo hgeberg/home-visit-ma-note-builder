@@ -1,6 +1,6 @@
 /* Recent-antibiotics workflow: isolated browser profiles and synthetic history. */
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const tests=[],test=(name,run)=>tests.push({name,run});
 const patient=(p,n=0)=>p.locator('.patient').nth(n);
 const field=(p,id,n=0)=>patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -58,7 +58,7 @@ test('Antibiotic histories remain separate across patients, houses and draft rec
 test('Old drafts preserve free text without inferring Yes and retain explicit No or None answers',async(p,c,url)=>{
   await seed(p);const saved=await flush(p),layout=saved.layout;
   delete layout.recentAntibioticsVersion;
-  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx)Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}
+  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx){delete abx.yesValue;Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}}
   const old={version:3,t:Date.now(),layout,patients:['No','None','Amoxicillin finished last week','Unknown'].map((abx,i)=>({vals:{name:'SYNTHETIC LEGACY '+i,abx},layout}))};
   const q=await c.newPage();await q.addInitScript(value=>{if(!sessionStorage.getItem('hvnb_current_draft'))sessionStorage.setItem('hvnb_current_draft',JSON.stringify(value));},old);
   await q.goto(url);await restore(q);
@@ -75,7 +75,7 @@ test('Old drafts preserve free text without inferring Yes and retain explicit No
 
 test('Saved layouts gain the workflow without removing unrelated customization',async(p,c,url)=>{
   await seed(p);const layout=(await flush(p)).layout;delete layout.recentAntibioticsVersion;
-  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx)Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}
+  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx){delete abx.yesValue;Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}}
   layout.sections[0].title='SYNTHETIC CUSTOM SECTION';
   const q=await c.newPage();await q.goto(url);await q.evaluate(value=>localStorage.setItem('hvnb_current_layout',JSON.stringify(value)),layout);await q.reload();
   assert.equal(await choice(q,'Yes').count(),1);assert.equal(await q.getByRole('heading',{name:'SYNTHETIC CUSTOM SECTION',exact:true}).count(),1);
@@ -98,10 +98,27 @@ test('Conditional fields and buttons fit mobile and desktop widths',async p=>{
   }
 });
 
+test('Renaming Yes in the editor preserves affirmative history and copy warnings',async p=>{
+ await seed(p);await choice(p,'Yes').click();await field(p,'f_abx_name').fill('SYNTHETIC RENAMED HISTORY');await field(p,'f_abx_when').fill('Last week');
+ await field(p,'editBtn').click();await field(p,'e_opts_abx').fill('No, Taken');await field(p,'e_opts_abx').press('Tab');
+ const apply=p.getByRole('button',{name:'Apply and preserve answers',exact:true});if(await apply.isVisible())await apply.click();
+ await field(p,'editBtn').click();assert.equal(await field(p,'f_abx_name').isVisible(),true);assert.match(await output(p),/SYNTHETIC RENAMED HISTORY, Last week/);
+ await field(p,'f_abx_name').fill('');await field(p,'f_abx_when').fill('');await field(p,'copyBtn').click();assert.match(await p.locator('dialog[open]').innerText(),/Recent antibiotic: not entered/);assert.match(await p.locator('dialog[open]').innerText(),/When taken: not entered/);
+ await p.getByRole('button',{name:'Go back',exact:true}).click();await p.reload();await restore(p);
+ assert.equal(await patient(p).locator('[data-choice="abx"][data-v="Taken"]').getAttribute('aria-checked'),'true');assert.equal(await field(p,'f_abx_name').isVisible(),true);
+});
+
+test('Legacy binary imports recover a renamed affirmative option and invalid semantics are rejected',async(p,c,url)=>{
+ await seed(p);const saved=await flush(p);const layout=saved.layout;const abx=layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');abx.opts=['No','Taken'];delete abx.yesValue;
+ await field(p,'editBtn').click();await p.getByRole('button',{name:'Import layout',exact:true}).click();await p.locator('dialog[open] textarea').fill(JSON.stringify(layout));await p.getByRole('button',{name:'Replace my layout',exact:true}).click();await field(p,'editBtn').click();
+ await patient(p).locator('[data-choice="abx"][data-v="Taken"]').click();assert.equal(await field(p,'f_abx_name').isVisible(),true);
+ await field(p,'editBtn').click();await p.getByRole('button',{name:'Import layout',exact:true}).click();abx.yesValue='Removed option';await p.locator('dialog[open] textarea').fill(JSON.stringify(layout));await p.getByRole('button',{name:'Replace my layout',exact:true}).click();assert.match(await p.locator('dialog[open]').innerText(),/doesn’t look like an exported layout/);
+});
+
 (async()=>{
  const server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(fs.readFileSync('index.html'));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port+'/';
- const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});let failed=0;
+ const browser=await chromium.launch(launchOptions);let failed=0;
  const selected=tests.filter(t=>!process.env.TEST_FILTER||t.name.includes(process.env.TEST_FILTER));
  try{for(const t of selected){const c=await browser.newContext({serviceWorkers:'block'}),errors=[];
   c.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));

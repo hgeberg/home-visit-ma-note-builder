@@ -1,7 +1,6 @@
 /* Installed-app recovery uses synthetic data in disposable Chrome profiles. */
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const executablePath=process.env.PLAYWRIGHT_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const backupKey='hvnb_current_app_draft',tests=[],test=(name,run,offline=false)=>tests.push({name,run,offline});
 const patient=(p,n=0)=>p.locator('.patient').nth(n);
 const field=(p,id,n=0)=>patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -90,6 +89,25 @@ test('A stale app window cannot overwrite another window’s newer saved shift',
  assert.equal(await q.locator('#draftWarning').isVisible(),true);assert.match(await q.locator('#draftWarning').innerText(),/Another app window/);assert.equal((await backup(q)).patients[0].vals.symptoms,'SYNTHETIC NEWEST SAVED HISTORY');
 });
 
+test('Reloading a conflicted window keeps both drafts and cannot replace the device shift',async(p,c,url)=>{
+ await seed(p);await flush(p);const q=await c.newPage();await q.goto(url);
+ await field(p,'f_symptoms').fill('SYNTHETIC NEWER DEVICE HISTORY');await flush(p);await restore(q);
+ await field(q,'f_symptoms').fill('SYNTHETIC LOCAL WINDOW HISTORY');await flush(q);
+ assert.equal(await q.locator('#draftWarning').isVisible(),true);
+ await q.reload();assert.match(await q.locator('dialog[open]').innerText(),/Different saved shifts/);
+ await q.getByRole('button',{name:'Restore this window’s shift',exact:true}).click();await flush(q);
+ assert.equal(await field(q,'f_symptoms').inputValue(),'SYNTHETIC LOCAL WINDOW HISTORY');assert.equal((await backup(q)).patients[0].vals.symptoms,'SYNTHETIC NEWER DEVICE HISTORY');
+ assert.equal(await q.locator('#draftWarning').isVisible(),true);
+ await q.reload();await q.getByRole('button',{name:'Restore saved device shift',exact:true}).click();
+ assert.equal(await field(q,'f_symptoms').inputValue(),'SYNTHETIC NEWER DEVICE HISTORY');
+});
+
+test('A failed device save recovers newer session work and retries after reload',async(p,c,url)=>{
+ await seed(p);await flush(p);await p.evaluate(()=>{const old=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(this===localStorage&&k==='hvnb_current_app_draft')throw Error('Synthetic quota');return old.call(this,k,v);};});
+ await field(p,'f_symptoms').fill('SYNTHETIC SESSION AFTER QUOTA');await flush(p);assert.equal(await p.locator('#draftWarning').isVisible(),true);
+ await p.reload();await restore(p);assert.equal(await field(p,'f_symptoms').inputValue(),'SYNTHETIC SESSION AFTER QUOTA');await flush(p);assert.equal((await backup(p)).patients[0].vals.symptoms,'SYNTHETIC SESSION AFTER QUOTA');assert.equal(await p.locator('#draftWarning').isVisible(),false);
+});
+
 test('Pending copied Office recovery survives closing and can be retried after reopening',async(p,c,url)=>{
  await p.evaluate(()=>{const old=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(this===localStorage&&k==='hvnb_current_office')throw Error('Synthetic Office save failure');return old.call(this,k,v);};});
  await seed(p);await field(p,'f_overnights').fill('RPP');await copy(p);await flush(p);const saved=await backup(p);assert.ok(saved.officeRecovery || saved.patients[0].pendingOfficeSync?.length);await p.close();
@@ -120,8 +138,8 @@ test('Offline app reopening restores the shift and serves only static assets fro
 test('A complete browser restart retains recovery on disk and opens offline',async(p,c,url)=>{
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'note-builder-pwa-test-'));let persistent;
  try{
-  persistent=await chromium.launchPersistentContext(profile,{headless:true,executablePath,serviceWorkers:'allow'});await installed(persistent);const q=await persistent.newPage();await q.goto(url);await q.waitForFunction(()=>!!navigator.serviceWorker.controller);await seed(q,'SYNTHETIC RESTART');await flush(q);await q.close();await persistent.close();persistent=null;
-  persistent=await chromium.launchPersistentContext(profile,{headless:true,executablePath,serviceWorkers:'allow'});await installed(persistent);await persistent.setOffline(true);const r=await persistent.newPage();await r.goto(url);await restore(r);assert.equal(await field(r,'f_name').inputValue(),'SYNTHETIC RESTART');
+  persistent=await chromium.launchPersistentContext(profile,{...launchOptions,serviceWorkers:'allow'});await installed(persistent);const q=await persistent.newPage();await q.goto(url);await q.waitForFunction(()=>!!navigator.serviceWorker.controller);await seed(q,'SYNTHETIC RESTART');await flush(q);await q.close();await persistent.close();persistent=null;
+  persistent=await chromium.launchPersistentContext(profile,{...launchOptions,serviceWorkers:'allow'});await installed(persistent);await persistent.setOffline(true);const r=await persistent.newPage();await r.goto(url);await restore(r);assert.equal(await field(r,'f_name').inputValue(),'SYNTHETIC RESTART');
  }finally{
   if(persistent)await persistent.close();const resolved=path.resolve(profile),temporary=path.resolve(os.tmpdir())+path.sep;
   if(!resolved.startsWith(temporary)||!path.basename(resolved).startsWith('note-builder-pwa-test-'))throw Error('Unexpected test-profile cleanup path');
@@ -133,7 +151,7 @@ test('A complete browser restart retains recovery on disk and opens offline',asy
  const allowed=new Set(['index.html','sw.js','manifest.webmanifest','icons/apple-touch-icon.png','icons/icon-192.png','icons/icon-512.png']);
  const server=http.createServer((req,res)=>{let file=new URL(req.url,'http://local').pathname.replace(/^\/app\//,'');if(!file)file='index.html';if(!allowed.has(file)){res.writeHead(404);res.end();return;}const type=file.endsWith('.js')?'application/javascript':file.endsWith('.png')?'image/png':file.endsWith('.webmanifest')?'application/manifest+json':'text/html; charset=utf-8';res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store'});res.end(fs.readFileSync(file));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port+'/app/';
- const browser=await chromium.launch({headless:true,executablePath});let failed=0;const selected=tests.filter(t=>!process.env.TEST_FILTER||t.name.includes(process.env.TEST_FILTER));
+ const browser=await chromium.launch(launchOptions);let failed=0;const selected=tests.filter(t=>!process.env.TEST_FILTER||t.name.includes(process.env.TEST_FILTER));
  try{for(const t of selected){const c=await browser.newContext({serviceWorkers:t.offline?'allow':'block',viewport:{width:810,height:1080}}),errors=[];await installed(c);c.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));const p=await c.newPage();p.setDefaultTimeout(10000);
   try{await p.goto(url);await t.run(p,c,url,browser);assert.deepEqual(errors,[]);console.log('PASS '+t.name);}catch(e){failed++;console.error('FAIL '+t.name+'\n'+e.stack);}finally{await c.close();}
  }}finally{await browser.close();await new Promise(r=>server.close(r));}
