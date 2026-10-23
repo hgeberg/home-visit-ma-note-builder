@@ -18,6 +18,6 @@ npm test
 
 All browser suites use disposable contexts and synthetic patients. The shared browser helper blocks live analytics. `PLAYWRIGHT_MODULE` and `PLAYWRIGHT_CHROME` can override the Playwright module and browser executable. Explicit legacy-migration cases still use old storage keys; current-state assertions and failure injection use `hvnb_current_*`.
 
-GitHub Actions runs the source checks and all browser groups on pull requests and main. Physical iPhone/iPad installation and on-screen keyboards require device testing.
+GitHub Actions runs the source checks and all browser groups on pull requests and main, using the Ubuntu 24.04 runner's preinstalled Google Chrome. Physical iPhone/iPad installation and on-screen keyboards require device testing.
 
 See `VERSION-HISTORY.md` for behavior changes and historical versions.
