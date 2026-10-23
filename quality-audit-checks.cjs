@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 const tests = [];
 const test = (name, run) => tests.push({name, run});
 const local = (page, id, i = 0) => page.locator('.patient').nth(i).locator(`[data-local-id="${id}"]`);
@@ -36,7 +36,7 @@ test('forty independent patients survive edits, middle insertion and full draft 
   assert.equal(await local(page, 'f_name', 13).inputValue(), '');
   assert.equal(await local(page, 'f_name', 14).inputValue(), 'SYNTHETIC STRESS 13');
   const before = await page.locator('[data-local-id="output"]').evaluateAll(nodes => nodes.map(n => n.value));
-  await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_draft') || '{}').patients?.length === 41);
+  await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || '{}').patients?.length === 41);
   await page.reload();
   await page.getByRole('button', {name:'Restore all 41 patients', exact:true}).click();
   assert.deepEqual(await page.locator('[data-local-id="output"]').evaluateAll(nodes => nodes.map(n => n.value)), before);
@@ -51,7 +51,7 @@ test('HTML-looking patient input remains literal in titles, output, clipboard an
   await local(page, 'f_inspic').check();
   await local(page, 'f_overnights').fill(tests);
   await local(page, 'copyBtn').click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === 1);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   assert.equal(await local(page, 'patientTitle').textContent(), 'Patient 1 · ' + name);
   assert.equal(await page.evaluate(() => window.__injected), undefined);
   assert.equal(await page.locator('.patient img, .patient svg, #officeContent img, #officeContent svg').count(), 0);
@@ -62,7 +62,7 @@ test('HTML-looking patient input remains literal in titles, output, clipboard an
 });
 
 test('prototype-looking custom choices are copied as literal option text', async page => {
-  await page.evaluate(() => localStorage.setItem('hvnb_layout', JSON.stringify({v:4, base:12, sections:[{id:'custom_section', tab:'visit', title:'Custom', fields:[{id:'custom', type:'choice', label:'Custom choice', opts:['Yes'], sub:{id:'custom_sub', on:'Yes', opts:['constructor','toString'], out:{}}}]}]})));
+  await page.evaluate(() => localStorage.setItem('hvnb_current_layout', JSON.stringify({v:4, base:12, sections:[{id:'custom_section', tab:'visit', title:'Custom', fields:[{id:'custom', type:'choice', label:'Custom choice', opts:['Yes'], sub:{id:'custom_sub', on:'Yes', opts:['constructor','toString'], out:{}}}]}]})));
   await page.reload();
   await page.locator('[data-choice="custom"]').click();
   await page.locator('[data-choice="custom_sub"][data-v="constructor"]').click();
@@ -71,8 +71,7 @@ test('prototype-looking custom choices are copied as literal option text', async
   assert.equal(await local(page, 'output').inputValue(), '\u200BCustom choice: toString');
 });
 
-test('model-context navigation opens the requested workspace even while editing layout', async page => {
-  await local(page, 'editBtn').click();
+test('model-context navigation opens the requested patient or Office workspace', async page => {
   const office = await page.evaluate(async () => window.__auditTool.execute({tab:'office'}));
   assert.equal(office.selected, true);
   assert.equal(await page.locator('#officeSection').isVisible(), true);
@@ -96,7 +95,7 @@ test('the application works without making patient-data network requests', async
   await local(page, 'f_inspic').check();
   await local(page, 'f_overnights').fill('Urine culture');
   await local(page, 'copyBtn').click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === 1);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   await page.locator('#view-office').click();
   assert.equal(await page.locator('.visit-name').textContent(), 'SYNTHETIC OFFLINE');
   assert.deepEqual(requested, []);
@@ -106,7 +105,7 @@ test('the application works without making patient-data network requests', async
   const source = fs.readFileSync(path.resolve(process.env.AUDIT_SOURCE || 'index.html'));
   const server = http.createServer((req, res) => {res.writeHead(200, {'Content-Type':'text/html; charset=utf-8'}); res.end(source);});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const browser = await chromium.launch({headless:true, executablePath:process.env.PLAYWRIGHT_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+  const browser = await chromium.launch(launchOptions);
   let failed = 0;
   const selected = tests.filter(t => !process.env.TEST_FILTER || t.name.includes(process.env.TEST_FILTER));
   try {

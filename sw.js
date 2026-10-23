@@ -3,14 +3,19 @@
 const ROOT = new URL('./', self.location.href);
 const APP = new URL('index.html', ROOT).href;
 const PREFIX = 'hvnb-shell-' + ROOT.pathname + '-';
-const CACHE = PREFIX + 'v8.24';
+const RELEASE = 'v9';
+const CACHE = PREFIX + RELEASE;
 const ASSETS = ['manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'].map(path => new URL(path, ROOT).href);
 const isApp = response => response.ok && response.headers.get('content-type')?.includes('text/html');
+const isShell = text => text.includes('<meta name="note-builder-app" content="shell">');
+const isRelease = text => text.includes('<meta name="note-builder-version" content="' + RELEASE + '">');
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const response = await fetch(APP, {cache:'reload'});
-    if(!isApp(response) || !(await response.clone().text()).includes('<meta name="note-builder-app" content="shell">')) throw Error('App shell unavailable');
+    if(!isApp(response)) throw Error('App shell unavailable');
+    const text = await response.clone().text();
+    if(!isShell(text) || !isRelease(text)) throw Error('Matching app release unavailable');
     const cache = await caches.open(CACHE);
     await cache.put(APP, response);
     // Consume each response before opening another uncached asset request.
@@ -41,8 +46,11 @@ self.addEventListener('fetch', event => {
     try{
       const response = await fetch(event.request, {signal:controller.signal, cache:'no-store'});
       if(!isApp(response)) throw Error('App unavailable');
+      // Body-read failures, including timeouts after headers, need offline fallback.
+      const text = await response.clone().text();
+      if(!isShell(text)) throw Error('App shell unavailable');
       try{
-        if((await response.clone().text()).includes('<meta name="note-builder-app" content="shell">')) await (await caches.open(CACHE)).put(APP, response.clone());
+        if(isRelease(text)) await (await caches.open(CACHE)).put(APP, response.clone());
       }catch(e){ /* Cache quota must not prevent the online app from opening. */ }
       return response;
     }catch(error){

@@ -1,6 +1,7 @@
 /* Recent-antibiotics workflow: isolated browser profiles and synthetic history. */
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
 const tests=[],test=(name,run)=>tests.push({name,run});
 const patient=(p,n=0)=>p.locator('.patient').nth(n);
 const field=(p,id,n=0)=>patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -58,7 +59,7 @@ test('Antibiotic histories remain separate across patients, houses and draft rec
 test('Old drafts preserve free text without inferring Yes and retain explicit No or None answers',async(p,c,url)=>{
   await seed(p);const saved=await flush(p),layout=saved.layout;
   delete layout.recentAntibioticsVersion;
-  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx)Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}
+  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx){delete abx.yesValue;Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}}
   const old={version:3,t:Date.now(),layout,patients:['No','None','Amoxicillin finished last week','Unknown'].map((abx,i)=>({vals:{name:'SYNTHETIC LEGACY '+i,abx},layout}))};
   const q=await c.newPage();await q.addInitScript(value=>{if(!sessionStorage.getItem('hvnb_current_draft'))sessionStorage.setItem('hvnb_current_draft',JSON.stringify(value));},old);
   await q.goto(url);await restore(q);
@@ -75,13 +76,13 @@ test('Old drafts preserve free text without inferring Yes and retain explicit No
 
 test('Saved layouts gain the workflow without removing unrelated customization',async(p,c,url)=>{
   await seed(p);const layout=(await flush(p)).layout;delete layout.recentAntibioticsVersion;
-  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx)Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}
+  for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx){delete abx.yesValue;Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}}
   layout.sections[0].title='SYNTHETIC CUSTOM SECTION';
   const q=await c.newPage();await q.goto(url);await q.evaluate(value=>localStorage.setItem('hvnb_current_layout',JSON.stringify(value)),layout);await q.reload();
   assert.equal(await choice(q,'Yes').count(),1);assert.equal(await q.getByRole('heading',{name:'SYNTHETIC CUSTOM SECTION',exact:true}).count(),1);
-  await field(q,'editBtn').click();await field(q,'e_chips_abx_name').fill('Custom history medicine');await field(q,'e_chips_abx_name').blur();
-  await q.waitForFunction(()=>JSON.parse(localStorage.getItem('hvnb_current_layout')||'null')?.recentAntibioticsVersion===1);
-  await q.reload();await choice(q,'Yes').click();assert.equal(await patient(q).locator('[data-field="abx_name"]').getByRole('button',{name:'Custom history medicine',exact:true}).count(),1);
+  await choice(q,'Yes').click();await field(q,'f_abx_name').fill('Custom history medicine');await field(q,'f_abx_when').fill('Last week');await flush(q);
+  await q.reload();await restore(q);assert.equal(await field(q,'f_abx_name').inputValue(),'Custom history medicine');
+  assert.equal(await q.getByRole('heading',{name:'SYNTHETIC CUSTOM SECTION',exact:true}).count(),1);
 });
 
 test('Conditional fields and buttons fit mobile and desktop widths',async p=>{
@@ -98,10 +99,27 @@ test('Conditional fields and buttons fit mobile and desktop widths',async p=>{
   }
 });
 
+test('A previously saved renamed affirmative choice retains history and missing-detail warnings',async p=>{
+ const layout=defaultLayout(),abx=layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');abx.opts=['No','Taken'];abx.yesValue='Taken';await installSavedLayout(p,layout);
+ await seed(p);await choice(p,'Taken').click();await field(p,'f_abx_name').fill('SYNTHETIC SAVED HISTORY');await field(p,'f_abx_when').fill('Last week');
+ assert.equal(await field(p,'f_abx_name').isVisible(),true);assert.match(await output(p),/SYNTHETIC SAVED HISTORY, Last week/);
+ await field(p,'f_abx_name').fill('');await field(p,'f_abx_when').fill('');await field(p,'copyBtn').click();assert.match(await p.locator('dialog[open]').innerText(),/Recent antibiotic: not entered/);assert.match(await p.locator('dialog[open]').innerText(),/When taken: not entered/);
+ await p.getByRole('button',{name:'Go back',exact:true}).click();await flush(p);await p.reload();await restore(p);
+ assert.equal(await choice(p,'Taken').getAttribute('aria-checked'),'true');assert.equal(await field(p,'f_abx_name').isVisible(),true);
+});
+
+test('Legacy saved binary choices gain their meaning while invalid saved semantics fall back safely',async p=>{
+ const layout=defaultLayout(),abx=layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');abx.opts=['No','Taken'];delete abx.yesValue;await installSavedLayout(p,layout);
+ await choice(p,'Taken').click();assert.equal(await field(p,'f_abx_name').isVisible(),true);
+ abx.yesValue='Removed option';await installSavedLayout(p,layout);
+ assert.match(await field(p,'layoutWarning').innerText(),/saved layout could not be loaded/);assert.equal(await choice(p,'Yes').count(),1);
+ assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_layout')).sections.flatMap(s=>s.fields).find(f=>f.id==='abx').yesValue),'Removed option');
+});
+
 (async()=>{
  const server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(fs.readFileSync('index.html'));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port+'/';
- const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});let failed=0;
+ const browser=await chromium.launch(launchOptions);let failed=0;
  const selected=tests.filter(t=>!process.env.TEST_FILTER||t.name.includes(process.env.TEST_FILTER));
  try{for(const t of selected){const c=await browser.newContext({serviceWorkers:'block'}),errors=[];
   c.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));

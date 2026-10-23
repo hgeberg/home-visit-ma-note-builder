@@ -1,5 +1,19 @@
 # Home Visit MA Note Builder versions
 
+## v9 — fixed forms, recovery conflicts, and offline reliability (October 23, 2026)
+
+Installed-app session drafts retain the revision of the device copy they came from. Reloading a stale window cannot replace a different device shift. When both contain different work, recovery offers the device shift or the window's shift; opening the window's shift keeps the device copy and a visible conflict warning. A failed device write can still recover newer session work and retry when its original device copy has not changed. Older drafts remain recoverable.
+
+Removed Edit layout and all runtime section/field editing, layout import/export, and layout reset controls. Form definitions are maintained through source updates. Existing saved custom forms, their conditional fields, and draft form snapshots remain readable without changing their stored answers. Patients, houses, checklists, message copying, and editing saved Office entries remain available.
+
+Recent antibiotics tracks the affirmative option separately from its label so previously saved renamed choices retain detail fields, combined output, and missing-detail warnings. Older saved binary forms with No and a renamed affirmative option gain that meaning; invalid semantic references are rejected.
+
+The service worker falls back to the saved app when a timeout aborts the HTML body after headers. Cache-write failures still permit online opening. Installation requires matching release metadata, and an older worker does not save a different release into its own cache. The static cache is v9; installed top padding remains 32px.
+
+Current regression fixtures now target the current storage namespace while explicit legacy-migration cases retain old keys. A shared portable browser helper, pinned Playwright dependency, grouped runner, and CI workflow make the checks reproducible. Synthetic browser tests block live analytics.
+
+Validation: 15 deterministic source checks pass locally, including the stale-window reload, transient quota retry, legacy recovery, antibiotic customization, release mismatch, slow-body fallback, and cache quota paths. Browser regression validation runs in CI, including fixed-form workflows and compatibility with earlier saved custom forms. Retired editor-only cases are removed or replaced with saved-form fixtures. Physical iPhone/iPad keyboards remain outside automated coverage.
+
 ## v8.24 — additional installed-app header spacing (October 21, 2026)
 
 Increased the installed app's top padding from 20px to 32px, moving the header another 12px below the existing safe-area inset. The offline app cache is updated to v8.24.

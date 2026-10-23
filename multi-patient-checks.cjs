@@ -4,24 +4,17 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 
-const playwrightPath = process.env.PLAYWRIGHT_MODULE ||
-  'C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright';
-const { chromium } = require(playwrightPath);
+const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
 const htmlPath = path.join(__dirname, 'index.html');
-const browserCandidates = [
-  process.env.PLAYWRIGHT_CHROME,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-].filter(Boolean);
-const executablePath = browserCandidates.find(candidate => fs.existsSync(candidate));
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 const local = (root, id) => root.locator(`[data-local-id="${id}"]`);
 const patients = page => page.locator('.patient');
 const patient = (page, index) => patients(page).nth(index);
 const output = root => local(root, 'output').inputValue();
-const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_draft')));
-const office = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]'));
+const draft = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft')));
+const office = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
 const dialog = root => root.page().locator('#dialogHosts [role="dialog"]');
 
 async function fillPatient(root, name, symptoms = '') {
@@ -46,8 +39,8 @@ async function markTest(root, id, result, subtype) {
 
 async function flushDraft(page, names) {
   await page.waitForFunction(expected => {
-    const saved = JSON.parse(sessionStorage.getItem('hvnb_draft') || 'null');
-    return saved && saved.version === 3 && Array.isArray(saved.patients) &&
+    const saved = JSON.parse(sessionStorage.getItem('hvnb_current_draft') || 'null');
+    return saved && saved.version === 4 && Array.isArray(saved.patients) &&
       JSON.stringify(saved.patients.map(p => p.vals.name || '')) === JSON.stringify(expected);
   }, names);
   return draft(page);
@@ -140,9 +133,9 @@ test('copy buttons copy their own output and create separate shared office recor
   const alphaOutput = await output(patient(page, 0));
   const betaOutput = await output(patient(page, 1));
   await local(patient(page, 0), 'copyBtn').click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === 1);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   await local(patient(page, 1), 'copyBtn').click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === 2);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 2);
   assert.deepEqual(await page.evaluate(() => window.__copies), [alphaOutput, betaOutput]);
   const records = await office(page);
   assert.deepEqual(records.map(record => record.name), ['TEST COPY ALPHA', 'TEST COPY BETA']);
@@ -172,7 +165,7 @@ test('pending clipboard completion retains the original patient and value snapsh
   await local(patient(page, 0), 'f_symptoms').fill('changed while clipboard was pending');
   await local(patient(page, 1), 'f_symptoms').fill('beta still separate');
   await page.evaluate(() => { window.__resolveCopy(); });
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_office') || '[]').length === 1);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   assert.deepEqual(await page.evaluate(() => window.__copies), [copiedOutput]);
   const saved = await flushDraft(page, ['TEST ASYNC ALPHA', 'TEST ASYNC BETA']);
   assert.equal(saved.patients[0].meta.sentVals.symptoms, 'before copying');
@@ -230,7 +223,7 @@ test('session-storage quota failure warns visibly and preserves both patients in
   await page.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (this === sessionStorage && key === 'hvnb_draft') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
+      if (this === sessionStorage && key === 'hvnb_current_draft') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
@@ -286,24 +279,23 @@ test('clearing one patient preserves the other patient and the aggregate draft',
   await flushDraft(page, ['', 'TEST KEEP BETA']);
 });
 
-test('shared layout edits update all forms without changing either patient value', async ({ page }) => {
-  await fillPatient(patient(page, 0), 'TEST LAYOUT ALPHA', 'alpha layout value');
+test('an existing shared form applies to every patient without mixing their values', async ({ page }) => {
+  const form = defaultLayout();
+  form.sections.flatMap(s => s.fields).find(f => f.id === 'symptoms').label = 'Current concerns';
+  await installSavedLayout(page, form);
+  await fillPatient(patient(page, 0), 'TEST FORM ALPHA', 'alpha form value');
   await addAfter(page, 0);
-  await fillPatient(patient(page, 1), 'TEST LAYOUT BETA', 'beta layout value');
-  await local(patient(page, 0), 'editBtn').click();
-  await local(patient(page, 0), 'e_label_symptoms').fill('Current concerns');
-  await local(patient(page, 0), 'e_label_symptoms').blur();
-  await page.waitForFunction(() => [...document.querySelectorAll('.patient')].every(root =>
-    root.querySelector('[data-local-id="output"]').value.includes('Current concerns:')));
-  assert.equal(await local(patient(page, 0), 'f_symptoms').inputValue(), 'alpha layout value');
-  assert.equal(await local(patient(page, 1), 'f_symptoms').inputValue(), 'beta layout value');
-  assert.match(await output(patient(page, 0)), /Current concerns: alpha layout value/);
-  assert.match(await output(patient(page, 1)), /Current concerns: beta layout value/);
+  await fillPatient(patient(page, 1), 'TEST FORM BETA', 'beta form value');
+  assert.equal(await local(patient(page, 0), 'f_symptoms').inputValue(), 'alpha form value');
+  assert.equal(await local(patient(page, 1), 'f_symptoms').inputValue(), 'beta form value');
+  assert.match(await output(patient(page, 0)), /Current concerns: alpha form value/);
+  assert.match(await output(patient(page, 1)), /Current concerns: beta form value/);
+  assert.equal(await page.getByRole('button', {name:'Edit layout', exact:true}).count(), 0);
 });
 
 test('the original single-patient draft restores and migrates to the aggregate format', async ({ page, origin }) => {
   await page.evaluate(() => {
-    sessionStorage.setItem('hvnb_draft', JSON.stringify({
+    sessionStorage.setItem('hvnb_current_draft', JSON.stringify({
       t: Date.now(), vals: { name: 'TEST LEGACY', dob: '01/01/2000', symptoms: 'legacy unfinished', k_confirm: true },
       meta: { sentAt: null, sentText: '', sentVals: null, sentAck: false, officeId: null, officeSkipped: false },
     }));
@@ -311,7 +303,7 @@ test('the original single-patient draft restores and migrates to the aggregate f
   // A fresh tab sharing a copied legacy draft avoids pagehide replacing our test seed.
   const legacy = await page.context().newPage();
   await legacy.addInitScript(() => {
-    sessionStorage.setItem('hvnb_draft', JSON.stringify({
+    sessionStorage.setItem('hvnb_current_draft', JSON.stringify({
       t: Date.now(), vals: { name: 'TEST LEGACY', dob: '01/01/2000', symptoms: 'legacy unfinished', k_confirm: true },
       meta: { sentAt: null, sentText: '', sentVals: null, sentAck: false, officeId: null, officeSkipped: false },
     }));
@@ -324,7 +316,7 @@ test('the original single-patient draft restores and migrates to the aggregate f
   await local(patient(legacy, 0), 'tab-check').click();
   assert.equal(await local(patient(legacy, 0), 'f_k_confirm').isChecked(), true);
   const saved = await flushDraft(legacy, ['TEST LEGACY']);
-  assert.equal(saved.version, 3);
+  assert.equal(saved.version, 4);
   assert.ok(Array.isArray(saved.layout.sections), 'Migrated drafts retain their form layout');
 });
 
@@ -338,7 +330,7 @@ test('the original single-patient draft restores and migrates to the aggregate f
   let browser;
   let failed = 0;
   try {
-    browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+    browser = await chromium.launch(launchOptions);
     for (const entry of tests) {
       const context = await browser.newContext();
       const errors = [];

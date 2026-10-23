@@ -2,14 +2,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const { chromium } = require('C:/Users/Hillel/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium, launchOptions} = require('./qa/browser.cjs');
 
 const checks = [];
 const pass = name => { checks.push(name); console.log(`PASS ${name}`); };
 (async () => {
   const server = http.createServer((req,res) => { res.writeHead(200,{'Content-Type':'text/html'}); res.end(fs.readFileSync(path.join(__dirname,'index.html'))); });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser = await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+  const browser = await chromium.launch(launchOptions);
   const errors = [];
   try {
     const context = await browser.newContext({viewport:{width:390,height:844}});
@@ -126,19 +126,14 @@ const pass = name => { checks.push(name); console.log(`PASS ${name}`); };
     pass('Office Save restores its replacement action and Remove focuses Office heading');
 
     await page.locator('#view-patients').click();
-    await field('editBtn').click();
     await field('tab-visit').focus();
     await page.keyboard.press('End');
-    assert.equal(await activeId(),'tab-office');
-    assert.equal(await field('panel-office').isVisible(),true);
-    assert.equal(await patient.locator('[role="tab"][tabindex="0"]').count(),1);
+    assert.equal(await activeId(),'tab-check');
+    assert.equal(await field('panel-check').isVisible(),true);
+    assert.equal(await field('tab-office').getAttribute('aria-controls'),'officeSection');
+    assert.equal(await patient.locator('[data-local-id="editBtn"], .editor, .builder').count(),0);
     await field('tab-visit').click();
-    await patient.locator('[data-field="notes"]').getByRole('button',{name:'Delete',exact:true}).click();
-    await modal.getByRole('button',{name:'Delete',exact:true}).click();
-    assert.equal(await activeId(),'editBtn');
-    assert.equal(await patient.locator('[data-field="notes"]').count(),0);
-    await field('editBtn').click();
-    pass('Layout editor includes Office keyboard tabs and Delete restores meaningful focus');
+    pass('Patient keyboard tabs stay separate from Office navigation with no layout editor');
 
     await page.locator('#clearShiftBtn').click();
     await second.locator('[data-local-id="newBtn"]').evaluate(button=>button.click());
