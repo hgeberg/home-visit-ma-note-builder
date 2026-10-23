@@ -13,8 +13,9 @@ async function main(){
  const browser=await chromium.launch(launchOptions);
  async function fresh(){const context=await browser.newContext();const page=await context.newPage();page.setDefaultTimeout(7000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port);return {context,page,errors};}
  async function run(name,test){const state=await fresh();try{await test(state);assert.deepEqual(state.errors,[]);results.push(name+' passed');console.log(name+' passed');}finally{await state.context.close();}}
- async function change(scope,id,value){await fid(scope,id).fill(value);await fid(scope,id).blur();}
- async function beginImport(page,value){await page.getByRole('button',{name:'Import layout',exact:true}).first().click();await page.getByRole('dialog').locator('textarea').fill(JSON.stringify(value));await page.getByRole('button',{name:'Replace my layout',exact:true}).click();}
+ async function approveReview(page){const apply=page.getByRole('button',{name:'Apply and preserve answers',exact:true});if(await apply.isVisible())await apply.click();}
+ async function change(scope,id,value){await fid(scope,id).fill(value);await fid(scope,id).blur();await approveReview(typeof scope.page==='function'?scope.page():scope);}
+ async function beginImport(page,value){await page.getByRole('button',{name:'Import layout',exact:true}).first().click();await page.getByRole('dialog').locator('textarea').fill(JSON.stringify(value));await page.getByRole('button',{name:'Replace my layout',exact:true}).click();await approveReview(page);}
  try{
   await run('DOB formats and calendar warning',async({page})=>{
    await fid(page,'f_name').fill('Synthetic Date');
@@ -48,7 +49,7 @@ async function main(){
    await change(p,'e_tests_tests','Rapid strep, Rapid flu[Y], Rapid COVID, Ears (done), Urine dip (done)');
    assert.ok(!(await fid(p,'output').inputValue()).includes('POSITIVE (X)'));assert.equal(await p.locator('[data-item="flu"] [data-s][aria-checked="true"]').count(),0);
    assert.match(await fid(patients.nth(1),'output').inputValue(),/POSITIVE \(Y\)/);
-   await page.getByRole('button',{name:'Reset to default',exact:true}).first().click();await page.getByRole('button',{name:'Reset layout',exact:true}).click();
+   await page.getByRole('button',{name:'Reset to default',exact:true}).first().click();await page.getByRole('button',{name:'Reset layout',exact:true}).click();await approveReview(page);
    for(let i=0;i<2;i++){const q=patients.nth(i),text=await fid(q,'output').inputValue();assert.ok(!text.includes('Certainly'));assert.ok(!text.includes('NOT YET AWARE'));assert.ok(!/POSITIVE \([XY]\)/.test(text));assert.match(text,new RegExp('Synthetic '+i));}
   });
   await run('Invalid imports reject before persistence',async({page})=>{

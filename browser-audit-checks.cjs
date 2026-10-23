@@ -135,6 +135,8 @@ const pass = name => { checks.push(name); console.log(`PASS ${name}`); };
     await field('tab-visit').click();
     await patient.locator('[data-field="notes"]').getByRole('button',{name:'Delete',exact:true}).click();
     await modal.getByRole('button',{name:'Delete',exact:true}).click();
+    const review = page.getByRole('button',{name:'Apply and preserve answers',exact:true});
+    if(await review.isVisible()) await review.click();
     assert.equal(await activeId(),'editBtn');
     assert.equal(await patient.locator('[data-field="notes"]').count(),0);
     await field('editBtn').click();
