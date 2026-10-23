@@ -40,7 +40,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v8.25';
+const release='v9';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
@@ -89,9 +89,9 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
   let pending;w.listeners.activate({waitUntil:p=>pending=p});await pending;assert(!w.buckets.has('hvnb-shell-/app/-v8.24'));assert(w.buckets.has('unrelated-cache'));
  });
  await check('A newer online release remains readable without contaminating the older release cache',async()=>{
-  const w=worker(async()=>new Response(shell('v8.26'),{headers:{'content-type':'text/html'}}));
+  const w=worker(async()=>new Response(shell('v9.1'),{headers:{'content-type':'text/html'}}));
   await(await w.caches.open(cacheKey)).put('https://example.test/app/index.html',new Response(shell(release)));
-  assert.equal(await(await w.navigate()).text(),shell('v8.26'));assert.equal(w.buckets.get(cacheKey).get('https://example.test/app/index.html'),shell(release));
+  assert.equal(await(await w.navigate()).text(),shell('v9.1'));assert.equal(w.buckets.get(cacheKey).get('https://example.test/app/index.html'),shell(release));
  });
  await check('A timeout after HTML headers falls back to the saved app body',async()=>{
   const w=worker(async(request,options)=>new Response(new ReadableStream({start(controller){options.signal.addEventListener('abort',()=>controller.error(new DOMException('Synthetic timeout','AbortError')));}}),{headers:{'content-type':'text/html'}}));

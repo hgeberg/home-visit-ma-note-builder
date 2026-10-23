@@ -1,6 +1,6 @@
 # Home Visit MA Note Builder versions
 
-## v8.25 — fixed forms, recovery conflicts, and offline reliability (October 23, 2026)
+## v9 — fixed forms, recovery conflicts, and offline reliability (October 23, 2026)
 
 Installed-app session drafts retain the revision of the device copy they came from. Reloading a stale window cannot replace a different device shift. When both contain different work, recovery offers the device shift or the window's shift; opening the window's shift keeps the device copy and a visible conflict warning. A failed device write can still recover newer session work and retry when its original device copy has not changed. Older drafts remain recoverable.
 
@@ -8,7 +8,7 @@ Removed Edit layout and all runtime section/field editing, layout import/export,
 
 Recent antibiotics tracks the affirmative option separately from its label so previously saved renamed choices retain detail fields, combined output, and missing-detail warnings. Older saved binary forms with No and a renamed affirmative option gain that meaning; invalid semantic references are rejected.
 
-The service worker falls back to the saved app when a timeout aborts the HTML body after headers. Cache-write failures still permit online opening. Installation requires matching release metadata, and an older worker does not save a different release into its own cache. The static cache is v8.25; installed top padding remains 32px.
+The service worker falls back to the saved app when a timeout aborts the HTML body after headers. Cache-write failures still permit online opening. Installation requires matching release metadata, and an older worker does not save a different release into its own cache. The static cache is v9; installed top padding remains 32px.
 
 Current regression fixtures now target the current storage namespace while explicit legacy-migration cases retain old keys. A shared portable browser helper, pinned Playwright dependency, grouped runner, and CI workflow make the checks reproducible. Synthetic browser tests block live analytics.
 
