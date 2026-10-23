@@ -159,7 +159,6 @@ dialog.sheet::backdrop{background:var(--scrim)}
   appearance:none;border:1px solid var(--chip-line);background:var(--card);color:var(--ink);
   border-radius:10px;padding:9px 13px;font-weight:680;cursor:pointer;min-height:42px;line-height:1.2
 }
-[data-local-id="editBtn"]{white-space:nowrap;flex:none}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.danger{color:var(--danger);border-color:var(--danger-line)}
 .btn.solid.danger{background:var(--pos);border-color:var(--pos);color:var(--fill-ink)}
@@ -218,7 +217,6 @@ textarea.inp{min-height:84px;resize:vertical}
 .checkrow input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
 .checkrow.done{background:var(--ok-soft);border-color:var(--ok-line);color:var(--ok)}
 .checkrow.remind:not(.done){background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
-.checkrow.template{cursor:default;color:var(--muted)}
 .checkrow .box{width:20px;height:20px;border:2px solid var(--field-line);border-radius:5px;flex:none}
 
 .note{padding:11px 12px;border-radius:10px;background:var(--chip);border:1px solid var(--chip-line);color:var(--chip-ink);font-size:14px;font-weight:600;line-height:1.4}
@@ -250,13 +248,6 @@ textarea.inp{min-height:84px;resize:vertical}
 .steps{display:grid;gap:8px;padding:8px 16px 12px}
 .row{display:flex;flex-wrap:wrap;gap:8px}
 .empty{padding:6px 16px 16px;color:var(--muted)}
-
-.editor{margin-top:10px;padding:10px;border:1px dashed var(--field-line);border-radius:10px;background:var(--bg);display:grid;gap:7px}
-.elabel{font-size:12px;font-weight:700;color:var(--muted);line-height:1.35}
-.sec-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:0 16px 12px}
-.sec-tools .inp{flex:1 1 180px;min-width:0;padding:8px 10px}
-.addmenu{padding:0 16px 16px}
-.builder{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block:12px}
 
 .actions{margin-top:12px}
 .actions-inner{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:8px}
@@ -373,7 +364,7 @@ dialog.scrim::backdrop{background:transparent}
   <section class="patient">
     <header class="top">
       <div><h2 id="patientTitle" tabindex="-1"></h2><p class="sub">Other patients in this house stay on this page. Open earlier houses from Patients today.</p></div>
-      <div class="patient-heading-actions"><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button><button type="button" class="btn" id="editBtn">Edit layout</button></div>
+      <div class="patient-heading-actions"><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button></div>
     </header>
     <div id="saveState" class="save-state" role="status"></div>
     <div id="patientBody">
@@ -383,13 +374,11 @@ dialog.scrim::backdrop{background:transparent}
       <div class="seg" role="tablist">
         <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
         <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist <span class="badge" id="badge-check"></span></button>
-        <button type="button" class="tab" role="tab" id="tab-office" aria-controls="panel-office" aria-selected="false">Office <span class="badge" id="badge-office"></span></button>
+        <button type="button" class="tab" id="tab-office" aria-controls="officeSection">Office <span class="badge" id="badge-office"></span></button>
       </div>
     </nav>
-    <div id="editBanner" class="banner info" hidden></div>
     <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
     <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden></div>
-    <div id="panel-office" role="tabpanel" aria-labelledby="tab-office" hidden></div>
     </div>
     <aside class="message-rail" aria-label="Teams message preview and actions">
       <section class="card message-card">
@@ -536,6 +525,7 @@ const PHARMACY_PRESETS = ['Madison', 'Westgate', 'Maple', 'Refuah'];
 // as Symptoms:%20Sore%20throat... An invisible zero-width space in front stops it looking like one.
 const COPY_PREFIX = '\u200B';
 const TABS = ['visit', 'check', 'office'];
+const PATIENT_TABS = ['visit', 'check'];
 
 /* ---------- helpers ---------- */
 
@@ -592,7 +582,6 @@ function chips(str){
     return { v: add ? s.slice(1).trim() : s, m: add ? 'add' : 'fill' };
   }).filter(c => c.v);
 }
-function chipsText(list){ return (list || []).map(c => (c.m === 'add' ? '+' : '') + c.v).join(', '); }
 function listItems(v){ return String(v || '').split(',').map(x => x.trim()).filter(Boolean); }
 function listHas(v, item){ const t = norm(item); return listItems(v).some(x => norm(x) === t); }
 function listToggle(v, item){
@@ -623,32 +612,6 @@ function validDob(v){
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
-}
-
-function parseTestList(str, old){
-  const byName = new Map((old || []).map(it => [norm(it.n), it]));
-  const used = new Set();
-  const out = String(str || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
-    let kind = 'posneg';
-    if(/\(done\)/i.test(s)){ kind = 'done'; s = s.replace(/\(done\)/ig, '').trim(); }
-    let sub = null;
-    const m = s.match(/\[(.*)\]\s*$/);
-    if(m){ sub = Array.from(new Set(m[1].split('|').map(x => x.trim()).filter(Boolean))); s = s.slice(0, m.index).trim(); }
-    if(!s) return null;
-    const prev = byName.get(norm(s));
-    const id = prev && !used.has(prev.id) ? prev.id : uid('t');
-    used.add(id);
-    const it = { id, n: s, kind };
-    if(kind === 'posneg' && sub && sub.length) it.sub = sub;
-    if(prev && prev.hint) it.hint = prev.hint;
-    return it;
-  }).filter(Boolean);
-  // Only a matching test name preserves its identity. A replacement must not
-  // inherit a result from whichever test previously occupied that position.
-  return out;
-}
-function testListText(items){
-  return (items || []).map(it => it.n + (it.kind === 'done' ? ' (done)' : '') + (it.sub && it.sub.length ? '[' + it.sub.join('|') + ']' : '')).join(', ');
 }
 
 /* ---------- default layout ---------- */
@@ -819,9 +782,7 @@ let M = restoreMeta(seed.meta);     // this visit's copy/office status
 let office = [];         // saved visits waiting on office steps
 let officeBaseline = []; // last storage snapshot, before any unsaved local changes
 let pendingOfficeSync = restorePendingOffice(seed.pendingOfficeSync);
-let tab = TABS.includes(seed.tab) && seed.tab !== 'office' ? seed.tab : 'visit';
-let editing = false;
-let layoutTimer = null;
+let tab = PATIENT_TABS.includes(seed.tab) ? seed.tab : 'visit';
 let pendingUpdate = false;
 let layoutWarning = '';
 let committedLayout = null;
@@ -858,7 +819,7 @@ function loadLayout(){
     L = defaultLayout();
     let stored = false;
     try{ stored = !!(store('local') && store('local').getItem(LAYOUT_KEY)); }catch(e){}
-    if(saved || stored) layoutWarning = 'The saved layout could not be loaded. The default form is shown. Import a valid backup or edit this layout to replace the saved one.';
+    if(saved || stored) layoutWarning = 'The saved layout could not be loaded. The default form is shown. Your saved form settings have been left unchanged.';
   }
   normalizeLayout();
   committedLayout = clone(L);
@@ -907,8 +868,6 @@ function migrateRecentAntibioticValues(values, keepReference = false){
   delete values.abx;
 }
 function saveLayout(migrations){
-  clearTimeout(layoutTimer);
-  layoutTimer = null;
   const proposed = clone(L), previous = clone(committedLayout);
   const impact = page.layoutImpact(proposed, migrations);
   if(impact.length){
@@ -932,7 +891,6 @@ function commitLayout(migrations){
   page.layoutChanged(root, L, migrations);
   renderOfficePanel();
 }
-function saveLayoutSoon(){ clearTimeout(layoutTimer); layoutTimer = setTimeout(saveLayout, 400); }
 function layoutChanged(){ normalizeLayout(); saveLayout(); renderAll(); }
 
 let officeWritable = true;
@@ -1317,7 +1275,7 @@ function restoreSheetFocus(previous){
     target = card && Array.from(card.querySelectorAll('button')).find(button => button.textContent === previous.textContent);
     target = target || document.querySelector('#officeHeading');
   }
-  if(!target || target.closest('[hidden]')) target = root.closest('[hidden]') ? document.querySelector('#officeHeading') : $('#editBtn');
+  if(!target || target.closest('[hidden]')) target = root.closest('[hidden]') ? document.querySelector('#officeHeading') : $('#patientTitle');
   try{ target.focus({preventScroll:true}); }catch(e){}
 }
 function drainSheets(){ drainPatientSheets(); }
@@ -1327,18 +1285,13 @@ function drainSheets(){ drainPatientSheets(); }
 function renderAll(){
   normalizeLayout();
   pruneValues();
-  for(const t of TABS){
+  for(const t of PATIENT_TABS){
     const p = $('#panel-' + t);
     p.textContent = '';
     if(t === 'visit') renderVisit(p);
     else if(t === 'check') renderCheck(p);
-    else renderOfficeTab(p);
   }
-  const eb = $('#editBanner');
-  eb.hidden = !editing;
-  eb.textContent = editing ? 'This layout is shared by every patient. Changes can affect entered answers. You will review affected answers before applying a change; originals will be preserved. Tap Done when finished.' : '';
-  $('#editBtn').textContent = editing ? 'Done' : 'Edit layout';
-  for(const t of TABS){
+  for(const t of PATIENT_TABS){
     $('#panel-' + t).hidden = t !== tab;
     $('#tab-' + t).setAttribute('aria-selected', t === tab ? 'true' : 'false');
   }
@@ -1357,21 +1310,12 @@ function renderVisit(p){
       h('ul', {}, preservedAnswers.map(a => h('li', {}, h('strong', {text:a.label + ': '}), a.value)))));
   }
   for(const sec of secsOf('visit')) p.append(renderSection(sec));
-  if(editing) p.append(builderTools('visit'));
 }
 
 function renderCheck(p){
   for(const sec of secsOf('check')) p.append(renderSection(sec));
-  if(editing) p.append(builderTools('check'));
 }
 
-function renderOfficeTab(p){
-  if(editing){
-    p.append(h('div', {class:'banner info', text:'Edit the shared Office checklist shown below the saved patients in the Office section.'}));
-    for(const sec of secsOf('office')) p.append(renderSection(sec));
-    p.append(builderTools('office'));
-  }
-}
 function renderOfficePanel(){
   if(!page.isOfficeOwner(root)) return;
   const p = page.officeContent;
@@ -1424,9 +1368,7 @@ function renderSection(sec){
   card.append(h('h2', {class:'sec-title', text:sec.title, data:{secTitle:sec.id}}));
   const grid = h('div', {class:'grid'});
   sec.fields.forEach(f => grid.append(renderField(sec, f)));
-  if(!sec.fields.length && editing) grid.append(h('p', {class:'small', text:'Empty section. Add something below.'}));
   card.append(grid);
-  if(editing) card.append(sectionTools(sec));
   return card;
 }
 
@@ -1434,16 +1376,13 @@ function renderField(sec, f){
   const full = sec.tab !== 'visit' || f.id === 'abx' || ['textarea', 'check', 'note', 'tests', 'mirror'].indexOf(f.type) >= 0 || (f.type === 'choice' && (f.detail || f.sub));
   const w = h('div', {class:'field' + (full ? ' full' : ''), data:{field:f.id}});
   if(f.when) w.dataset.when = JSON.stringify(f.when);
-  if(sec.tab === 'office' && f.type === 'check'){
-    w.append(h('div', {class:'checkrow template'}, h('span', {class:'box', 'aria-hidden':'true'}), h('span', {text:f.label, data:{labelOf:f.id}})));
-  } else if(f.type === 'note'){
+  if(f.type === 'note'){
     w.append(h('div', {class:'note', text:f.label, data:{labelOf:f.id}}));
   } else if(f.type === 'check'){
     w.append(checkRow(f.id, f.label, f.remind, 'f_' + f.id));
   } else if(f.type === 'mirror'){
     const src = fieldById(f.of);
     if(src) w.append(checkRow(f.of, src.label, src.remind, 'm_' + f.id));
-    else if(editing) w.append(h('div', {class:'note', text:'This item pointed to a Visit tab box that was deleted.'}));
     else w.hidden = true;
   } else if(f.type === 'tests'){
     w.append(...testsField(f));
@@ -1452,7 +1391,6 @@ function renderField(sec, f){
   } else {
     w.append(...textField(f));
   }
-  if(editing) w.append(fieldEditor(sec, f));
   return w;
 }
 
@@ -1583,12 +1521,11 @@ function refresh(opts){
 
   $$('[data-when]').forEach(el => {
     let w = null; try{ w = JSON.parse(el.dataset.when); }catch(e){}
-    el.hidden = !editing && !whenOK(w, ctx);
+    el.hidden = !whenOK(w, ctx);
   });
   $$('[data-detail-of]').forEach(inp => { inp.hidden = V[inp.dataset.detailOf] !== inp.dataset.detailOn; });
   $$('[data-sub-of]').forEach(row => { row.hidden = V[row.dataset.subOf] !== row.dataset.subOn; });
   $$('section.card[data-sec]').forEach(card => {
-    if(editing){ card.hidden = false; return; }
     const kids = $$(':scope > .grid > .field', card);
     card.hidden = kids.length > 0 && kids.every(k => k.hidden);
   });
@@ -1729,17 +1666,15 @@ function updateBadges(ctx){
 /* ---------- tabs ---------- */
 
 function configureOfficeLink(){
-  TABS.forEach(t => { $('#tab-' + t).tabIndex = t === tab ? 0 : -1; });
-  const button = $('#tab-office');
-  button.setAttribute('role', editing ? 'tab' : 'button');
-  button.setAttribute('aria-controls', editing ? prefix + 'panel-office' : 'officeSection');
-  if(!editing){ button.removeAttribute('aria-selected'); button.tabIndex = 0; }
+  PATIENT_TABS.forEach(t => { $('#tab-' + t).tabIndex = t === tab ? 0 : -1; });
+  $('#tab-office').setAttribute('aria-controls', 'officeSection');
 }
 function setTab(t){
-  if(t === 'office' && !editing){ page.showOffice(); return; }
+  if(t === 'office'){ page.showOffice(); return; }
+  if(!PATIENT_TABS.includes(t)) return;
   page.showPatients(false);
   tab = t;
-  for(const x of TABS){
+  for(const x of PATIENT_TABS){
     $('#panel-' + x).hidden = x !== t;
     $('#tab-' + x).setAttribute('aria-selected', x === t ? 'true' : 'false');
   }
@@ -2023,218 +1958,9 @@ function offerRestore(d, alternative){
 
 function updateSheet(){
   return { title:'Updated form available', dismissable:false,
-    body:['The default form changed since you edited yours. Switch to the new form, or keep your edited one? Your office list stays either way. Affected answers will be reviewed and preserved.'],
+    body:['An updated form is available. Use the new form, or keep this device’s saved form? Your Office list stays either way. Affected answers will be reviewed and preserved.'],
     buttons:[ {label:'Switch to the new form', kind:'primary', on:() => { L = defaultLayout(); pendingUpdate = false; layoutChanged(); }},
               {label:'Keep mine', on:() => { L.base = DEFAULT_BASE; saveLayout(); pendingUpdate = false; flash('Kept your form'); }} ] };
-}
-
-/* ---------- layout editing ---------- */
-
-const ADD_TYPES = {
-  visit: [['Short text', 'text'], ['Long text', 'textarea'], ['DOB', 'dob'], ['Yes / No / N/A', 'yesno'], ['Custom choices', 'choice'], ['Checkbox (not copied)', 'check'], ['Reminder note', 'note'], ['Test panel', 'tests']],
-  check: [['Checklist item', 'check'], ['Reminder note', 'note']],
-  office: [['Office step', 'check'], ['Reminder note', 'note']]
-};
-
-function sectionTools(sec){
-  const wrap = h('div', {});
-  const ti = h('input', {class:'inp', type:'text', id:'e_sec_' + sec.id, value:sec.title, 'aria-label':'Section name'});
-  ti.addEventListener('input', () => {
-    sec.title = ti.value;
-    const t = $('[data-sec-title="' + sec.id + '"]');
-    if(t) t.textContent = sec.title;
-    saveLayoutSoon();
-  });
-  ti.addEventListener('change', () => { if(!sec.title.trim()){ sec.title = 'Untitled section'; ti.value = sec.title; } saveLayout(); });
-  wrap.append(h('div', {class:'sec-tools'}, ti,
-    h('button', {type:'button', class:'btn small', text:'▲', 'aria-label':'Move section up', onclick:() => moveSection(sec, -1)}),
-    h('button', {type:'button', class:'btn small', text:'▼', 'aria-label':'Move section down', onclick:() => moveSection(sec, 1)}),
-    h('button', {type:'button', class:'btn small danger', text:'Delete section', onclick:() => sheet({
-      title:'Delete “' + sec.title + '”?', body:['This removes the section and everything in it from the layout.'],
-      buttons:[ {label:'Delete section', kind:'solid danger', on:() => { L.sections = L.sections.filter(s => s !== sec); layoutChanged(); }}, {label:'Cancel'} ] })})));
-  const menu = h('div', {class:'chips'});
-  for(const [label, type] of ADD_TYPES[sec.tab]) menu.append(h('button', {type:'button', class:'chip', text:'+ ' + label, onclick:() => addField(sec, type)}));
-  wrap.append(h('div', {class:'addmenu'}, h('div', {class:'elabel', text:'Add to this section'}), menu));
-  return wrap;
-}
-
-function fieldEditor(sec, f){
-  const box = h('div', {class:'editor'});
-  if(f.type === 'mirror'){
-    const src = fieldById(f.of);
-    box.append(h('div', {class:'elabel', text: src ? 'Same box as on the Visit tab. Change its text there.' : 'Its Visit tab box was deleted.'}));
-  } else {
-    const isNote = f.type === 'note';
-    box.append(h('label', {class:'elabel', for:'e_label_' + f.id, text: isNote ? 'Reminder text' : (f.type === 'check' ? 'Item text' : 'Field name (also used in the message)')}));
-    const li = h(isNote ? 'textarea' : 'input', {class:'inp', id:'e_label_' + f.id});
-    if(!isNote) li.type = 'text';
-    li.value = f.label;
-    li.addEventListener('input', () => {
-      f.label = li.value;
-      $$('[data-label-of="' + f.id + '"]').forEach(n => { n.textContent = f.label; });
-      saveLayoutSoon();
-    });
-    li.addEventListener('change', () => {
-      if(!f.label.trim()){ f.label = 'Untitled'; li.value = f.label; $$('[data-label-of="' + f.id + '"]').forEach(n => { n.textContent = f.label; }); }
-      saveLayout();
-      refresh();
-    });
-    box.append(li);
-  }
-  if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
-    box.append(h('label', {class:'elabel', for:'e_chips_' + f.id, text:'Quick buttons, separated by commas. Put + in front of ones that add to a list instead of replacing.'}));
-    const ci = h('input', {class:'inp', type:'text', id:'e_chips_' + f.id, placeholder:'None, +Strep, +Flu'});
-    ci.value = chipsText(f.chips);
-    ci.addEventListener('change', () => { f.chips = chips(ci.value); rerenderField(sec, f); });
-    box.append(ci);
-    box.append(h('label', {class:'elabel', for:'e_ph_' + f.id, text:'Gray hint inside the box'}));
-    const pi = h('input', {class:'inp', type:'text', id:'e_ph_' + f.id});
-    pi.value = f.ph || '';
-    pi.addEventListener('input', () => { f.ph = pi.value; const inp = $('#f_' + f.id); if(inp) inp.placeholder = f.ph; saveLayoutSoon(); });
-    box.append(pi);
-  }
-  if(f.type === 'choice'){
-    box.append(h('label', {class:'elabel', for:'e_opts_' + f.id, text:'Choices, separated by commas'}));
-    const oi = h('input', {class:'inp', type:'text', id:'e_opts_' + f.id});
-    oi.value = (f.opts || []).join(', ');
-    oi.addEventListener('change', () => {
-      const list = Array.from(new Set(oi.value.split(',').map(s => s.trim()).filter(Boolean)));
-      if(!list.length){ oi.value = (f.opts || []).join(', '); return; }
-      const old = f.opts || [];
-      const migrations = {choices:old.flatMap((value, i) => !list.includes(value) && list.length === old.length ? [{id:f.id, from:value, to:list[i]}] : [])};
-      for(const k of ['detail', 'sub']){
-        const o = f[k];
-        if(o && !list.includes(o.on)){
-          if(list.length === old.length && old.includes(o.on)) o.on = list[old.indexOf(o.on)];
-          else delete f[k];
-        }
-      }
-      for(const semantic of ['unawareValue','yesValue']) if(f[semantic] && !list.includes(f[semantic])){
-        const renamed = migrations.choices.find(c => c.from === f[semantic]);
-        if(renamed) f[semantic] = renamed.to; else delete f[semantic];
-      }
-      f.opts = list;
-      rerenderField(sec, f, migrations);
-    });
-    box.append(oi);
-  }
-  if(f.type === 'tests'){
-    box.append(h('label', {class:'elabel', for:'e_tests_' + f.id, text:'Tests, separated by commas. Add (done) for ones with no result, like Ears (done). Add [A|B] for choices that show when it’s positive.'}));
-    const tt = h('input', {class:'inp', type:'text', id:'e_tests_' + f.id});
-    tt.value = testListText(f.items);
-    tt.addEventListener('change', () => {
-      const previous = f.items;
-      const list = parseTestList(tt.value, previous);
-      const migrations = {subtypes:[]};
-      for(const item of list){
-        const old = previous.find(it => it.id === item.id);
-        if(!old || !old.sub || !item.sub || old.sub.length !== item.sub.length) continue;
-        old.sub.forEach((value, i) => { if(!item.sub.includes(value)) migrations.subtypes.push({id:f.id, itemId:item.id, from:value, to:item.sub[i]}); });
-      }
-      if(list.length) f.items = list; else tt.value = testListText(f.items);
-      rerenderField(sec, f, migrations);
-    });
-    box.append(tt);
-  }
-  if(f.when) box.append(h('div', {class:'elabel', text:'Shows only when ' + whenText(f.when) + '.'}));
-  if(f.underPositive) box.append(h('div', {class:'elabel', text:'Prints in capitals under each positive test, not as its own line.'}));
-  box.append(h('div', {class:'row'},
-    h('button', {type:'button', class:'btn small', text:'▲ Up', onclick:() => moveField(sec, f, -1)}),
-    h('button', {type:'button', class:'btn small', text:'▼ Down', onclick:() => moveField(sec, f, 1)}),
-    h('button', {type:'button', class:'btn small danger', text:'Delete', onclick:() => sheet({
-      title:'Delete “' + (f.type === 'mirror' ? ((fieldById(f.of) || {}).label || 'this item') : f.label) + '”?', body:['This removes it from the layout.'],
-      buttons:[ {label:'Delete', kind:'solid danger', on:() => { sec.fields = sec.fields.filter(x => x !== f); layoutChanged(); }}, {label:'Cancel'} ] })})));
-  return box;
-}
-
-function rerenderField(sec, f, migrations){
-  if(!saveLayout(migrations)) return;
-  const old = $('[data-field="' + f.id + '"]');
-  if(old) old.replaceWith(renderField(sec, f));
-  refresh();
-}
-
-function moveSection(sec, dir){
-  const list = secsOf(sec.tab);
-  const i = list.indexOf(sec), j = i + dir;
-  if(j < 0 || j >= list.length) return;
-  const a = L.sections.indexOf(list[i]), b = L.sections.indexOf(list[j]);
-  const tmp = L.sections[a]; L.sections[a] = L.sections[b]; L.sections[b] = tmp;
-  layoutChanged();
-}
-
-function moveField(sec, f, dir){
-  const list = secsOf(sec.tab);
-  const si = list.indexOf(sec);
-  const fi = sec.fields.indexOf(f);
-  if(fi < 0) return;
-  if(dir < 0 && fi === 0){
-    if(si <= 0) return;
-    sec.fields.splice(fi, 1); list[si - 1].fields.push(f);
-  } else if(dir > 0 && fi === sec.fields.length - 1){
-    if(si >= list.length - 1) return;
-    sec.fields.splice(fi, 1); list[si + 1].fields.unshift(f);
-  } else {
-    sec.fields.splice(fi, 1); sec.fields.splice(fi + dir, 0, f);
-  }
-  layoutChanged();
-}
-
-function addField(sec, type){
-  const f = { id: uid('f'), type, label: 'New field' };
-  if(type === 'yesno'){ f.type = 'choice'; f.opts = ['Yes', 'No', 'N/A']; }
-  else if(type === 'choice') f.opts = ['Option 1', 'Option 2'];
-  else if(type === 'text' || type === 'textarea' || type === 'dob'){ f.chips = []; f.ph = type === 'dob' ? 'MM/DD/YYYY' : ''; }
-  else if(type === 'check'){ f.label = sec.tab === 'office' ? 'New office step' : 'New item'; if(sec.tab === 'office') f.when = 'anyTest'; }
-  else if(type === 'note') f.label = 'New reminder';
-  else if(type === 'tests'){ f.label = 'Tap each test you did'; f.items = parseTestList('New test', []); }
-  sec.fields.push(f);
-  layoutChanged();
-  flash('Added. Change its text in the box under it.');
-}
-
-function builderTools(t){
-  return h('div', {class:'builder'},
-    h('button', {type:'button', class:'btn', text:'+ Add section', onclick:() => { L.sections.push({ id:uid('s'), tab:t, title:'New section', fields:[] }); layoutChanged(); }}),
-    h('button', {type:'button', class:'btn', text:'Export layout', onclick:exportLayout}),
-    h('button', {type:'button', class:'btn', text:'Import layout', onclick:importLayout}),
-    h('button', {type:'button', class:'btn danger', text:'Reset to default', onclick:() => sheet({
-      title:'Reset the layout?', body:['This puts back the original fields, checklist and office steps. Your office list stays. Affected answers will be reviewed and preserved.'],
-      buttons:[ {label:'Reset layout', kind:'solid danger', on:() => { L = defaultLayout(); layoutChanged(); }}, {label:'Cancel'} ] })}));
-}
-
-function copyPlain(text, okMsg){
-  const request = page.beginCopy(root);
-  if(!request){ flash('Another message is still copying. Wait for it to finish.', 'warn'); return; }
-  const complete = fn => {
-    if(lifecycle.signal.aborted || !page.isCopyCurrent(request)) return;
-    try{ fn(); }finally{ page.finishCopy(request); }
-  };
-  const fallback = () => complete(() => { if(legacyCopy(text)) flash(okMsg); else flash('Copy was blocked. Press and hold the text to copy it', 'bad'); });
-  try{
-    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(() => complete(() => flash(okMsg)), fallback); return; }
-  }catch(e){}
-  fallback();
-}
-
-function exportLayout(){
-  const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
-  ta.value = JSON.stringify(L);
-  sheet({ title:'Export layout', body:['Your form layout, with no patient information in it. Keep a copy in Notes as a backup, or paste it into Import on another device.', ta],
-    buttons:[ {label:'Copy layout', kind:'primary', keepOpen:true, on:() => copyPlain(ta.value, 'Layout copied')}, {label:'Close'} ] });
-}
-
-function importLayout(){
-  const ta = h('textarea', {class:'inp mono', rows:'8', placeholder:'Paste an exported layout here'});
-  const err = h('div', {class:'err', role:'alert'});
-  let parsed = null;
-  sheet({ title:'Import layout', body:['This replaces your current layout. Your office list stays. Affected answers will be reviewed and preserved.', ta, err],
-    buttons:[ {label:'Replace my layout', kind:'primary', validate:() => {
-                try{ parsed = JSON.parse(ta.value); }catch(e){ parsed = null; }
-                if(!validLayout(parsed)){ err.textContent = 'That doesn’t look like an exported layout.'; return false; }
-                return true; },
-              on:() => { L = parsed; layoutChanged(); }},
-              {label:'Cancel'} ] });
 }
 
 /* ---------- wiring ---------- */
@@ -2263,13 +1989,6 @@ function bind(){
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (index + (['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 1) + buttons.length) % buttons.length;
     if(buttons[next].getAttribute('aria-checked') !== 'true') buttons[next].click();
     buttons[next].focus({preventScroll:true});
-  });
-  $('#editBtn').addEventListener('click', () => {
-    setCollapsed(false);
-    editing = !editing;
-    if(!editing && tab === 'office') tab = 'visit';
-    renderAll();
-    flash(editing ? 'Editing the layout' : 'Done editing');
   });
   $('#collapseBtn').addEventListener('click', () => setCollapsed(!collapsed));
   $('#newBtn').addEventListener('click', () => newPatient());
@@ -2337,7 +2056,6 @@ return {
   },
   getLayout:() => L,
   acceptsLayout:validLayout,
-  flushLayout:() => { if(layoutTimer) saveLayout(); },
   resize:() => autoSize($('#output')),
   applyLayout:(layout, migrations) => {
     preserveLayoutAnswers(layout, migrations);
@@ -2350,7 +2068,7 @@ return {
   },
   destroy:() => {
     page.cancelCopy(root);
-    lifecycle.abort(); clearTimeout(flashTimer); clearTimeout(layoutTimer);
+    lifecycle.abort(); clearTimeout(flashTimer);
     if(sheetOpen) closeSheet();
     for(let i = pendingPatientSheets.length - 1; i >= 0; i--) if(pendingPatientSheets[i].owner === root) pendingPatientSheets.splice(i, 1);
     dialogHost.remove(); M = freshMeta();
@@ -2668,7 +2386,6 @@ function createPatientPage(){
       page.clearUndo();
       appDraftWriteBlocked = false;
       resetting = true; held = true; clearTimeout(timer);
-      patients.forEach(p => p.flushLayout());
       const layout = patients.length ? clone(patients[0].getLayout()) : null;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
       activeHouseId = 'house-1';
@@ -2742,7 +2459,7 @@ function createPatientPage(){
   window.addEventListener('storage', e => { if(e.key === shiftKey || e.key === null) page.isCurrentShift(); });
   window.addEventListener('focus', page.isCurrentShift);
   window.addEventListener('pageshow', page.isCurrentShift);
-  const flushBeforeLeaving = () => { patients.forEach(p => p.flushLayout()); page.saveDraft(); };
+  const flushBeforeLeaving = page.saveDraft;
   document.addEventListener('visibilitychange', () => { if(document.hidden) flushBeforeLeaving(); else page.isCurrentShift(); });
   window.addEventListener('pagehide', flushBeforeLeaving);
 }

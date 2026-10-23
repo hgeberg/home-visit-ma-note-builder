@@ -29,7 +29,7 @@ function abxEnv(){
  const env={DEFAULT_BASE:12,PHARMACY_PRESETS:['Madison','Westgate','Maple','Refuah'],norm:s=>String(s??'').trim().toLowerCase(),TABS:['visit','check','office'],console};
  vm.createContext(env);
  const code=section('function defaultLayout(){','\nconst WHEN_TEXT =')+section('function reconcileValues(','\nfunction pruneValues(')+section('function context(vals){','\nfunction officeSteps(')+section('function normalizeLayout(){','\nfunction saveLayout(');
- vm.runInContext('let L; let V={}; let M={}; let preservedAnswers=[];'+section('function chips(str){','\nfunction chipsText(')+'\n'+code+"\nfunction secsOf(t){return L.sections.filter(s=>s.tab===t)}; function fieldById(id){return L.sections.flatMap(s=>s.fields).find(f=>f.id===id)}; function validDob(){return true}; L=defaultLayout(); normalizeLayout(); globalThis.probe={layout:L,buildOutput,reconcileValues,context,normalizeLayout,migrateRecentAntibioticValues,getPreserved:()=>preservedAnswers};",env);
+ vm.runInContext('let L; let V={}; let M={}; let preservedAnswers=[];'+section('function chips(str){','\nfunction listItems(')+'\n'+code+"\nfunction secsOf(t){return L.sections.filter(s=>s.tab===t)}; function fieldById(id){return L.sections.flatMap(s=>s.fields).find(f=>f.id===id)}; function validDob(){return true}; L=defaultLayout(); normalizeLayout(); globalThis.probe={layout:L,buildOutput,reconcileValues,context,normalizeLayout,migrateRecentAntibioticValues,getPreserved:()=>preservedAnswers};",env);
  return env.probe;
 }
 function worker(fetchImpl){

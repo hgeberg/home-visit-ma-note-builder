@@ -71,8 +71,7 @@ test('prototype-looking custom choices are copied as literal option text', async
   assert.equal(await local(page, 'output').inputValue(), '\u200BCustom choice: toString');
 });
 
-test('model-context navigation opens the requested workspace even while editing layout', async page => {
-  await local(page, 'editBtn').click();
+test('model-context navigation opens the requested patient or Office workspace', async page => {
   const office = await page.evaluate(async () => window.__auditTool.execute({tab:'office'}));
   assert.equal(office.selected, true);
   assert.equal(await page.locator('#officeSection').isVisible(), true);

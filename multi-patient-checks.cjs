@@ -5,6 +5,7 @@ const http = require('node:http');
 const path = require('node:path');
 
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
 const htmlPath = path.join(__dirname, 'index.html');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -278,19 +279,18 @@ test('clearing one patient preserves the other patient and the aggregate draft',
   await flushDraft(page, ['', 'TEST KEEP BETA']);
 });
 
-test('shared layout edits update all forms without changing either patient value', async ({ page }) => {
-  await fillPatient(patient(page, 0), 'TEST LAYOUT ALPHA', 'alpha layout value');
+test('an existing shared form applies to every patient without mixing their values', async ({ page }) => {
+  const form = defaultLayout();
+  form.sections.flatMap(s => s.fields).find(f => f.id === 'symptoms').label = 'Current concerns';
+  await installSavedLayout(page, form);
+  await fillPatient(patient(page, 0), 'TEST FORM ALPHA', 'alpha form value');
   await addAfter(page, 0);
-  await fillPatient(patient(page, 1), 'TEST LAYOUT BETA', 'beta layout value');
-  await local(patient(page, 0), 'editBtn').click();
-  await local(patient(page, 0), 'e_label_symptoms').fill('Current concerns');
-  await local(patient(page, 0), 'e_label_symptoms').blur();
-  await page.waitForFunction(() => [...document.querySelectorAll('.patient')].every(root =>
-    root.querySelector('[data-local-id="output"]').value.includes('Current concerns:')));
-  assert.equal(await local(patient(page, 0), 'f_symptoms').inputValue(), 'alpha layout value');
-  assert.equal(await local(patient(page, 1), 'f_symptoms').inputValue(), 'beta layout value');
-  assert.match(await output(patient(page, 0)), /Current concerns: alpha layout value/);
-  assert.match(await output(patient(page, 1)), /Current concerns: beta layout value/);
+  await fillPatient(patient(page, 1), 'TEST FORM BETA', 'beta form value');
+  assert.equal(await local(patient(page, 0), 'f_symptoms').inputValue(), 'alpha form value');
+  assert.equal(await local(patient(page, 1), 'f_symptoms').inputValue(), 'beta form value');
+  assert.match(await output(patient(page, 0)), /Current concerns: alpha form value/);
+  assert.match(await output(patient(page, 1)), /Current concerns: beta form value/);
+  assert.equal(await page.getByRole('button', {name:'Edit layout', exact:true}).count(), 0);
 });
 
 test('the original single-patient draft restores and migrates to the aggregate format', async ({ page, origin }) => {

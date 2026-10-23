@@ -4,6 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'));
 const tests = [];
 const test = (name, fn) => tests.push([name,fn]);
@@ -66,11 +67,22 @@ test('Recovery replays queued Copy before a newer saved-entry removal',async(c,u
  const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);await fill(p,'overnights','RPP');await samePatient(p);await failRead(p);await copy(p);await p.locator('#view-office').click();await p.locator('.office-patient').getByRole('button',{name:'Remove',exact:true}).click();await p.locator('dialog[open]').getByRole('button',{name:'Remove',exact:true}).click();assert.deepEqual(await stored(p),[]);assert.notEqual(await p.locator('#officeSaveWarning').getAttribute('hidden'),null);
 });
 test('Draft restoration preserves custom fields despite another tab changing layout preference',async(c,url)=>{
- const p=await fresh(c,url);await button(p,'editBtn').click();await p.getByRole('button',{name:'Export layout',exact:true}).first().click();const original=JSON.parse(await p.locator('dialog[open] textarea').inputValue());await p.getByRole('button',{name:'Close',exact:true}).click();await button(p,'editBtn').click();const custom=JSON.parse(JSON.stringify(original));custom.sections[0].fields.push({id:'audit_extra',type:'text',label:'Audit extra',out:'Audit extra'});await p.evaluate(layout=>localStorage.setItem('hvnb_current_layout',JSON.stringify(layout)),custom);await p.reload();await seed(p);await fill(p,'audit_extra','SYNTHETIC IMPORTANT DRAFT VALUE');await p.waitForTimeout(400);const q=await fresh(c,url);await q.evaluate(layout=>localStorage.setItem('hvnb_current_layout',JSON.stringify(layout)),original);await p.reload();await p.getByRole('button',{name:'Restore this visit',exact:true}).click();assert.equal(await field(p,'audit_extra').inputValue(),'SYNTHETIC IMPORTANT DRAFT VALUE');assert((await button(p,'output').inputValue()).includes('SYNTHETIC IMPORTANT DRAFT VALUE'));assert.deepEqual(await p.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_layout'))),original);const draft=await p.evaluate(()=>JSON.parse(sessionStorage.getItem('hvnb_current_draft')));assert.equal(draft.layout.sections[0].fields.at(-1).id,'audit_extra');assert.equal(draft.patients[0].layout,undefined);
+ const original=defaultLayout(),custom=JSON.parse(JSON.stringify(original));custom.sections[0].fields.push({id:'audit_extra',type:'text',label:'Audit extra',out:'Audit extra'});
+ const p=await fresh(c,url);await installSavedLayout(p,custom);await seed(p);await fill(p,'audit_extra','SYNTHETIC IMPORTANT DRAFT VALUE');await p.waitForTimeout(400);
+ const q=await fresh(c,url);await q.evaluate(layout=>localStorage.setItem('hvnb_current_layout',JSON.stringify(layout)),original);
+ await p.reload();await p.getByRole('button',{name:'Restore this visit',exact:true}).click();
+ assert.equal(await field(p,'audit_extra').inputValue(),'SYNTHETIC IMPORTANT DRAFT VALUE');assert((await button(p,'output').inputValue()).includes('SYNTHETIC IMPORTANT DRAFT VALUE'));
+ assert.deepEqual(await p.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_layout'))),original);
+ const draft=await p.evaluate(()=>JSON.parse(sessionStorage.getItem('hvnb_current_draft')));assert.equal(draft.layout.sections[0].fields.at(-1).id,'audit_extra');assert.equal(draft.patients[0].layout,undefined);
 });
-test('Leaving the page flushes a pending layout edit before saving its draft',async(c,url)=>{
- const p=await fresh(c,url);await seed(p);await button(p,'editBtn').click();const label=p.locator('input[aria-label="Section name"]').first();await label.fill('SYNTHETIC SECTION TITLE');await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));const result=await p.evaluate(()=>({saved:JSON.parse(localStorage.getItem('hvnb_current_layout')),draft:JSON.parse(sessionStorage.getItem('hvnb_current_draft'))}));assert.equal(result.saved.sections[0].title,'SYNTHETIC SECTION TITLE');assert.equal(result.draft.layout.sections[0].title,'SYNTHETIC SECTION TITLE');
+
+test('Leaving the page immediately flushes entered patient answers to the draft',async(c,url)=>{
+ const p=await fresh(c,url);await seed(p);await fill(p,'notes','SYNTHETIC LAST ANSWER');
+ await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+ const draft=await p.evaluate(()=>JSON.parse(sessionStorage.getItem('hvnb_current_draft')));
+ assert.equal(draft.patients[0].vals.notes,'SYNTHETIC LAST ANSWER');
 });
+
 test('A write failure during queued-copy replay keeps the warning and visible pending card',async(c,url)=>{
  const p=await fresh(c,url);await clipboard(p);await seed(p);await failRead(p);await copy(p);await p.evaluate(()=>{let writes=0;window.failReplay=true;const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(this===localStorage&&k==='hvnb_current_office'&&++writes>1&&window.failReplay)throw Error('Synthetic replay quota failure');return original.call(this,k,v);};});await retry(p);assert.equal(await p.locator('.office-patient').count(),1);assert.equal(await p.locator('#officeSaveWarning').getAttribute('hidden'),null);assert.deepEqual(await stored(p),[]);await p.evaluate(()=>window.failReplay=false);await p.locator('#retryOfficeSave').click();assert.equal((await stored(p)).length,1);assert.notEqual(await p.locator('#officeSaveWarning').getAttribute('hidden'),null);
 });

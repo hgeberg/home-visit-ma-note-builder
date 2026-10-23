@@ -1,6 +1,7 @@
 /* Recent-antibiotics workflow: isolated browser profiles and synthetic history. */
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
 const tests=[],test=(name,run)=>tests.push({name,run});
 const patient=(p,n=0)=>p.locator('.patient').nth(n);
 const field=(p,id,n=0)=>patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -79,9 +80,9 @@ test('Saved layouts gain the workflow without removing unrelated customization',
   layout.sections[0].title='SYNTHETIC CUSTOM SECTION';
   const q=await c.newPage();await q.goto(url);await q.evaluate(value=>localStorage.setItem('hvnb_current_layout',JSON.stringify(value)),layout);await q.reload();
   assert.equal(await choice(q,'Yes').count(),1);assert.equal(await q.getByRole('heading',{name:'SYNTHETIC CUSTOM SECTION',exact:true}).count(),1);
-  await field(q,'editBtn').click();await field(q,'e_chips_abx_name').fill('Custom history medicine');await field(q,'e_chips_abx_name').blur();
-  await q.waitForFunction(()=>JSON.parse(localStorage.getItem('hvnb_current_layout')||'null')?.recentAntibioticsVersion===1);
-  await q.reload();await choice(q,'Yes').click();assert.equal(await patient(q).locator('[data-field="abx_name"]').getByRole('button',{name:'Custom history medicine',exact:true}).count(),1);
+  await choice(q,'Yes').click();await field(q,'f_abx_name').fill('Custom history medicine');await field(q,'f_abx_when').fill('Last week');await flush(q);
+  await q.reload();await restore(q);assert.equal(await field(q,'f_abx_name').inputValue(),'Custom history medicine');
+  assert.equal(await q.getByRole('heading',{name:'SYNTHETIC CUSTOM SECTION',exact:true}).count(),1);
 });
 
 test('Conditional fields and buttons fit mobile and desktop widths',async p=>{
@@ -98,21 +99,21 @@ test('Conditional fields and buttons fit mobile and desktop widths',async p=>{
   }
 });
 
-test('Renaming Yes in the editor preserves affirmative history and copy warnings',async p=>{
- await seed(p);await choice(p,'Yes').click();await field(p,'f_abx_name').fill('SYNTHETIC RENAMED HISTORY');await field(p,'f_abx_when').fill('Last week');
- await field(p,'editBtn').click();await field(p,'e_opts_abx').fill('No, Taken');await field(p,'e_opts_abx').press('Tab');
- const apply=p.getByRole('button',{name:'Apply and preserve answers',exact:true});if(await apply.isVisible())await apply.click();
- await field(p,'editBtn').click();assert.equal(await field(p,'f_abx_name').isVisible(),true);assert.match(await output(p),/SYNTHETIC RENAMED HISTORY, Last week/);
+test('A previously saved renamed affirmative choice retains history and missing-detail warnings',async p=>{
+ const layout=defaultLayout(),abx=layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');abx.opts=['No','Taken'];abx.yesValue='Taken';await installSavedLayout(p,layout);
+ await seed(p);await choice(p,'Taken').click();await field(p,'f_abx_name').fill('SYNTHETIC SAVED HISTORY');await field(p,'f_abx_when').fill('Last week');
+ assert.equal(await field(p,'f_abx_name').isVisible(),true);assert.match(await output(p),/SYNTHETIC SAVED HISTORY, Last week/);
  await field(p,'f_abx_name').fill('');await field(p,'f_abx_when').fill('');await field(p,'copyBtn').click();assert.match(await p.locator('dialog[open]').innerText(),/Recent antibiotic: not entered/);assert.match(await p.locator('dialog[open]').innerText(),/When taken: not entered/);
- await p.getByRole('button',{name:'Go back',exact:true}).click();await p.reload();await restore(p);
- assert.equal(await patient(p).locator('[data-choice="abx"][data-v="Taken"]').getAttribute('aria-checked'),'true');assert.equal(await field(p,'f_abx_name').isVisible(),true);
+ await p.getByRole('button',{name:'Go back',exact:true}).click();await flush(p);await p.reload();await restore(p);
+ assert.equal(await choice(p,'Taken').getAttribute('aria-checked'),'true');assert.equal(await field(p,'f_abx_name').isVisible(),true);
 });
 
-test('Legacy binary imports recover a renamed affirmative option and invalid semantics are rejected',async(p,c,url)=>{
- await seed(p);const saved=await flush(p);const layout=saved.layout;const abx=layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');abx.opts=['No','Taken'];delete abx.yesValue;
- await field(p,'editBtn').click();await p.getByRole('button',{name:'Import layout',exact:true}).click();await p.locator('dialog[open] textarea').fill(JSON.stringify(layout));await p.getByRole('button',{name:'Replace my layout',exact:true}).click();await field(p,'editBtn').click();
- await patient(p).locator('[data-choice="abx"][data-v="Taken"]').click();assert.equal(await field(p,'f_abx_name').isVisible(),true);
- await field(p,'editBtn').click();await p.getByRole('button',{name:'Import layout',exact:true}).click();abx.yesValue='Removed option';await p.locator('dialog[open] textarea').fill(JSON.stringify(layout));await p.getByRole('button',{name:'Replace my layout',exact:true}).click();assert.match(await p.locator('dialog[open]').innerText(),/doesn’t look like an exported layout/);
+test('Legacy saved binary choices gain their meaning while invalid saved semantics fall back safely',async p=>{
+ const layout=defaultLayout(),abx=layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');abx.opts=['No','Taken'];delete abx.yesValue;await installSavedLayout(p,layout);
+ await choice(p,'Taken').click();assert.equal(await field(p,'f_abx_name').isVisible(),true);
+ abx.yesValue='Removed option';await installSavedLayout(p,layout);
+ assert.match(await field(p,'layoutWarning').innerText(),/saved layout could not be loaded/);assert.equal(await choice(p,'Yes').count(),1);
+ assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_layout')).sections.flatMap(s=>s.fields).find(f=>f.id==='abx').yesValue),'Removed option');
 });
 
 (async()=>{

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 const patients = page => page.locator('#patients .patient');
@@ -136,12 +137,10 @@ test('canceling or escaping the shift confirmation preserves every patient and O
 });
 
 test('confirmed shift clearing empties all patients and Office on reload while preserving the custom layout', async ({ page }) => {
+  const savedForm = defaultLayout();
+  savedForm.sections.flatMap(s => s.fields).find(f => f.id === 'symptoms').label = 'Current concerns';
+  await installSavedLayout(page, savedForm);
   await fillPatient(page, 'TEST SHIFT ALPHA', '4plex');
-  await local(patient(page), 'editBtn').click();
-  await local(patient(page), 'e_label_symptoms').fill('Current concerns');
-  await local(patient(page), 'e_label_symptoms').blur();
-  await page.waitForFunction(() => (localStorage.getItem('hvnb_current_layout') || '').includes('Current concerns'));
-  await local(patient(page), 'editBtn').click();
   await copyPatient(page);
   await addPatient(page);
   await fillPatient(page, 'TEST SHIFT BETA', 'RPP', 1);
@@ -324,25 +323,7 @@ test('stale Office retry notices a new shift before a storage event and cannot r
   await assertStoredEmpty(page);
 });
 
-test('an immediate shift clear preserves a layout edit before its delayed save runs', async ({ page }) => {
-  await fillPatient(page, 'TEST RAPID LAYOUT', '4plex');
-  await local(patient(page), 'editBtn').click();
-  await page.evaluate(() => {
-    const editor = document.querySelector('#patients [data-local-id="e_label_symptoms"]');
-    editor.value = 'Latest shift concerns';
-    editor.dispatchEvent(new Event('input', { bubbles: true }));
-    // Confirm within the same event-loop task, before the debounced layout
-    // persistence can execute or a blur/change event can force it to save.
-    document.querySelector('#clearShiftBtn').click();
-    document.querySelector('#confirmClearShift').click();
-  });
-  await assertBlank(page);
-  assert.match(await page.evaluate(() => localStorage.getItem('hvnb_current_layout') || ''), /Latest shift concerns/);
-  await page.reload();
-  await assertBlank(page);
-  await local(patient(page), 'f_symptoms').fill('Retained layout after reload');
-  assert.match(await local(patient(page), 'output').inputValue(), /Latest shift concerns: Retained layout after reload/);
-});
+
 
 test('separate Office and shift controls fit desktop and mobile screens', async ({ page }) => {
   await fillTwoSaved(page);

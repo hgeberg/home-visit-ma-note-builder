@@ -9,7 +9,6 @@ async function copy(p,n=0){await f(p,'copyBtn',n).click();await f(p,'sentBanner'
 async function restore(p){await p.getByRole('button',{name:/^Restore (this visit|all)/}).click();}
 async function clear(p,n=0){await f(p,'newBtn',n).click();const b=p.getByRole('button',{name:'Clear this patient',exact:true});if(await b.count())await b.click();}
 async function failure(p,mode='write'){await p.evaluate(mode=>{window.failOffice=true;const method=mode==='read'?'getItem':'setItem',old=Storage.prototype[method];Storage.prototype[method]=function(k,...v){if(this===localStorage&&k==='hvnb_current_office'&&window.failOffice)throw Error('Synthetic failure');return old.call(this,k,...v)};},mode);}
-async function editTests(p,value){await f(p,'e_tests_tests').fill(value);await f(p,'e_tests_tests').blur();}
 async function remove(p){await p.locator('#view-office').click();await p.locator('.office-patient').getByRole('button',{name:'Remove',exact:true}).click();await p.locator('dialog[open]').getByRole('button',{name:'Remove',exact:true}).click();}
 
 test('Persistent copy and Office states remain visible and Retry works from Patients', async p=>{
@@ -41,26 +40,7 @@ test('Navigation expands the chosen patient and collapse choices survive reload'
   await p.reload();await restore(p);assert.equal(await f(p,'patientBody').isVisible(),false);assert.equal(await f(p,'patientBody',1).isVisible(),false);
   await p.locator('#expandPatients').click();assert.equal(await f(p,'f_name',1).inputValue(),'SYNTHETIC BETA');
 });
-test('Layout review can be canceled and preserves affected answers for every patient', async p=>{
-  await seed(p);await f(p,'addPatientBtn').click();await seed(p,'SYNTHETIC BETA',1);
-  for(let n=0;n<2;n++){const root=p.locator('.patient').nth(n);await root.locator('[data-item="flu"] input').check();await root.locator('[data-item="flu"] [data-r="Positive"]').click();await root.locator('[data-item="flu"] [data-s="'+(n?'A':'B')+'"]').click();}
-  await f(p,'editBtn').click();
-  const replacement='Rapid strep, RSV, Rapid COVID, Ears (done), Urine dip (done)';
-  await editTests(p,replacement);assert.match(await p.locator('dialog[open]').innerText(),/SYNTHETIC ALPHA.*Rapid flu/s);assert.match(await p.locator('dialog[open]').innerText(),/SYNTHETIC BETA/);
-  await p.getByRole('button',{name:'Cancel',exact:true}).click();assert.match(await f(p,'output').inputValue(),/Rapid flu: POSITIVE \(B\)/);
-  await editTests(p,replacement);await p.getByRole('button',{name:'Apply and preserve answers',exact:true}).click();
-  for(let n=0;n<2;n++){const root=p.locator('.patient').nth(n);assert.ok(!(await f(p,'output',n).inputValue()).includes('POSITIVE'));await root.locator('.preserved-answers summary').click();assert.match(await root.locator('.preserved-answers').innerText(),new RegExp('Rapid flu: Positive \\('+(n?'A':'B')+'\\)'));}
-  await p.reload();await restore(p);assert.equal(await p.locator('.preserved-answers').count(),2);
-  assert.equal(await f(p,'f_name',1).inputValue(),'SYNTHETIC BETA');
-});
-test('Removing an entered field keeps its original answer after confirmation', async p=>{
-  await f(p,'f_notes').fill('SYNTHETIC IMPORTANT NOTE');await f(p,'editBtn').click();
-  await p.locator('[data-field="notes"] .editor').getByRole('button',{name:'Delete',exact:true}).click();
-  await p.locator('dialog[open]').getByRole('button',{name:'Delete',exact:true}).click();
-  await p.getByRole('button',{name:'Apply and preserve answers',exact:true}).click();
-  assert.equal(await f(p,'f_notes').count(),0);await p.locator('.preserved-answers summary').click();assert.match(await p.locator('.preserved-answers').innerText(),/SYNTHETIC IMPORTANT NOTE/);
-  await p.reload();await restore(p);assert.equal(await p.locator('.preserved-answers').count(),1);
-});
+
 test('Undo clearing restores the exact values and copied association', async p=>{
   await seed(p);await copy(p);const before=await f(p,'output').inputValue();const id=(await stored(p))[0].id;
   await clear(p);await p.locator('#undoAction').click();assert.equal(await f(p,'output').inputValue(),before);
