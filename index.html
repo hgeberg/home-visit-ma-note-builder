@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.1">
+<meta name="note-builder-version" content="v9.0.2">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -295,6 +295,7 @@ dialog.scrim::backdrop{background:transparent}
 .sheet .flabel{margin-top:10px}
 .sheet .btns{display:grid;gap:8px;margin-top:14px}
 .sheet .btns .btn{min-height:46px}
+.sheet .btn:disabled{opacity:.5;cursor:default}
 .steplist{margin:4px 0 8px;padding-left:20px;display:grid;gap:4px}
 .preview{margin:0 0 6px;padding:10px 12px;border-radius:10px;background:var(--out-bg);color:var(--out-ink);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .err{color:var(--danger);font-size:13px;font-weight:650;min-height:18px;margin-top:6px}
@@ -310,7 +311,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.1</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.2</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -1226,13 +1227,13 @@ function openSheet(opts){
   for(const b of opts.body || []){ if(b) card.append(typeof b === 'string' ? h('p', {text:b}) : b); }
   const btns = h('div', {class:'btns'});
   for(const b of opts.buttons || []){
-    btns.append(h('button', {type:'button', class:'btn ' + (b.kind || ''), text:b.label, onclick:() => {
+    btns.append(h('button', {type:'button', class:'btn ' + (b.kind || ''), text:b.label, disabled:b.disabled, onclick:() => {
       if(b.keepOpen){ if(b.on) b.on(); return; }
       if(b.validate && b.validate() === false) return;
       const previousFocus = closeSheet();
       if(b.on) b.on();
       drainSheets();
-      restoreSheetFocus(previousFocus);
+      if(b.restoreFocus !== false) restoreSheetFocus(previousFocus);
     }}));
   }
   card.append(btns);
@@ -1847,28 +1848,46 @@ function nameDobInputs(name, dob){
   return { nameIn, dobIn, nodes: [h('label', {class:'flabel', for:'sheet_name', text:'Name'}), nameIn, h('label', {class:'flabel', for:'sheet_dob', text:'DOB'}), dobIn] };
 }
 
-function editOfficeVisit(o){
-  const original = {name:o.name || '', dob:o.dob || '', overnights:o.overnights || '', bloodreason:o.bloodreason || ''};
-  const f = nameDobInputs(o.name, o.dob);
-  const tests = h('textarea', {class:'inp', id:'sheet_overnights', value:o.overnights || '', rows:'3'});
-  const reason = h('input', {class:'inp', id:'sheet_bloodreason', value:o.bloodreason || '', type:'text'});
+function editOfficeVisit(o, pending){
+  const original = pending ? pending.original : {name:o.name || '', dob:o.dob || '', overnights:o.overnights || '', bloodreason:o.bloodreason || ''};
+  const values = pending ? pending.values : original;
+  const f = nameDobInputs(values.name, values.dob);
+  const tests = h('textarea', {class:'inp', id:'sheet_overnights', value:values.overnights, rows:'3'});
+  const reason = h('input', {class:'inp', id:'sheet_bloodreason', value:values.bloodreason, type:'text'});
   const err = h('div', {class:'err', role:'alert'});
+  const currentValues = () => ({name:f.nameIn.value, dob:f.dobIn.value, overnights:tests.value, bloodreason:reason.value});
+  const changedKeys = edited => Object.keys(edited).filter(key => edited[key].trim() !== String(original[key]).trim());
+  const visitAvailable = !!page.patientForOffice(o.id);
+  const openVisit = () => page.openOfficeVisit(o.id);
   sheet({ title:'Edit saved entry', focus:'#sheet_name', body:[
     'Changes apply to this saved entry. Copying the patient again replaces it with the current visit details.', ...f.nodes,
     h('label', {class:'flabel', for:'sheet_overnights', text:'Overnight tests'}), tests,
-    h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason, err],
+    h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason,
+    !visitAvailable ? h('p', {class:'small', text:'This visit form is no longer open here. You can still edit the saved Office entry.'}) : null, err],
     buttons:[ {label:'Save changes', kind:'primary', validate:() => {
                   if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
                   if(f.dobIn.value.trim() && !validDob(f.dobIn.value)){ err.textContent = 'DOB: enter a valid date (MM/DD/YYYY).'; return false; }
                   if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the overnight tests, or cancel and remove this entry if no tests were sent.'; return false; }
                   return true; },
                 on:() => {
-                  const edited = {name:f.nameIn.value.trim(), dob:f.dobIn.value.trim(), overnights:tests.value.trim(), bloodreason:reason.value.trim()};
-                  const changed = Object.keys(edited).filter(key => edited[key] !== String(original[key]).trim());
+                  const edited = Object.fromEntries(Object.entries(currentValues()).map(([key, value]) => [key, value.trim()]));
+                  const changed = changedKeys(edited);
                   let found = false;
                   mutateOffice(() => { const v = office.find(x => x.id === o.id); if(v){ found = true; changed.forEach(key => { v[key] = edited[key]; }); } });
                   if(!found){ flash('This entry was removed in another tab. No changes were saved.', 'warn'); return; }
                   flash(officeWritable ? 'Saved changes' : 'Changes could not be saved. Keep this page open', officeWritable ? '' : 'bad'); }},
+              {label:'Open visit page', disabled:!visitAvailable, restoreFocus:false, validate:() => {
+                if(!page.isCurrentShift()) return false;
+                if(page.patientForOffice(o.id)) return true;
+                err.textContent = 'This visit form is no longer open here.';
+                return false;
+              }, on:() => {
+                const values = currentValues();
+                if(!changedKeys(values).length){ openVisit(); return; }
+                const resume = () => editOfficeVisit(o, {original, values});
+                sheet({title:'Unsaved Office changes', body:['Open the visit page without saving the changes to this Office entry?'], onDismiss:resume,
+                  buttons:[{label:'Keep editing', kind:'primary', on:resume}, {label:'Open without saving', restoreFocus:false, on:openVisit}]});
+              }},
               {label:'Cancel'} ] });
 }
 
@@ -2031,6 +2050,8 @@ return {
   hasContent:() => hasContent(V) || preservedAnswers.length > 0,
   collapse:setCollapsed,
   name:() => String(V.name || '').trim(),
+  officeId:() => M.officeId,
+  showVisit:() => setTab('visit'),
   layoutImpact:(layout, migrations) => affectedAnswers(layout, migrations).map(a => a.label),
   renderSaveState,
   hasPendingOffice:() => pendingOfficeSync.length > 0,
@@ -2209,6 +2230,15 @@ function createPatientPage(){
       page.showHouse(patient.root.dataset.houseId, false);
       document.querySelector('#patientNavigator').open = false;
       patient.focus();
+    },
+    patientForOffice:id => typeof id === 'string' && id ? patients.find(p => p.officeId() === id) : null,
+    openOfficeVisit:id => {
+      if(!page.isCurrentShift()) return false;
+      const patient = page.patientForOffice(id);
+      if(!patient) return false;
+      page.openPatient(patient);
+      patient.showVisit();
+      return true;
     },
     newHouse:() => {
       if(!page.isCurrentShift()) return;
