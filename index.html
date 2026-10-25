@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9">
+<meta name="note-builder-version" content="v9.0.1">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -310,12 +310,16 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.1</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
   <div id="storageSetupWarning" class="banner warn" role="alert" hidden><p>Saved information could not be moved to this version’s separate storage. Your previous data is unchanged. Retry to open the app.</p><button type="button" class="btn" id="retryStorageSetup">Retry storage setup</button></div>
   <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
+  <div id="draftReadWarning" class="banner warn" role="alert" hidden>
+    <p>Saved drafts could not be read. They have not been changed. Retry before entering patients.</p>
+    <button type="button" class="btn" id="retryDraftRead">Retry reading saved drafts</button>
+  </div>
   <div id="shiftClearWarning" class="banner warn" role="alert" hidden>
     <p>Patient forms have been cleared, but some saved information could not be deleted. Retry before closing this page.</p>
     <button type="button" class="btn" id="retryShiftClear">Retry clearing saved data</button>
@@ -789,6 +793,7 @@ let committedLayout = null;
 let collapsed = seed.collapsed === true;
 let preservedAnswers = Array.isArray(seed.preservedAnswers) ? seed.preservedAnswers.filter(x => x && typeof x.label === 'string' && typeof x.value === 'string') : [];
 const clone = value => JSON.parse(JSON.stringify(value));
+let previousValues = clone(V);
 
 function freshMeta(){ return { sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
 function restoreMeta(value){
@@ -1516,6 +1521,8 @@ function testsField(f){
 
 function refresh(opts){
   opts = opts || {};
+  const beforeEdit = previousValues;
+  previousValues = clone(V);
   const res = buildOutput(V);
   const ctx = res.ctx;
 
@@ -1573,7 +1580,7 @@ function refresh(opts){
   page.updateTitles();
   saveDraftSoon();
 
-  if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard();
+  if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard(beforeEdit);
 }
 
 function autoSize(el){
@@ -1925,12 +1932,12 @@ function clearVisit(msg){
   });
 }
 
-function sentGuard(){
+function sentGuard(beforeEdit){
   sheet({ title:'You already copied this visit', dismissable:false,
     body:['You copied it at ' + fmtTime(M.sentAt) + '. Is this still the same patient?'],
     buttons:[ {label:'Same patient, keep editing', kind:'primary', on:() => { M.sentAck = true; saveDraft(); }},
               {label:'No, undo this edit and add a patient', on:() => {
-                if(M.sentVals) V = JSON.parse(JSON.stringify(M.sentVals));
+                V = clone(beforeEdit);
                 renderAll();
                 page.addPatient(root);
               }} ] });
@@ -2082,12 +2089,14 @@ function createPatientPage(){
   const officeSection = document.querySelector('#officeSection');
   const template = document.querySelector('#patientTemplate');
   const warning = document.querySelector('#draftWarning');
+  const readWarning = document.querySelector('#draftReadWarning');
   const key = 'hvnb_current_draft';
   const appDraftKey = 'hvnb_current_app_draft';
   const installedApp = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
   let appDraftBaseline = null;
   let appDraftWriteBlocked = false;
   let appDraftSourceBase = {revision:null};
+  let draftReadBlocked = false;
   const shiftKey = 'hvnb_current_shift_generation';
   const clearDialog = document.querySelector('#clearShiftDialog');
   const clearError = document.querySelector('#clearShiftError');
@@ -2172,6 +2181,7 @@ function createPatientPage(){
     generation:() => generation,
     matchesShift:value => !!value && (value.shift === generation || (!value.shift && generation === 'initial')),
     isCurrentShift:() => {
+      if(draftReadBlocked) return false;
       if(resetting) return true;
       const latest = readGeneration();
       if(latest === generation) return true;
@@ -2401,6 +2411,7 @@ function createPatientPage(){
       status.textContent = cleared ? message : 'Patient forms cleared. Saved-data removal still needs a retry.';
     },
     clearShift:() => {
+      if(draftReadBlocked) return;
       const nextGeneration = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
       try{ window.localStorage.setItem(shiftKey, nextGeneration); }
       catch(e){ clearError.textContent = 'Couldn’t clear this shift because browser storage is unavailable. Nothing was cleared. Try again.'; return; }
@@ -2413,23 +2424,47 @@ function createPatientPage(){
     return page.matchesShift(value) && Array.isArray(value.patients) && value.patients.length && value.patients.every(p => object(p) && object(p.vals)) && Number.isFinite(value.t) && value.t > 0 && (installedApp || Date.now() - value.t < 8 * 60 * 60 * 1000);
   };
   let draft = null, alternativeDraft = null;
-  try{ const saved = JSON.parse(window.sessionStorage.getItem(key)); if(usableDraft(saved)) draft = saved; }catch(e){}
-  if(installedApp){
+  function readSavedDrafts(){
+    if(patients.length) return;
+    let sessionRaw, deviceRaw = null;
     try{
-      appDraftBaseline = window.localStorage.getItem(appDraftKey);
-      appDraftSourceBase = draftBase(appDraftBaseline);
-      const saved = JSON.parse(appDraftBaseline);
+      sessionRaw = window.sessionStorage.getItem(key);
+      if(installedApp) deviceRaw = window.localStorage.getItem(appDraftKey);
+    }catch(e){
+      held = true;
+      draftReadBlocked = true;
+      setDraftReadBlocked(true);
+      document.querySelector('#retryDraftRead').focus({preventScroll:true});
+      return;
+    }
+    const wasBlocked = draftReadBlocked;
+    draftReadBlocked = false;
+    generation = readGeneration();
+    draft = null; alternativeDraft = null;
+    const sessionDraft = parsedDraft(sessionRaw);
+    if(usableDraft(sessionDraft)) draft = sessionDraft;
+    if(installedApp){
+      appDraftBaseline = deviceRaw;
+      appDraftSourceBase = draftBase(deviceRaw);
+      const saved = parsedDraft(deviceRaw);
       if(usableDraft(saved)){
         const diverged = draft && !sameDraft(draft, saved) && !matchesBase(draft.appDraftBase, appDraftBaseline);
         if(!draft || saved.t >= draft.t){ if(diverged) alternativeDraft = draft; draft = saved; }
         else if(diverged) alternativeDraft = saved;
       }
-    }catch(e){}
+    }
+    held = !!draft;
+    if(generation !== 'initial') page.cleanupSavedData();
+    setDraftReadBlocked(false);
+    const first = page.addPatient(null, {}, false);
+    if(draft) first.offerRestore(draft, alternativeDraft);
+    else if(wasBlocked) document.querySelector('#houseHeading').focus({preventScroll:true});
   }
-  if(draft) held = true;
-  if(generation !== 'initial') page.cleanupSavedData();
-  const first = page.addPatient(null, {}, false);
-  if(draft) first.offerRestore(draft, alternativeDraft);
+  function setDraftReadBlocked(blocked){
+    readWarning.hidden = !blocked;
+    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#patients', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
+  }
+  document.querySelector('#retryDraftRead').addEventListener('click', readSavedDrafts);
   document.querySelector('#retryOfficeSave').addEventListener('click', () => {
     if(!patients.length) return;
     patients[0].retryOffice();
@@ -2439,7 +2474,7 @@ function createPatientPage(){
   document.querySelector('#dismissUndo').addEventListener('click', page.clearUndo);
   document.querySelector('#collapsePatients').addEventListener('click', () => page.housePatients().forEach(p => p.collapse(true)));
   document.querySelector('#expandPatients').addEventListener('click', () => page.housePatients().forEach(p => p.collapse(false)));
-  document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(page.housePatients().at(-1).root));
+  document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(page.housePatients().at(-1)?.root));
   document.querySelector('#newHouseBtn').addEventListener('click', page.newHouse);
   document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
   document.querySelector('#view-office').addEventListener('click', page.showOffice);
@@ -2462,6 +2497,7 @@ function createPatientPage(){
   const flushBeforeLeaving = page.saveDraft;
   document.addEventListener('visibilitychange', () => { if(document.hidden) flushBeforeLeaving(); else page.isCurrentShift(); });
   window.addEventListener('pagehide', flushBeforeLeaving);
+  readSavedDrafts();
 }
 
 let initialized = false;

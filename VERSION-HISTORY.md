@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.1 — preserve checklist work and unread drafts (October 24, 2026)
+
+Choosing “No, undo this edit and add a patient” restores the answers from immediately before the mistaken edit. Checklist work completed after copying, retained hidden history, copied-message status, and the saved Office association remain intact. The guard covers text, choice, checkbox, and nested test-result changes.
+
+An initial session or installed-app draft read failure now leaves both recovery copies untouched. The app shows a Retry warning and waits to open patient forms until the required reads succeed. Repeated failures and page lifecycle events cannot replace or remove the unread draft. Retry offers the existing recovery choices, or opens a blank form when no current draft exists; a shift cleared in another tab is checked before restoring older work.
+
+The displayed version, release metadata, package version, and static cache advance to v9.0.1. Validation adds six source regressions and eight browser regressions for these failures. All 21 deterministic source checks pass locally; the full browser suite runs in CI. Physical Safari/iOS behavior remains outside automated coverage.
+
 ## v9 — fixed forms, recovery conflicts, and offline reliability (October 23, 2026)
 
 Installed-app session drafts retain the revision of the device copy they came from. Reloading a stale window cannot replace a different device shift. When both contain different work, recovery offers the device shift or the window's shift; opening the window's shift keeps the device copy and a visible conflict warning. A failed device write can still recover newer session work and retry when its original device copy has not changed. Older drafts remain recoverable.
