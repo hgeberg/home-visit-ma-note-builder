@@ -22,6 +22,74 @@ async function samePatient(p){const b=p.getByRole('button',{name:'Same patient, 
 async function retry(p){await p.locator('#view-office').click();await p.locator('#retryOfficeSave').click();await p.waitForTimeout(30);}
 async function failRead(p){await p.evaluate(()=>{const original=Storage.prototype.getItem;let once=true;Storage.prototype.getItem=function(k){if(this===localStorage&&k==='hvnb_current_office'&&once){once=false;throw Error('Synthetic read failure');}return original.call(this,k);};});}
 
+async function unreadDraftPage(c,url,{installed=false,kind='session',once=false}={}){
+ const p=await c.newPage();p.setDefaultTimeout(15000);
+ await p.addInitScript(({installed,kind,once})=>{
+  localStorage.setItem('hvnb_current_migrated','1');sessionStorage.setItem('hvnb_current_migrated','1');
+  Object.defineProperty(navigator,'standalone',{configurable:true,value:installed});
+  const draft=notes=>JSON.stringify({version:4,t:Date.now()-(notes==='DEVICE'?2000:1000),patients:[{vals:{name:'SYNTHETIC '+notes,notes,k_pa:true}}]});
+  sessionStorage.setItem('hvnb_current_draft',draft('WINDOW'));
+  if(installed)localStorage.setItem('hvnb_current_app_draft',draft('DEVICE'));
+  const read=Storage.prototype.getItem;
+  window.syntheticDraftBytes=()=>({session:read.call(sessionStorage,'hvnb_current_draft'),device:read.call(localStorage,'hvnb_current_app_draft')});
+  window.originalDraftBytes=window.syntheticDraftBytes();window.failDraftRead=true;
+  Storage.prototype.getItem=function(k){
+   if(window.failDraftRead&&((kind==='session'&&this===sessionStorage&&k==='hvnb_current_draft')||(kind==='device'&&this===localStorage&&k==='hvnb_current_app_draft'))){
+    if(once)window.failDraftRead=false;throw Error('Synthetic initial draft read failure');
+   }
+   return read.call(this,k);
+  };
+ },{installed,kind,once});
+ await p.goto(url);return p;
+}
+
+test('A failed first draft read preserves saved bytes and Retry restores the original patient',async(c,url)=>{
+ const p=await unreadDraftPage(c,url,{once:true});
+ assert.equal(await p.locator('#draftReadWarning').isVisible(),true);assert.equal(await p.locator('.patient').count(),0);
+ assert.equal(await p.locator('#patients').getAttribute('inert'),'');
+ await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+ assert.deepEqual(await p.evaluate(()=>window.syntheticDraftBytes()),await p.evaluate(()=>window.originalDraftBytes));
+ await p.locator('#retryDraftRead').click();await p.getByRole('button',{name:'Restore this visit',exact:true}).click();
+ assert.equal(await field(p,'name').inputValue(),'SYNTHETIC WINDOW');assert.equal(await field(p,'notes').inputValue(),'WINDOW');
+ assert.equal(await button(p,'f_k_pa').isChecked(),true);assert.equal(await p.locator('#draftReadWarning').isVisible(),false);
+ await fill(p,'notes','SYNTHETIC SAVING WORKS AGAIN');await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+ assert.equal(await p.evaluate(()=>JSON.parse(sessionStorage.getItem('hvnb_current_draft')).patients[0].vals.notes),'SYNTHETIC SAVING WORKS AGAIN');
+});
+
+test('Repeated failed draft reads keep the original draft intact until a successful retry',async(c,url)=>{
+ const p=await unreadDraftPage(c,url);
+ for(let i=0;i<2;i++)await p.locator('#retryDraftRead').click();
+ await p.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pagehide'));});
+ assert.equal(await p.locator('.patient').count(),0);assert.equal(await p.locator('#draftReadWarning').isVisible(),true);
+ assert.deepEqual(await p.evaluate(()=>window.syntheticDraftBytes()),await p.evaluate(()=>window.originalDraftBytes));
+ await p.evaluate(()=>window.failDraftRead=false);await p.locator('#retryDraftRead').click();
+ await p.getByRole('button',{name:'Restore this visit',exact:true}).click();assert.equal(await field(p,'name').inputValue(),'SYNTHETIC WINDOW');
+});
+
+for(const kind of ['session','device'])test('Installed '+kind+' draft read failures preserve both copies and recover the selected shift',async(c,url)=>{
+ const p=await unreadDraftPage(c,url,{installed:true,kind});
+ assert.equal(await p.locator('.patient').count(),0);await p.locator('#retryDraftRead').click();
+ await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+ assert.deepEqual(await p.evaluate(()=>window.syntheticDraftBytes()),await p.evaluate(()=>window.originalDraftBytes));
+ await p.evaluate(()=>window.failDraftRead=false);await p.locator('#retryDraftRead').click();
+ assert.match(await p.locator('dialog[open]').innerText(),/Different saved shifts/);
+ await p.getByRole('button',{name:'Restore saved device shift',exact:true}).click();
+ assert.equal(await field(p,'name').inputValue(),'SYNTHETIC DEVICE');assert.equal(await field(p,'notes').inputValue(),'DEVICE');
+ assert.equal(await p.locator('#draftReadWarning').isVisible(),false);
+});
+
+test('Retry after another tab clears the shift does not restore the unread older draft',async(c,url)=>{
+ const p=await unreadDraftPage(c,url),q=await fresh(c,url);
+ await q.locator('#clearShiftBtn').click();await q.locator('#confirmClearShift').click();
+ await p.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ assert.equal(await p.locator('.patient').count(),0);
+ assert.deepEqual(await p.evaluate(()=>window.syntheticDraftBytes()),await p.evaluate(()=>window.originalDraftBytes));
+ await p.evaluate(()=>window.failDraftRead=false);await p.locator('#retryDraftRead').click();
+ assert.equal(await p.getByRole('button',{name:'Restore this visit',exact:true}).count(),0);assert.equal(await field(p,'name').inputValue(),'');
+ await fill(p,'name','SYNTHETIC NEW SHIFT');await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+ assert.equal(await p.evaluate(()=>JSON.parse(sessionStorage.getItem('hvnb_current_draft')).patients[0].vals.name),'SYNTHETIC NEW SHIFT');
+});
+
 test('Only one clipboard request runs and a recopy saves newest values',async(c,url)=>{
  const p=await fresh(c,url);await clipboard(p,'delayed');await seed(p);await copy(p);assert(await button(p,'copyBtn').isDisabled());
  await fill(p,'overnights','RPP');await button(p,'copyBtn').evaluate(b=>b.click());assert.equal(await p.evaluate(()=>pendingCopies.length),1);
@@ -58,7 +126,7 @@ test('Malformed Office step elements do not crash recopy or lose test names',asy
  const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);await p.evaluate(()=>{const list=JSON.parse(localStorage.getItem('hvnb_current_office'));list[0].steps=[null,7,{id:'invalid'}, {id:'valid',label:'Synthetic step',done:true}];localStorage.setItem('hvnb_current_office',JSON.stringify(list));});await copy(p);const result=await stored(p);assert.equal(result.length,1);assert.equal(result[0].overnights,'Blood');assert(result[0].steps.every(s=>s&&typeof s.id==='string'&&typeof s.label==='string'));
 });
 test('Malformed copied metadata cannot crash undo during restored draft editing',async(c,url)=>{
- const p=await fresh(c,url);await p.addInitScript(()=>sessionStorage.setItem('hvnb_current_draft',JSON.stringify({version:2,t:Date.now(),patients:[{vals:{name:'SYNTHETIC RESTORE'},meta:{sentAt:Date.now(),sentText:'Patient: SYNTHETIC RESTORE',sentVals:'broken'}}]})));await p.reload();await p.getByRole('button',{name:'Restore this visit',exact:true}).click();await fill(p,'name','SYNTHETIC EDIT');await p.getByRole('button',{name:'No, undo this edit and add a patient',exact:true}).click();assert.equal(await p.locator('.patient').count(),2);assert.equal(await field(p,'name').inputValue(),'SYNTHETIC EDIT');
+ const p=await fresh(c,url);await p.addInitScript(()=>sessionStorage.setItem('hvnb_current_draft',JSON.stringify({version:2,t:Date.now(),patients:[{vals:{name:'SYNTHETIC RESTORE'},meta:{sentAt:Date.now(),sentText:'Patient: SYNTHETIC RESTORE',sentVals:'broken'}}]})));await p.reload();await p.getByRole('button',{name:'Restore this visit',exact:true}).click();await fill(p,'name','SYNTHETIC EDIT');await p.getByRole('button',{name:'No, undo this edit and add a patient',exact:true}).click();assert.equal(await p.locator('.patient').count(),2);assert.equal(await field(p,'name').inputValue(),'SYNTHETIC RESTORE');
 });
 test('Recovery replays queued Copy before a newer saved-entry edit',async(c,url)=>{
  const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);await fill(p,'overnights','RPP');await samePatient(p);await failRead(p);await copy(p);await p.locator('#view-office').click();await p.getByRole('button',{name:'Edit saved entry',exact:true}).click();await p.locator('[data-local-id="sheet_name"]').fill('SYNTHETIC EDIT AFTER COPY');await p.getByRole('button',{name:'Save changes',exact:true}).click();const result=await stored(p);assert.equal(result.length,1);assert.equal(result[0].overnights,'RPP');assert.equal(result[0].name,'SYNTHETIC EDIT AFTER COPY');assert.notEqual(await p.locator('#officeSaveWarning').getAttribute('hidden'),null);

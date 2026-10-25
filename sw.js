@@ -3,7 +3,7 @@
 const ROOT = new URL('./', self.location.href);
 const APP = new URL('index.html', ROOT).href;
 const PREFIX = 'hvnb-shell-' + ROOT.pathname + '-';
-const RELEASE = 'v9';
+const RELEASE = 'v9.0.1';
 const CACHE = PREFIX + RELEASE;
 const ASSETS = ['manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'].map(path => new URL(path, ROOT).href);
 const isApp = response => response.ok && response.headers.get('content-type')?.includes('text/html');

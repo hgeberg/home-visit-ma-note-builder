@@ -195,6 +195,44 @@ test('the copied-patient guard can undo the edit and append a blank patient', as
   assert.equal(saved.patients[1].meta.sentAt, null);
 });
 
+for (const change of ['name', 'choice', 'test result']) {
+  test('undoing a copied ' + change + ' edit retains post-copy checklists and hidden history after reload', async ({ page }) => {
+    const first = patient(page, 0);
+    await fillPatient(first, 'TEST KEEP CHECKLIST', 'original symptoms');
+    await first.locator('[data-choice="abx"][data-v="Yes"]').click();
+    await local(first, 'f_abx_name').fill('SYNTHETIC RETAINED MEDICINE');
+    await local(first, 'f_abx_when').fill('Last week');
+    await first.locator('[data-choice="abx"][data-v="No"]').click();
+    await markTest(first, 'flu', 'Positive', 'B');
+    await first.locator('[data-choice="aware"][data-v="Aware"]').click();
+    await local(first, 'f_overnights').fill('RPP');
+    const before = await output(first);
+    await local(first, 'copyBtn').click();
+    await local(first, 'sentBanner').waitFor({state:'visible'});
+    await local(first, 'tab-check').click();
+    for (const id of ['k_confirm', 'k_pa', 'k_posted']) await local(first, 'f_' + id).check();
+    await local(first, 'tab-visit').click();
+    if (change === 'name') await local(first, 'f_name').fill('TEST NEXT PERSON');
+    else if (change === 'choice') await first.locator('[data-choice="abx"][data-v="Yes"]').click();
+    else await first.locator('[data-item="flu"] [data-r="Negative"]').click();
+    await page.getByRole('button', {name:'No, undo this edit and add a patient', exact:true}).click();
+    assert.equal(await patients(page).count(), 2);
+    assert.equal(await output(first), before);
+    for (const id of ['k_confirm', 'k_pa', 'k_posted']) assert.equal(await local(first, 'f_' + id).isChecked(), true);
+    const saved = await flushDraft(page, ['TEST KEEP CHECKLIST', '']);
+    assert.equal(saved.patients[0].vals.abx, 'No');
+    assert.equal(saved.patients[0].vals.abx_name, 'SYNTHETIC RETAINED MEDICINE');
+    assert.equal(saved.patients[0].vals.abx_when, 'Last week');
+    assert.deepEqual(saved.patients[0].vals.tests.flu, {on:true, r:'Positive', s:'B'});
+    assert.equal((await office(page)).length, 1);
+    await page.reload(); await restore(page);
+    const restored = patient(page, 0);
+    assert.equal(await output(restored), before);
+    for (const id of ['k_confirm', 'k_pa', 'k_posted']) assert.equal(await local(restored, 'f_' + id).isChecked(), true);
+    assert.equal(await local(patient(page, 1), 'f_name').inputValue(), '');
+  });
+}
+
 test('clearing warns about uncopied changes and never saves an uncopied patient to Office', async ({ page }) => {
   const first = patient(page, 0);
   await fillPatient(first, 'TEST CLEAR WARNING', 'already copied symptoms');

@@ -14,13 +14,18 @@ const cloned=x=>JSON.parse(JSON.stringify(x));
 const createPageSource=section('function createPatientPage(){','\nlet initialized = false;');
 function app(local,session,clock,installed=true){
  const elements=new Map();
- function element(id=''){return {id,hidden:false,dataset:{},style:{},open:false,textContent:'',content:{firstElementChild:{cloneNode:()=>element()}},append(){},after(){},replaceChildren(){},querySelectorAll:()=>[],addEventListener(){},setAttribute(){},focus(){},scrollIntoView(){},showModal(){this.open=true;},close(){this.open=false;}};}
+ function element(id=''){
+  const listeners=new Map();
+  return {id,hidden:false,dataset:{},style:{},open:false,textContent:'',content:{firstElementChild:{cloneNode:()=>element()}},append(){},after(){},replaceChildren(){},querySelectorAll:()=>[],
+   addEventListener(type,fn){listeners.set(type,fn);},click(){listeners.get('click')?.();},setAttribute(){},focus(){},scrollIntoView(){},showModal(){this.open=true;},close(){this.open=false;}};
+ }
  const doc={querySelector(sel){if(!elements.has(sel))elements.set(sel,element(sel));return elements.get(sel);},createElement:()=>element(),addEventListener(){}};
- const env={document:doc,navigator:{standalone:installed},window:{localStorage:local,sessionStorage:session,matchMedia:()=>({matches:installed}),addEventListener(){},scrollTo(){}},setTimeout:()=>1,clearTimeout(){},console,Date:class extends Date{static now(){return clock.now;}},Math};
+ const windowEvents=new Map();
+ const env={windowEvents,document:doc,navigator:{standalone:installed},window:{localStorage:local,sessionStorage:session,matchMedia:()=>({matches:installed}),addEventListener(type,fn){windowEvents.set(type,fn);},scrollTo(){}},setTimeout:()=>1,clearTimeout(){},console,Date:class extends Date{static now(){return clock.now;}},Math};
  env.mountPatient=(root,seed,page)=>{
    env.page=page;const vals=cloned(seed.vals||{}),layout=cloned(seed.layout||{v:4,sections:[]});
    let office={values:[],writable:true,baseline:[],readFailed:false};
-   const p={root,vals,serialize:()=>({vals:cloned(vals),meta:seed.meta||{},preservedAnswers:[]}),getOffice:()=>office,hasPendingOffice:()=>false,hasContent:()=>Object.values(vals).some(Boolean),name:()=>vals.name||'',title(){},renderSaveState(){},getLayout:()=>layout,acceptsLayout:()=>true,offerRestore:(d,alternative)=>{env.offered=cloned(d);env.alternative=alternative ? cloned(alternative) : null;},destroy(){},collapse(){},resize(){},focus(){},applyOffice:(values,writable,baseline,readFailed)=>{office={values,writable,baseline,readFailed};},keepPendingOffice(){},renderOffice(){},flushLayout(){}};
+   const p={root,vals,serialize:()=>({vals:cloned(vals),meta:seed.meta||{},preservedAnswers:[]}),getOffice:()=>office,hasPendingOffice:()=>false,hasContent:()=>Object.values(vals).some(Boolean),name:()=>vals.name||'',title(){},renderSaveState(){},getLayout:()=>layout,acceptsLayout:value=>!!value&&Array.isArray(value.sections),offerRestore:(d,alternative)=>{env.offered=cloned(d);env.alternative=alternative ? cloned(alternative) : null;},destroy(){},collapse(){},resize(){},focus(){},applyOffice:(values,writable,baseline,readFailed)=>{office={values,writable,baseline,readFailed};},keepPendingOffice(){},renderOffice(){},flushLayout(){}};
    env.lastPatient=p;return p;
  };
  vm.createContext(env);vm.runInContext(createPageSource+'\ncreatePatientPage();',env);return env;
@@ -40,10 +45,50 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9';
+const release='v9.0.1';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
+ await check('Undoing a copied-patient edit preserves all answers from immediately before that edit',()=>{
+  const copied={name:'SYNTHETIC ORIGINAL',inspic:true,tests:{flu:{on:true,r:'Positive',s:'B'}}};
+  const before={...cloned(copied),k_confirm:true,k_pa:true,k_posted:true,hidden_answer:'RETAINED'};
+  const env={V:{...cloned(before),name:'SYNTHETIC NEXT'},M:{sentAt:1000,sentVals:copied},clone:cloned,fmtTime:()=>'',root:{},renderAll(){},saveDraft(){},page:{addPatient(){env.added=true;}},sheet:opts=>{env.guard=opts;}};
+  vm.createContext(env);vm.runInContext(section('function sentGuard(','\n/* ---------- restore + layout updates ---------- */')+'\nsentGuard('+JSON.stringify(before)+');',env);
+  env.guard.buttons[1].on();assert.deepEqual(JSON.parse(JSON.stringify(env.V)),before);assert.equal(env.added,true);assert.equal(env.M.sentVals.k_pa,undefined);
+ });
+ await check('A failed first session read preserves the original draft until Retry and Restore',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:2000};
+  const original=JSON.stringify({version:4,t:1000,patients:[{vals:{name:'SYNTHETIC UNREAD DRAFT',notes:'KEEP THIS'}}]});session.setItem('hvnb_current_draft',original);
+  const read=session.getItem.bind(session);let failed=false;session.getItem=k=>{if(k==='hvnb_current_draft'&&!failed){failed=true;throw Error('Synthetic first read');}return read(k);};
+  const a=app(local,session,clock,false);assert.equal(read('hvnb_current_draft'),original);assert.equal(a.offered,undefined);assert.equal(a.document.querySelector('#draftReadWarning').hidden,false);
+  a.windowEvents.get('pagehide')();assert.equal(read('hvnb_current_draft'),original);
+  a.document.querySelector('#retryDraftRead').click();assert.equal(a.offered.patients[0].vals.notes,'KEEP THIS');assert.equal(read('hvnb_current_draft'),original);
+  a.page.restore(a.offered);assert.equal(a.lastPatient.vals.notes,'KEEP THIS');a.lastPatient.vals.notes='RECOVERED AND SAVED';a.page.saveDraft();assert.equal(JSON.parse(read('hvnb_current_draft')).patients[0].vals.notes,'RECOVERED AND SAVED');
+ });
+ await check('Repeated draft-read failures block saving and shift events until the storage read succeeds',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:2000};
+  const original=JSON.stringify({version:4,t:1000,patients:[{vals:{name:'SYNTHETIC PROTECTED'}}]});session.setItem('hvnb_current_draft',original);
+  const read=session.getItem.bind(session);let fail=true;session.getItem=k=>{if(k==='hvnb_current_draft'&&fail)throw Error('Synthetic persistent read');return read(k);};
+  const a=app(local,session,clock,false);a.document.querySelector('#retryDraftRead').click();a.windowEvents.get('pagehide')();a.windowEvents.get('focus')();
+  assert.equal(read('hvnb_current_draft'),original);assert.equal(a.lastPatient,undefined);assert.equal(a.document.querySelector('#draftReadWarning').hidden,false);
+  fail=false;a.document.querySelector('#retryDraftRead').click();assert.equal(a.offered.patients[0].vals.name,'SYNTHETIC PROTECTED');assert.equal(a.document.querySelector('#draftReadWarning').hidden,true);
+ });
+ for(const failedKind of ['session','device'])await check('An installed-app '+failedKind+' read failure preserves both recovery copies',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:3000};
+  const state=notes=>JSON.stringify({version:4,t:notes==='DEVICE'?1000:2000,patients:[{vals:{name:'SYNTHETIC',notes}}]});
+  const device=state('DEVICE'),windowDraft=state('WINDOW');local.setItem('hvnb_current_app_draft',device);session.setItem('hvnb_current_draft',windowDraft);
+  const storage=failedKind==='session'?session:local,key=failedKind==='session'?'hvnb_current_draft':'hvnb_current_app_draft',read=storage.getItem.bind(storage);let fail=true;
+  storage.getItem=k=>{if(k===key&&fail)throw Error('Synthetic unread recovery copy');return read(k);};
+  const a=app(local,session,clock);assert.equal(a.lastPatient,undefined);a.windowEvents.get('pagehide')();fail=false;
+  assert.equal(local.getItem('hvnb_current_app_draft'),device);assert.equal(session.getItem('hvnb_current_draft'),windowDraft);
+  a.document.querySelector('#retryDraftRead').click();assert.equal(a.offered.patients[0].vals.notes,'WINDOW');assert.equal(a.alternative.patients[0].vals.notes,'DEVICE');
+  a.page.restore(a.alternative);assert.equal(a.lastPatient.vals.notes,'DEVICE');
+ });
+ await check('Retry after a failed read with no saved draft opens a usable blank form',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:2000};const read=session.getItem.bind(session);let once=true;
+  session.getItem=k=>{if(k==='hvnb_current_draft'&&once){once=false;throw Error('Synthetic first read');}return read(k);};
+  const a=app(local,session,clock,false);assert.equal(a.lastPatient,undefined);a.document.querySelector('#retryDraftRead').click();assert.equal(a.offered,undefined);a.lastPatient.vals.name='NEW PATIENT';a.page.saveDraft();assert.equal(JSON.parse(session.getItem('hvnb_current_draft')).patients[0].vals.name,'NEW PATIENT');
+ });
  await check('A stale installed window stays blocked after reload and retains both recovery choices',()=>{
   const local=new MemoryStorage(),sa=new MemoryStorage(),sb=new MemoryStorage(),clock={now:1000};
   let a=app(local,sa,clock);a.lastPatient.vals.name='SYNTHETIC';a.lastPatient.vals.notes='Original';a.page.saveDraft();
