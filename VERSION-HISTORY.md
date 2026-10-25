@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.2 — open linked visits from Office (October 24, 2026)
+
+The Edit saved entry dialog now includes Open visit page. It locates the original form by its saved Office association, opens the correct house, expands the patient, selects Visit, and focuses the patient heading. Matching survives draft recovery and independent name edits, including patients sharing a name and DOB. Navigation retains the current patient answers and does not recopy or change the saved Office entry.
+
+If the form has been cleared or is not open in this tab, the editor explains that it is unavailable and disables the shortcut. Saving Office details remains available. Navigating with unsaved Office edits first asks for confirmation; Keep editing and Escape preserve the entered values.
+
+Release metadata, package version, and offline cache advance to v9.0.2. Five new browser regressions cover navigation/focus, cross-house identity after recovery, unavailable forms, and both unsaved-edit confirmation paths. Existing legacy-entry, other-tab, and mobile editor checks also cover the shortcut.
+
 ## v9.0.1 — preserve checklist work and unread drafts (October 24, 2026)
 
 Choosing “No, undo this edit and add a patient” restores the answers from immediately before the mistaken edit. Checklist work completed after copying, retained hidden history, copied-message status, and the saved Office association remain intact. The guard covers text, choice, checkbox, and nested test-result changes.

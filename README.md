@@ -1,8 +1,10 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.1.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.2.
 
 The website has a fixed form. Layout editing, field/section changes, and layout import/export/reset controls are removed. Form changes are made in the source. Previously saved forms and draft form snapshots remain readable, and Office saved-entry editing remains available.
+
+Edit saved entry in Office includes Open visit page. It opens the linked patient’s Visit tab, changing houses and expanding the form as needed. Cleared or unavailable forms are explained in the editor. Unsaved Office edits require confirmation before navigating away.
 
 Open `index.html` through a local or hosted web server. Installed-app recovery and offline caching require a secure origin (HTTPS, or localhost for testing). Patient information stays in browser storage on that device.
 

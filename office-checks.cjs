@@ -57,6 +57,119 @@ async function clearPatient(root) {
   assert.equal(await local(root, 'f_name').inputValue(), '');
 }
 
+test('Open visit page selects the linked patient Visit tab and restores meaningful focus', async ({ page }) => {
+  await fillPatient(patient(page), 'TEST FIRST VISIT', '4plex');
+  await copyPatient(page, patient(page), 1);
+  await addAfter(page, 0);
+  const target = patient(page, 1);
+  await fillPatient(target, 'TEST LINKED VISIT', 'RPP');
+  await copyPatient(page, target, 2);
+  await local(target, 'tab-check').click();
+  await local(target, 'f_k_pa').check();
+  await local(target, 'collapseBtn').click();
+  const before = await records(page);
+  await showOffice(page);
+  await cards(page).filter({hasText:'TEST LINKED VISIT'}).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.getByRole('button', {name:'Open visit page', exact:true}).click();
+  assert.equal(await page.locator('#officeSection').isVisible(), false);
+  assert.equal(await local(target, 'panel-visit').isVisible(), true);
+  assert.equal(await local(target, 'collapseBtn').getAttribute('aria-expanded'), 'true');
+  assert.equal(await local(target, 'f_k_pa').isChecked(), true);
+  assert.equal(await page.evaluate(() => document.activeElement.id), await local(target, 'patientTitle').getAttribute('id'));
+  assert.deepEqual(await records(page), before);
+});
+
+test('Open visit page retains exact identity across houses, duplicate names, Office renames and reload', async ({ page }) => {
+  const first = patient(page);
+  await fillPatient(first, 'TEST DUPLICATE NAME', '4plex');
+  await local(first, 'f_notes').fill('FIRST HOUSE VISIT');
+  await copyPatient(page, first, 1);
+  await local(first, 'tab-check').click();
+  await local(first, 'f_k_confirm').check();
+  await local(first, 'collapseBtn').click();
+  await page.locator('#newHouseBtn').click();
+  await fillPatient(patient(page, 1), 'TEST DUPLICATE NAME', 'RPP');
+  await local(patient(page, 1), 'f_notes').fill('SECOND HOUSE VISIT');
+  await copyPatient(page, patient(page, 1), 2);
+  const firstId = (await records(page))[0].id;
+  await showOffice(page);
+  await page.locator('[data-office-id="' + firstId + '"]').getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.getByRole('dialog').getByLabel('Name', {exact:true}).fill('TEST RENAMED OFFICE ENTRY');
+  await page.getByRole('button', {name:'Save changes', exact:true}).click();
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await page.reload();
+  await page.getByRole('button', {name:'Restore all 2 patients', exact:true}).click();
+  await showOffice(page);
+  await cards(page).filter({hasText:'TEST RENAMED OFFICE ENTRY'}).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.getByRole('button', {name:'Open visit page', exact:true}).click();
+  assert.equal(await page.locator('#houseHeading').innerText(), 'House 1');
+  assert.equal(await local(patient(page), 'panel-visit').isVisible(), true);
+  assert.equal(await local(patient(page), 'f_notes').inputValue(), 'FIRST HOUSE VISIT');
+  assert.equal(await local(patient(page), 'f_k_confirm').isChecked(), true);
+  assert.equal(await patient(page, 1).isVisible(), false);
+  assert.equal((await records(page)).find(o => o.id === firstId).name, 'TEST RENAMED OFFICE ENTRY');
+});
+
+test('A cleared visit cannot be confused with an unrelated form having the same name and DOB', async ({ page }) => {
+  const root = patient(page);
+  await fillPatient(root, 'TEST SAME NAME', 'RPP');
+  await copyPatient(page, root, 1);
+  const id = (await records(page))[0].id;
+  await clearPatient(root);
+  await fillPatient(root, 'TEST SAME NAME', '4plex');
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  assert.equal(await page.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), false);
+  assert.match(await page.getByRole('dialog').innerText(), /visit form is no longer open here/);
+  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Urine culture');
+  await page.getByRole('button', {name:'Save changes', exact:true}).click();
+  assert.equal((await records(page))[0].id, id);
+  assert.equal((await records(page))[0].overnights, 'Urine culture');
+  await showPatients(page);
+  assert.equal(await local(root, 'f_overnights').inputValue(), '4plex');
+});
+
+test('Keep editing and Escape preserve unsaved Office values before opening a visit', async ({ page }) => {
+  await fillPatient(patient(page), 'TEST ORIGINAL ENTRY', 'RPP');
+  await copyPatient(page, patient(page), 1);
+  const before = await records(page);
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.getByRole('dialog').getByLabel('Name', {exact:true}).fill('TEST UNSAVED ENTRY');
+  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Strep culture');
+  await page.getByRole('button', {name:'Open visit page', exact:true}).click();
+  assert.match(await page.getByRole('dialog').innerText(), /Unsaved Office changes/);
+  await page.getByRole('button', {name:'Keep editing', exact:true}).click();
+  assert.equal(await page.getByRole('dialog').getByLabel('Name', {exact:true}).inputValue(), 'TEST UNSAVED ENTRY');
+  await page.getByRole('button', {name:'Open visit page', exact:true}).click();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('dialog').getByLabel('Name', {exact:true}).inputValue(), 'TEST UNSAVED ENTRY');
+  assert.equal(await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).inputValue(), 'Strep culture');
+  assert.deepEqual(await records(page), before);
+  await page.getByRole('button', {name:'Save changes', exact:true}).click();
+  assert.equal((await records(page))[0].name, 'TEST UNSAVED ENTRY');
+  assert.equal((await records(page))[0].overnights, 'Strep culture');
+});
+
+test('Confirmed navigation discards only unsaved Office edits and opens the current visit answers', async ({ page }) => {
+  const root = patient(page);
+  await fillPatient(root, 'TEST OPEN CURRENT VISIT', 'RPP');
+  await copyPatient(page, root, 1);
+  await changeCopied(root, 'f_notes', 'CURRENT UNSENT VISIT NOTES');
+  const before = await records(page);
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Unsaved Office order');
+  await page.getByRole('dialog').getByLabel('DOB', {exact:true}).fill('bad');
+  await page.getByRole('button', {name:'Open visit page', exact:true}).click();
+  await page.getByRole('button', {name:'Open without saving', exact:true}).click();
+  assert.equal(await local(root, 'panel-visit').isVisible(), true);
+  assert.equal(await local(root, 'f_notes').inputValue(), 'CURRENT UNSENT VISIT NOTES');
+  assert.equal(await local(root, 'f_overnights').inputValue(), 'RPP');
+  assert.equal(await local(root, 'f_dob').inputValue(), '01/01/2000');
+  assert.deepEqual(await records(page), before);
+});
+
 test('Office is its own view with one reference checklist beneath the saved patient list', async ({ page }) => {
   assert.equal(await page.locator('#officeSection').isVisible(), false);
   assert.equal(await page.locator('#patients').isVisible(), true);
@@ -232,6 +345,7 @@ test('legacy Office entries retain identity and steps, disclose missing orders, 
   assert.deepEqual((await records(page))[0].steps, legacy.steps);
   await card.getByRole('button', { name: /Edit saved entry/i }).click();
   const dialog = page.locator('[role="dialog"]:visible');
+  assert.equal(await dialog.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), false);
   await dialog.getByLabel('Overnight tests', { exact: true }).fill('Blood: CBC; custom legacy assay');
   await dialog.getByLabel('Reason for blood work', { exact: true }).fill('Verified from copied note');
   await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
@@ -283,6 +397,10 @@ test('another open tab receives Office changes without altering its unfinished p
   assert.match(await cards(secondTab).innerText(), /TEST CROSS TAB COPIED/);
   assert.equal(await local(patient(secondTab), 'f_name').inputValue(), 'TEST SEPARATE TAB DRAFT');
   assert.equal(await local(patient(secondTab), 'f_overnights').inputValue(), 'Uncopied custom test');
+  await showOffice(secondTab);
+  await cards(secondTab).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  assert.equal(await secondTab.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), false);
+  await secondTab.getByRole('button', {name:'Cancel', exact:true}).click();
 });
 
 test('retrying a failed Copy save merges another tab\'s newly saved patient', async ({ page, origin }) => {
@@ -374,6 +492,10 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
     await page.screenshot({ path: path.join(qaDirectory, `office-${viewport.name}.png`) });
     const dimensions = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }));
     assert.ok(dimensions.document <= dimensions.viewport, `${viewport.name} has no horizontal overflow: ${JSON.stringify(dimensions)}`);
+    await cards(page).first().getByRole('button', {name:'Edit saved entry', exact:true}).click();
+    const buttonBox = await page.getByRole('button', {name:'Open visit page', exact:true}).boundingBox();
+    assert.ok(buttonBox.x >= 0 && buttonBox.x + buttonBox.width <= viewport.width, 'Open visit page fits the editor width');
+    await page.getByRole('button', {name:'Cancel', exact:true}).click();
     console.log(`QA ${viewport.name}: ${dimensions.viewport}px viewport, ${dimensions.document}px document, screenshot saved`);
   }
 });
