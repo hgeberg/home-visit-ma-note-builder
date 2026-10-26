@@ -26,6 +26,7 @@ function app(local,session,clock,installed=true){
    env.page=page;const vals=cloned(seed.vals||{}),layout=cloned(seed.layout||{v:4,sections:[]});
    let office={values:[],writable:true,baseline:[],readFailed:false};
    const p={root,vals,serialize:()=>({vals:cloned(vals),meta:seed.meta||{},preservedAnswers:[]}),getOffice:()=>office,hasPendingOffice:()=>false,hasContent:()=>Object.values(vals).some(Boolean),name:()=>vals.name||'',title(){},renderSaveState(){},getLayout:()=>layout,acceptsLayout:value=>!!value&&Array.isArray(value.sections),offerRestore:(d,alternative)=>{env.offered=cloned(d);env.alternative=alternative ? cloned(alternative) : null;},destroy(){},collapse(){},resize(){},focus(){},applyOffice:(values,writable,baseline,readFailed)=>{office={values,writable,baseline,readFailed};},keepPendingOffice(){},renderOffice(){},flushLayout(){}};
+   p.progress=()=>({dob:vals.dob||'',messageStatus:vals.name||vals.notes?'not-copied':'blank',pendingCurrentOffice:false,officePending:false,officeSaved:false,pendingCopies:[]});
    env.lastPatient=p;return p;
  };
  vm.createContext(env);vm.runInContext(createPageSource+'\ncreatePatientPage();',env);return env;
@@ -45,7 +46,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9.0.4';
+const release='v9.0.5';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{

@@ -1,5 +1,15 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.5 — shift review and searchable patient status (October 26, 2026)
+
+Patients today can be searched by name or DOB across every house, including dates typed without separators. Each result shows its DOB, message-copy state, and relevant Office-save state. Filtering leaves the current house and patient forms unchanged.
+
+Clear shift now reviews uncopied messages, changes made after copying, and pending Office saves before the existing destructive confirmation. Each current visit can be opened directly, including visits in another house or previously on Checklist. Pending saves from earlier cleared forms retain the copied patient's name and lead to Office for retry. Cancel and Escape keep the shift intact.
+
+Blank forms and checklist-only activity do not trigger review warnings or affect patient status. Checklist use remains an optional reference. Message and save statuses are derived from existing state and remain current after copying, editing, recovery, and Office updates. Release metadata, package version, and the offline cache advance to v9.0.5.
+
+Validation: 21 deterministic source checks and 11 focused review/search browser cases passed. Existing multi-patient, Office, shift, data lifecycle, and house suites also passed. Coverage includes keyboard and 320px layouts, recovery, pending-save retry, unrelated saved patients, historical copies after clearing a form, and checklist exclusion. Physical mobile keyboards remain outside automated coverage.
+
 ## v9.0.4 — exposure shortcuts and one allergy shortcut (October 25, 2026)
 
 Selecting Yes for Exposure reveals Strep, Flu, and COVID shortcuts below the editable exposure details. Multiple shortcuts can be selected together. Selecting No or Unknown hides the shortcuts and excludes the retained exposure details from the message. Medication allergies keeps NKDA and removes the duplicate None shortcut.

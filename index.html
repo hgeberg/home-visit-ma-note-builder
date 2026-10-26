@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.4">
+<meta name="note-builder-version" content="v9.0.5">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -128,6 +128,20 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .patient-navigator>#patientJumps{display:block;max-height:min(50vh,360px)}
 .patient-group .patient-jumps{margin-top:0;max-height:none;overflow:visible}
 .patient-jumps .btn[aria-current="page"]{border-color:var(--accent);background:var(--accent-soft)}
+.patient-search{display:grid;gap:6px;margin-top:12px}
+.patient-search-controls{display:flex;gap:8px;align-items:center}
+.patient-search-controls .inp{flex:1;min-width:0}
+.patient-search-controls .btn{flex:none}
+.patient-jumps .patient-jump{display:grid;gap:5px;min-width:0;min-height:64px;flex:1 1 240px}
+.patient-jump-name{font-weight:740;overflow-wrap:anywhere}
+.patient-jump-meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.progress-labels{display:flex;flex-wrap:wrap;gap:5px}
+.progress-label{font-size:12px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--chip);border:1px solid var(--chip-line);color:var(--chip-ink)}
+.progress-label.warn{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.progress-label.ok{background:var(--ok-soft);border-color:var(--ok-line);color:var(--ok)}
+.shift-review-list{list-style:none;display:grid;gap:8px;margin:10px 0;padding:0;max-height:min(38vh,300px);overflow:auto}
+.shift-review-list .btn{display:grid;gap:6px;width:100%;text-align:left;overflow-wrap:anywhere}
+#shiftReviewSummary{font-weight:650}
 .house-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:18px}
 .house-toolbar h2{margin:0;font-size:20px}
 .house-toolbar p{margin:3px 0 0;color:var(--muted);font-size:13px}
@@ -311,7 +325,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.4</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.5</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -339,6 +353,11 @@ dialog.scrim::backdrop{background:transparent}
   </div>
   <details id="patientNavigator" class="patient-navigator">
     <summary id="patientNavSummary">Patients today</summary>
+    <div class="patient-search">
+      <label class="flabel" for="patientSearch">Find a patient</label>
+      <div class="patient-search-controls"><input class="inp" type="search" id="patientSearch" placeholder="Name or DOB" autocomplete="off" aria-controls="patientJumps"><button type="button" class="btn small" id="clearPatientSearch">Clear search</button></div>
+      <p class="small" id="patientSearchStatus" role="status"></p>
+    </div>
     <nav id="patientJumps" class="patient-jumps" aria-label="Open a patient’s house"></nav>
   </details>
   <section id="houseToolbar" class="house-toolbar" aria-label="Current house">
@@ -356,7 +375,9 @@ dialog.scrim::backdrop{background:transparent}
 </main>
 <div id="dialogHosts"></div>
 <dialog class="sheet" id="clearShiftDialog" aria-labelledby="clearShiftTitle">
-  <h3 id="clearShiftTitle">Clear everything for this shift?</h3>
+  <h3 id="clearShiftTitle">Review this shift before clearing</h3>
+  <p id="shiftReviewSummary" role="status"></p>
+  <ul id="shiftReviewList" class="shift-review-list"></ul>
   <p>This removes every patient form, saved draft and Office entry, including unfinished information. It starts one blank patient for your next shift. Your layout settings stay.</p>
   <p>Other tabs running this version in the same browser will also reset. This cannot be undone.</p>
   <div id="clearShiftError" class="err" role="alert"></div>
@@ -1676,6 +1697,22 @@ function renderSaveState(text = buildOutput(V).text){
   }
   el.textContent = copied + ' · ' + saved;
   el.classList.toggle('warn', pending || !!(M.sentAt && text !== M.sentText));
+  page.updateTitles();
+}
+
+function visitProgress(){
+  const text = buildOutput(V).text;
+  const messageStatus = M.sentAt ? (text === M.sentText ? 'copied' : 'changed') : (text || context(V).anyTest ? 'not-copied' : 'blank');
+  const ownOffice = M.officeId && office.find(o => o.id === M.officeId);
+  const savedOffice = M.officeId && officeBaseline.find(o => o.id === M.officeId);
+  const pendingCurrentOffice = pendingOfficeSync.some(p => p.meta === M) || !!(M.officeId && !officeWritable && JSON.stringify(ownOffice) !== JSON.stringify(savedOffice));
+  return {
+    dob:String(V.dob || '').trim(), messageStatus, pendingCurrentOffice,
+    officePending:pendingCurrentOffice || pendingOfficeSync.length > 0,
+    officeId:M.officeId,
+    officeSaved:!!(ownOffice && !officeReadFailed && JSON.stringify(ownOffice) === JSON.stringify(savedOffice)),
+    pendingCopies:pendingOfficeSync.filter(p => p.meta !== M).map(p => ({name:String(p.values.name || '').trim(), dob:String(p.values.dob || '').trim(), officeId:p.meta.officeId}))
+  };
 }
 function setCollapsed(value){
   collapsed = value;
@@ -2083,6 +2120,7 @@ return {
   hasContent:() => hasContent(V) || preservedAnswers.length > 0,
   collapse:setCollapsed,
   name:() => String(V.name || '').trim(),
+  progress:visitProgress,
   officeId:() => M.officeId,
   showVisit:() => setTab('visit'),
   layoutImpact:(layout, migrations) => affectedAnswers(layout, migrations).map(a => a.label),
@@ -2161,7 +2199,7 @@ function createPatientPage(){
   let activeCopy = null;
   let replayingOffice = false;
   let generation = 'initial', resetting = false;
-  let undo = null, undoTimer = null, navSignature = '';
+  let undo = null, undoTimer = null, navSignature = '', reviewSignature = '';
   const readGeneration = () => { try{ return window.localStorage.getItem(shiftKey) || 'initial'; }catch(e){ return generation; } };
   generation = readGeneration();
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -2301,25 +2339,118 @@ function createPatientPage(){
       const count = page.housePatients().length;
       document.querySelector('#houseHeading').textContent = 'House ' + (houses.indexOf(activeHouseId) + 1);
       document.querySelector('#houseSummary').textContent = count + (count === 1 ? ' patient' : ' patients') + ' in this house · Only this house is shown.';
-      const signature = JSON.stringify([activeHouseId, patients.map(p => [p.root.id, p.name(), p.root.dataset.houseId])]);
+      page.renderPatientNavigation();
+      if(clearDialog.open) page.renderShiftReview();
+    },
+    renderPatientNavigation:() => {
+      const houses = page.houseIds();
+      const query = String(document.querySelector('#patientSearch').value || '').trim().toLowerCase();
+      const states = patients.map((p, i) => ({p, number:i + 1, state:p.progress()}));
+      const signature = JSON.stringify([activeHouseId, query, states.map(({p, state}) => [p.root.id, p.name(), p.root.dataset.houseId, state])]);
       if(signature === navSignature) return;
       navSignature = signature;
       document.querySelector('#patientNavSummary').textContent = 'Patients today (' + patients.length + ')';
-      const jumps = document.querySelector('#patientJumps'); jumps.replaceChildren();
+      const matches = states.filter(({p, state}) => {
+        if(!query) return true;
+        if(p.name().toLowerCase().includes(query) || state.dob.toLowerCase().includes(query)) return true;
+        return /^[\d\s/.-]+$/.test(query) && query.replace(/\D/g, '').length > 0 && state.dob.replace(/\D/g, '').includes(query.replace(/\D/g, ''));
+      });
+      const resultText = matches.length + ' of ' + patients.length + ' patients' + (!matches.length ? ' · No matches.' : '');
+      document.querySelector('#patientSearchStatus').textContent = resultText;
+      const jumps = document.querySelector('#patientJumps');
+      const scrollTop = jumps.scrollTop || 0;
+      const focusedId = document.activeElement?.dataset?.navPatient;
+      jumps.replaceChildren();
       const groups = new Map();
       houses.forEach((id, i) => {
+        if(!matches.some(({p}) => p.root.dataset.houseId === id)) return;
         const group = document.createElement('section'); group.className = 'patient-group';
         const heading = document.createElement('h3'); heading.textContent = 'House ' + (i + 1) + (id === activeHouseId ? ' · Current' : '');
         const list = document.createElement('div'); list.className = 'patient-jumps';
         group.append(heading, list); jumps.append(group); groups.set(id, list);
       });
-      patients.forEach((p, i) => {
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn small';
-        button.textContent = (i + 1) + '. ' + (p.name() || 'Unnamed patient');
+      matches.forEach(({p, number, state}) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn small patient-jump';
+        const label = number + '. ' + (p.name() || 'Unnamed patient');
+        button.dataset.navPatient = p.root.id;
+        button.setAttribute('aria-label', label);
+        button.append(progressNode('span', label, 'patient-jump-name'));
+        const details = progressNode('span', state.dob ? 'DOB ' + state.dob : 'DOB not entered', 'patient-jump-meta');
+        details.id = 'nav-' + p.root.id + '-details';
+        button.setAttribute('aria-describedby', details.id);
+        const labels = progressLabels(state);
+        details.append(labels);
+        button.append(details);
         if(p.root.dataset.houseId === activeHouseId) button.setAttribute('aria-current', 'page');
         button.addEventListener('click', () => page.openPatient(p));
         groups.get(p.root.dataset.houseId).append(button);
       });
+      jumps.scrollTop = scrollTop;
+      if(focusedId) jumps.querySelector('[data-nav-patient="' + focusedId + '"]')?.focus({preventScroll:true});
+    },
+    reviewItems:() => {
+      const items = [];
+      const houses = page.houseIds();
+      for(const [index, patient] of patients.entries()){
+        const state = patient.progress(), reasons = [];
+        if(state.messageStatus === 'not-copied') reasons.push('Not copied');
+        if(state.messageStatus === 'changed') reasons.push('Changes not copied');
+        if(state.pendingCurrentOffice) reasons.push('Office save pending');
+        const house = 'House ' + (houses.indexOf(patient.root.dataset.houseId) + 1);
+        if(reasons.length) items.push({id:patient.root.id, patient, officeId:state.officeId, name:patient.name() || 'Unnamed patient', dob:state.dob, house, number:index + 1, reasons});
+        state.pendingCopies.forEach((copy, i) => items.push({id:patient.root.id + '-pending-' + i, patient, officeId:copy.officeId, name:copy.name || 'Unnamed earlier patient', dob:copy.dob, house, earlier:true, reasons:['Office save pending', 'Earlier copied visit; original form unavailable']}));
+      }
+      if(patients.length){
+        const state = patients[0].getOffice();
+        if(!state.writable){
+          const current = new Map(state.values.map(o => [o.id, o]));
+          const baseline = new Map(state.baseline.map(o => [o.id, o]));
+          const covered = new Set(items.filter(item => item.reasons.includes('Office save pending')).map(item => item.officeId));
+          for(const id of new Set([...current.keys(), ...baseline.keys()])){
+            if(covered.has(id) || JSON.stringify(current.get(id)) === JSON.stringify(baseline.get(id))) continue;
+            const record = current.get(id) || baseline.get(id);
+            items.push({id:'office-' + id, name:record.name || 'Unnamed saved patient', dob:record.dob, officeOnly:true, reasons:['Office save pending', current.has(id) ? 'Saved entry changes' : 'Entry removal not saved']});
+          }
+          if(state.readFailed || !items.some(item => item.reasons.includes('Office save pending'))){
+            items.push({id:'office-unavailable', name:'Office list', officeOnly:true, reasons:['Office saves could not be confirmed']});
+          }
+        }
+      }
+      return items;
+    },
+    renderShiftReview:() => {
+      const items = page.reviewItems();
+      const signature = JSON.stringify(items.map(({patient, ...item}) => item));
+      if(signature === reviewSignature) return;
+      reviewSignature = signature;
+      document.querySelector('#shiftReviewSummary').textContent = items.length
+        ? items.length + (items.length === 1 ? ' item to review' : ' items to review') + ' before clearing. Open an item to review it without clearing anything.'
+        : 'No uncopied messages, changes after copying, or pending Office saves found.';
+      const list = document.querySelector('#shiftReviewList');
+      const focusedId = document.activeElement?.dataset?.reviewItem;
+      const scrollTop = list.scrollTop || 0;
+      list.replaceChildren();
+      for(const item of items){
+        const li = document.createElement('li');
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn'; button.dataset.reviewItem = item.id;
+        button.append(progressNode('span', (item.number ? item.number + '. ' : '') + item.name, 'patient-jump-name'));
+        const description = [item.house, item.dob ? 'DOB ' + item.dob : '', ...item.reasons].filter(Boolean).join(' · ');
+        button.append(progressNode('span', description, 'patient-jump-meta'));
+        button.append(progressNode('span', item.earlier || item.officeOnly ? 'Open Office to review saves →' : 'Open visit →', 'small'));
+        button.addEventListener('click', () => {
+          clearDialog.close();
+          if(!page.isCurrentShift()) return;
+          if(item.earlier || item.officeOnly){ page.showOffice(); document.querySelector('#retryOfficeSave').focus({preventScroll:true}); }
+          else if(patients.includes(item.patient)){ page.openPatient(item.patient); item.patient.showVisit(); item.patient.focus(); }
+        });
+        li.append(button); list.append(li);
+      }
+      list.hidden = !items.length;
+      list.scrollTop = scrollTop;
+      if(focusedId){
+        const target = list.querySelector('[data-review-item="' + focusedId + '"]');
+        (target || document.querySelector('#cancelClearShift')).focus({preventScroll:true});
+      }
     },
     saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
     saveDraft:() => {
@@ -2464,6 +2595,7 @@ function createPatientPage(){
       activeHouseId = 'house-1';
       document.querySelector('#patientNavigator').open = false;
       generation = nextGeneration;
+      document.querySelector('#patientSearch').value = '';
       if(clearDialog.open) clearDialog.close();
       const cleared = page.cleanupSavedData();
       appDraftSourceBase = draftBase(appDraftBaseline);
@@ -2481,6 +2613,19 @@ function createPatientPage(){
       page.resetShift(nextGeneration, 'Shift cleared. Ready for the next patient.');
     }
   };
+  function progressNode(tag, text, className){
+    const node = document.createElement(tag); node.textContent = text;
+    if(className) node.className = className;
+    return node;
+  }
+  function progressLabels(state){
+    const row = document.createElement('span'); row.className = 'progress-labels';
+    const label = {blank:'Blank visit', 'not-copied':'Not copied', changed:'Changes not copied', copied:'Copied'}[state.messageStatus];
+    row.append(progressNode('span', label, 'progress-label ' + (state.messageStatus === 'copied' ? 'ok' : state.messageStatus === 'blank' ? '' : 'warn')));
+    if(state.officePending) row.append(progressNode('span', 'Office save pending', 'progress-label warn'));
+    else if(state.officeSaved) row.append(progressNode('span', 'Office saved', 'progress-label ok'));
+    return row;
+  }
   const usableDraft = value => {
     if(!object(value)) return false;
     if(object(value.vals) && !value.patients) value.patients = [{vals:value.vals, meta:value.meta}];
@@ -2539,6 +2684,8 @@ function createPatientPage(){
   document.querySelector('#expandPatients').addEventListener('click', () => page.housePatients().forEach(p => p.collapse(false)));
   document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(page.housePatients().at(-1)?.root));
   document.querySelector('#newHouseBtn').addEventListener('click', page.newHouse);
+  document.querySelector('#patientSearch').addEventListener('input', page.renderPatientNavigation);
+  document.querySelector('#clearPatientSearch').addEventListener('click', () => { document.querySelector('#patientSearch').value = ''; page.renderPatientNavigation(); document.querySelector('#patientSearch').focus(); });
   document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
   document.querySelector('#view-office').addEventListener('click', page.showOffice);
   document.querySelector('.workspace-tabs').addEventListener('keydown', e => {
@@ -2548,7 +2695,10 @@ function createPatientPage(){
     const button = document.querySelector(office ? '#view-office' : '#view-patients');
     button.click(); button.focus();
   });
-  document.querySelector('#clearShiftBtn').addEventListener('click', () => { clearError.textContent = ''; clearDialog.showModal(); });
+  document.querySelector('#clearShiftBtn').addEventListener('click', () => {
+    if(!page.isCurrentShift()) return;
+    clearError.textContent = ''; reviewSignature = ''; page.renderShiftReview(); clearDialog.showModal(); document.querySelector('#cancelClearShift').focus();
+  });
   document.querySelector('#cancelClearShift').addEventListener('click', () => clearDialog.close());
   document.querySelector('#confirmClearShift').addEventListener('click', page.clearShift);
   document.querySelector('#retryShiftClear').addEventListener('click', () => {
