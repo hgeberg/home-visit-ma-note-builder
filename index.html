@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.3">
+<meta name="note-builder-version" content="v9.0.4">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -311,7 +311,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.3</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.4</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -622,7 +622,7 @@ function validDob(v){
 /* ---------- default layout ---------- */
 
 function defaultLayout(){
-  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, sections: [
+  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, exposurePresetsVersion:1, allergyPresetsVersion:1, sections: [
     { id:'s_door', tab:'visit', title:'At the door', fields:[
       { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
       { id:'dob', type:'dob', label:'DOB', req:true },
@@ -634,8 +634,8 @@ function defaultLayout(){
       { id:'symptoms', type:'textarea', label:'Symptoms', ph:'Type symptoms or tap common ones',
         chips: chips('+Sore throat, +Cough, +Congestion, +Fever, +Headache, +Ear pain, +Ear pulling, +Nausea, +Vomiting, +Diarrhea, +Rash, +Fussy, +Not sleeping, +Sinus pain') },
       { id:'duration', type:'text', label:'Duration', ph:'2 days', chips: chips('1 day, 2 days, 3 days, 1 week') },
-      { id:'exposure', type:'choice', label:'Exposure', opts:['No','Yes','Unknown'], detail:{ id:'exposureto', on:'Yes', ph:'Exposed to what?' } },
-      { id:'allergies', type:'text', label:'Medication allergies', ph:'Medication or food allergy', chips: chips('NKDA, None') },
+      { id:'exposure', type:'choice', label:'Exposure', opts:['No','Yes','Unknown'], detail:{ id:'exposureto', on:'Yes', ph:'Exposed to what?', chips:chips('+Strep, +Flu, +COVID') } },
+      { id:'allergies', type:'text', label:'Medication allergies', ph:'Medication or food allergy', chips: chips('NKDA') },
       ...recentAntibioticFields(),
       { id:'history', type:'textarea', label:'Medical history', ph:'Relevant history', chips: chips('None') },
       { id:'meds', type:'text', label:'Daily medications', ph:'Medication list', chips: chips('None') },
@@ -747,6 +747,7 @@ function validLayout(t){
   const strings = v => Array.isArray(v) && v.every(x => typeof x === 'string' && x.trim()) && new Set(v).size === v.length;
   const condition = v => v === undefined || (typeof v === 'string' ? Object.prototype.hasOwnProperty.call(WHEN_TEXT, v) : Array.isArray(v) && v.length > 0 && v.every(x => typeof x === 'string' && Object.prototype.hasOwnProperty.call(WHEN_TEXT, x)));
   const optional = (o, key, type) => o[key] === undefined || typeof o[key] === type;
+  const validChips = value => value === undefined || (Array.isArray(value) && value.every(c => obj(c) && typeof c.v === 'string' && c.v.trim() && ['add','fill'].includes(c.m)));
   const sectionIds = new Set(), valueIds = new Set(), testDomIds = new Set(), fields = new Map();
   const addId = (id, set) => { if(!safeId(id) || set.has(id)) return false; set.add(id); return true; };
   if(!obj(t) || !Array.isArray(t.sections) || (t.v !== undefined && !Number.isFinite(t.v)) || (t.base !== undefined && !Number.isFinite(t.base))) return false;
@@ -758,7 +759,7 @@ function validLayout(t){
       if((f.type !== 'mirror' && typeof f.label !== 'string') || !condition(f.when)) return false;
       if(!['ph','cap','im','out','unawareValue','yesValue'].every(k => optional(f, k, 'string')) || !['req','remind','keepLines','underPositive'].every(k => optional(f, k, 'boolean'))) return false;
       if(f.outAlt !== undefined && (!obj(f.outAlt) || typeof f.outAlt.out !== 'string' || !condition(f.outAlt.when))) return false;
-      if(f.chips !== undefined && (!Array.isArray(f.chips) || !f.chips.every(c => obj(c) && typeof c.v === 'string' && c.v.trim() && ['add','fill'].includes(c.m)))) return false;
+      if(!validChips(f.chips)) return false;
       if(f.type === 'choice' && (!strings(f.opts) || !f.opts.length)) return false;
       if(f.opts !== undefined && !strings(f.opts)) return false;
       if(f.unawareValue !== undefined && (f.type !== 'choice' || !f.opts.includes(f.unawareValue))) return false;
@@ -767,6 +768,7 @@ function validLayout(t){
         if(f[key] === undefined) continue;
         const child = f[key];
         if(f.type !== 'choice' || !obj(child) || !addId(child.id, valueIds) || typeof child.on !== 'string' || !f.opts.includes(child.on) || !optional(child, 'ph', 'string') || !optional(child, 'label', 'string')) return false;
+        if(key === 'detail' && !validChips(child.chips)) return false;
         if(key === 'sub' && (!strings(child.opts) || !child.opts.length || (child.out !== undefined && (!obj(child.out) || !Object.entries(child.out).every(([k,v]) => child.opts.includes(k) && typeof v === 'string'))))) return false;
       }
       if(f.type === 'mirror' && !safeId(f.of)) return false;
@@ -831,6 +833,24 @@ function loadLayout(){
   committedLayout = clone(L);
 }
 function normalizeLayout(){
+  if(L.exposurePresetsVersion !== 1){
+    const exposure = fieldById('exposure');
+    if(exposure?.type === 'choice' && exposure.detail){
+      exposure.detail.chips = exposure.detail.chips || [];
+      for(const name of ['Strep', 'Flu', 'COVID']){
+        if(!exposure.detail.chips.some(c => norm(c.v) === norm(name))) exposure.detail.chips.push({v:name, m:'add'});
+      }
+    }
+    L.exposurePresetsVersion = 1;
+  }
+  if(L.allergyPresetsVersion !== 1){
+    const allergies = fieldById('allergies');
+    if(allergies && ['text', 'textarea'].includes(allergies.type)){
+      allergies.chips = (allergies.chips || []).filter(c => norm(c.v) !== 'none');
+      if(!allergies.chips.some(c => norm(c.v) === 'nkda')) allergies.chips.push({v:'NKDA', m:'fill'});
+    }
+    L.allergyPresetsVersion = 1;
+  }
   if(L.symptomPresetsVersion !== 1){
     const symptoms = fieldById('symptoms');
     if(symptoms && ['text', 'textarea'].includes(symptoms.type)){
@@ -1437,19 +1457,21 @@ function textField(f){
     refresh({user:true});
   });
   const parts = [h('label', {class:'flabel', for:id, text:f.label, data:{labelOf:f.id}}), inp];
-  if(f.chips && f.chips.length){
-    const row = h('div', {class:'chips'});
-    for(const c of f.chips){
-      row.append(h('button', {type:'button', class:'chip', text:c.v, 'aria-pressed':'false', data:{for:f.id, v:c.v, mode:c.m}, onclick:() => {
-        const cur = String(V[f.id] || '');
-        V[f.id] = c.m === 'add' ? listToggle(cur, c.v) : (norm(cur) === norm(c.v) ? '' : c.v);
-        inp.value = V[f.id];
-        refresh({user:true});
-      }}));
-    }
-    parts.push(row);
-  }
+  if(f.chips && f.chips.length) parts.push(shortcutRow(f, inp));
   return parts;
+}
+
+function shortcutRow(f, inp, data){
+  const row = h('div', {class:'chips', data});
+  for(const c of f.chips){
+    row.append(h('button', {type:'button', class:'chip', text:c.v, 'aria-pressed':'false', data:{for:f.id, v:c.v, mode:c.m}, onclick:() => {
+      const cur = String(V[f.id] || '');
+      V[f.id] = c.m === 'add' ? listToggle(cur, c.v) : (norm(cur) === norm(c.v) ? '' : c.v);
+      inp.value = V[f.id];
+      refresh({user:true});
+    }}));
+  }
+  return row;
 }
 
 function choiceField(f){
@@ -1468,6 +1490,7 @@ function choiceField(f){
     inp.value = V[d.id] || '';
     inp.addEventListener('input', () => { V[d.id] = inp.value; refresh({user:true}); });
     parts.push(inp);
+    if(d.chips && d.chips.length) parts.push(shortcutRow(d, inp, {detailOf:f.id, detailOn:d.on}));
   }
   if(f.sub){
     const sb = f.sub;

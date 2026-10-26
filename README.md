@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.3.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.4.
+
+Exposure Yes shows Strep, Flu, and COVID shortcuts that can be selected together or combined with typed details. Medication allergies offers NKDA as its default shortcut. Saved forms receive these shortcut updates without changing entered answers.
 
 Symptoms has separate Nausea and Vomiting choices, plus Fussy, Not sleeping, and Sinus pain. Previously saved forms gain these shortcuts while retaining custom choices and all entered symptom text.
 

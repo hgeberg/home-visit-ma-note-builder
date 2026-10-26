@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.4 — exposure shortcuts and one allergy shortcut (October 25, 2026)
+
+Selecting Yes for Exposure reveals Strep, Flu, and COVID shortcuts below the editable exposure details. Multiple shortcuts can be selected together. Selecting No or Unknown hides the shortcuts and excludes the retained exposure details from the message. Medication allergies keeps NKDA and removes the duplicate None shortcut.
+
+Saved forms and recovered draft layouts receive the shortcut updates while retaining custom choices and all entered answers. Release metadata, package version, and the offline cache advance to v9.0.4.
+
+Validation: all 21 existing source checks and three focused output, saved-form, and schema checks passed. Browser checks verified multiple exposure selections, conditional visibility and output for Yes/No/Unknown, retained details when returning to Yes, and the NKDA shortcut.
+
 ## v9.0.3 — separate and additional symptom choices (October 25, 2026)
 
 Replaced the combined Nausea/vomiting shortcut with separate Nausea and Vomiting choices, and added Fussy, Not sleeping, and Sinus pain. Previously saved forms and recovered draft layouts gain the new choices while retaining custom shortcuts. Existing entered symptom text, including Nausea/vomiting, remains unchanged.
