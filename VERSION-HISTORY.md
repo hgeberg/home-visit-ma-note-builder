@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.1.0 — server-verified printing PIN and owner settings (October 26, 2026)
+
+Office tools opens the printing PIN prompt. Instructions are delivered by the Sites backend only after server verification; the public app no longer contains the encrypted instructions or local decryption code. The existing printing PIN is retained initially. Two failed attempts cause a server-enforced 15-minute cooldown. PIN entry keeps ten stars and replaces them one at a time with visible digits.
+
+The owner-only PIN settings page requires the authorized ChatGPT account and changes the printing PIN immediately. The current PIN is never displayed, and changing it preserves active cooldowns. Printing instructions require an internet connection; patient workflows and offline app storage remain browser-local. Release metadata, package version, and the offline cache advance to v9.1.0.
+
+Validation: all 21 reliability checks, 18 existing Office browser checks, seven server-backed printing checks, 23 backend/admin checks, and seven owner-settings browser checks passed. Local database integration verified that an owner PIN update rejects the old PIN and accepts the new one, then restores the synthetic test setting. Public-source scans found no protected credentials or instruction payload.
+
 ## v9.0.9 — replace PIN stars one at a time (October 26, 2026)
 
 The printing PIN field starts with ten stars. Each entered digit replaces one star while remaining visible; deleting digits restores the corresponding stars. Submission and Lock instructions restore all ten stars when clearing the entered PIN. The existing printing PIN and ten-digit input limit remain. Release metadata, package version, and the offline cache advance to v9.0.9.

@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.9">
+<meta name="note-builder-version" content="v9.1.0">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -110,6 +110,8 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .office-reference-list .small{margin-top:2px}
 .office-summary{margin:8px 0;color:var(--muted)}
 .office-printing code{font-size:inherit;overflow-wrap:anywhere}
+.office-printing>summary{cursor:pointer;padding:16px}
+.office-printing-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.7;padding:14px 16px}
 .office-printing-form{display:grid;gap:10px;margin-top:12px}
 .office-printing-unlock{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .office-printing-pin{position:relative;flex:1 1 160px;max-width:180px;min-width:0}
@@ -332,7 +334,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.9</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.1.0</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -377,7 +379,8 @@ dialog.scrim::backdrop{background:transparent}
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
     <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
     <div id="officeContent"></div>
-    <section class="card office-printing" aria-labelledby="officePrintingHeading">
+    <details id="officePrintingTools" class="card office-printing">
+      <summary class="sec-title">Office tools</summary>
       <h3 id="officePrintingHeading" class="sec-title">Print requisitions for Lakewood Field</h3>
       <div id="officePrintingGate" class="pad">
         <p>Enter the printing PIN to view the office-computer instructions.</p>
@@ -391,11 +394,14 @@ dialog.scrim::backdrop{background:transparent}
             <button class="btn primary" type="submit">Unlock instructions</button>
           </div>
           <p id="officePrintingError" class="err" role="alert" hidden></p>
+          <p id="officePrintingStatus" class="small" role="status" tabindex="-1">Connect to check printing access.</p>
+          <button id="officePrintingRetry" class="btn small" type="button" hidden>Retry connection</button>
         </form>
       </div>
       <div id="officePrintingInstructions" class="office-printing-body" role="region" aria-labelledby="officePrintingHeading" tabindex="-1" hidden></div>
       <div id="officePrintingLockRow" class="row pad" hidden><button id="officePrintingLock" class="btn small" type="button">Lock instructions</button></div>
-    </section>
+      <p class="small pad"><a href="https://premier-printing-pin-trial.hgeberg.chatgpt.site/admin" target="_blank" rel="noopener">Manage printing PIN (owner only)</a></p>
+    </details>
   </section>
   <div id="undoNotice" class="banner info undo-notice" hidden><span id="undoText" role="status"></span><button id="undoAction" class="btn" type="button">Undo</button><button id="dismissUndo" class="btn small" type="button" aria-label="Dismiss Undo">Dismiss</button></div>
 </main>
@@ -2816,8 +2822,8 @@ openCurrentApp();
 </script>
 <script>
 (() => {
-  // Only authenticated ciphertext ships with the public app. The PIN is never stored.
-  const encrypted = null; // Archived printing payload removed.
+  const API = 'https://premier-printing-pin-trial.hgeberg.chatgpt.site';
+  const tools = document.getElementById('officePrintingTools');
   const form = document.getElementById('officePrintingForm');
   const pin = document.getElementById('officePrintingPin');
   const stars = document.getElementById('officePrintingStars');
@@ -2826,78 +2832,94 @@ openCurrentApp();
   const lockRow = document.getElementById('officePrintingLockRow');
   const lockButton = document.getElementById('officePrintingLock');
   const error = document.getElementById('officePrintingError');
+  const status = document.getElementById('officePrintingStatus');
+  const retry = document.getElementById('officePrintingRetry');
   const submit = form.querySelector('button[type="submit"]');
-  const bytes = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
-  let attempt = 0;
-  function updatePinStars(){
-    const count = Math.min(pin.value.length, 10);
-    stars.textContent = ' '.repeat(count) + '*'.repeat(10 - count);
+  let state = null, pending = false, serial = 0, statusSerial = 0, active = null, timer = null;
+  const isLocked = () => !!state?.lockedUntil && state.lockedUntil > Date.now();
+  function updateStars(){const count=Math.min(pin.value.length,10);stars.textContent=' '.repeat(count)+'*'.repeat(10-count);}
+  function renderStatus(){
+    const locked=isLocked();
+    pin.disabled=pending||locked;
+    submit.disabled=pending||locked||!state;
+    submit.textContent=pending?'Checking PIN…':locked?'Please wait':'Unlock instructions';
+    if(locked){const seconds=Math.max(0,Math.ceil((state.lockedUntil-Date.now())/1000));status.textContent='Try again in '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')+'.';}
+    else status.textContent=state?state.attemptsRemaining+' '+(state.attemptsRemaining===1?'attempt':'attempts')+' remaining.':'Connect to check printing access.';
   }
-  pin.addEventListener('input', updatePinStars);
-  updatePinStars();
-  function lock(focus = false){
-    attempt++;
-    instructions.replaceChildren();
-    instructions.hidden = true;
-    lockRow.hidden = true;
-    gate.hidden = false;
-    pin.value = '';
-    updatePinStars();
-    pin.removeAttribute('aria-invalid');
-    error.textContent = '';
-    error.hidden = true;
-    submit.disabled = false;
-    submit.textContent = 'Unlock instructions';
-    if(focus) pin.focus();
+  function acceptState(data){
+    if(!data||!Number.isInteger(data.attemptsRemaining)||data.attemptsRemaining<0||data.attemptsRemaining>2||!(data.lockedUntil===null||Number.isFinite(data.lockedUntil)))return false;
+    state={attemptsRemaining:data.attemptsRemaining,lockedUntil:data.lockedUntil};
+    retry.hidden=true;
+    if(timer)clearInterval(timer);
+    timer=null;
+    if(isLocked())timer=setInterval(()=>{
+      if(!isLocked()){clearInterval(timer);timer=null;state=null;refreshStatus();}
+      else renderStatus();
+    },1000);
+    renderStatus();return true;
   }
-  function showError(message){
-    error.textContent = message;
-    error.hidden = false;
-    pin.setAttribute('aria-invalid', 'true');
-    pin.focus();
-  }
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if(submit.disabled) return;
-    error.hidden = true;
-    pin.removeAttribute('aria-invalid');
-    if(!/^[0-9]{1,10}$/.test(pin.value)){
-      showError('Enter the printing PIN using up to 10 digits.');
-      return;
-    }
-    if(!window.crypto?.subtle){
-      showError('Unlocking requires HTTPS or localhost and a browser with secure encryption support.');
-      return;
-    }
-    const current = ++attempt;
-    submit.disabled = true;
-    submit.textContent = 'Unlocking…';
+  function showError(message){error.textContent=message;error.hidden=false;}
+  async function request(path, method='GET', body, controller=new AbortController()){
+    const timeout=setTimeout(()=>controller.abort(),12000);
     try{
-      const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin.value), 'PBKDF2', false, ['deriveKey']);
-      pin.value = '';
-      updatePinStars();
-      const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:bytes(encrypted.salt), iterations:600000, hash:'SHA-256'}, material, {name:'AES-GCM', length:256}, false, ['decrypt']);
-      const plaintext = await crypto.subtle.decrypt({name:'AES-GCM', iv:bytes(encrypted.iv)}, key, bytes(encrypted.ciphertext));
-      if(current !== attempt) return;
-      // This HTML is the fixed, authenticated instructions authored with the app.
-      instructions.innerHTML = new TextDecoder().decode(plaintext);
-      gate.hidden = true;
-      instructions.hidden = false;
-      lockRow.hidden = false;
-      instructions.focus();
+      const response=await fetch(API+path,{method,mode:'cors',credentials:'omit',cache:'no-store',signal:controller.signal,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});
+      const data=await response.json();return {response,data};
+    }finally{clearTimeout(timeout);}
+  }
+  async function refreshStatus(){
+    const current=serial,check=++statusSerial;
+    try{
+      const {response,data}=await request('/api/pin/status');
+      if(current!==serial||check!==statusSerial)return;
+      if(!response.ok||!acceptState(data))throw Error('unavailable');
+      if(!isLocked()){error.hidden=true;error.textContent='';}
     }catch(_){
-      if(current === attempt) showError('Incorrect printing PIN. Try again.');
-    }finally{
-      if(current === attempt){
-        pin.value = '';
-        updatePinStars();
-        submit.disabled = false;
-        submit.textContent = 'Unlock instructions';
+      if(current!==serial||check!==statusSerial)return;
+      state=null;retry.hidden=false;renderStatus();
+      showError('Connect to the internet to unlock printing instructions. If access is unavailable, retry or contact Yaakov Bryks.');
+    }
+  }
+  function lock(focus=false){
+    serial++;active?.abort();active=null;pending=false;
+    instructions.replaceChildren();instructions.hidden=true;lockRow.hidden=true;gate.hidden=false;
+    pin.value='';updateStars();error.textContent='';error.hidden=true;pin.removeAttribute('aria-invalid');renderStatus();
+    if(focus&&!pin.disabled)pin.focus();
+  }
+  pin.addEventListener('input',updateStars);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(pending||isLocked()||!state)return;
+    if(!/^[0-9]{1,10}$/.test(pin.value)){showError('Enter the printing PIN using up to 10 digits.');pin.setAttribute('aria-invalid','true');pin.focus();return;}
+    const entered=pin.value,current=++serial,controller=new AbortController();
+    active=controller;pending=true;pin.value='';updateStars();pin.removeAttribute('aria-invalid');error.hidden=true;renderStatus();
+    let refocus=false;
+    try{
+      const {response,data}=await request('/api/pin/unlock','POST',{pin:entered},controller);
+      if(current!==serial)return;
+      if(!acceptState(data))throw Error('unavailable');
+      if(!response.ok){
+        if(response.status===429)showError('Too many incorrect attempts. Wait for the cooldown before trying again.');
+        else if(response.status===401){showError('Incorrect printing PIN. Try again.');pin.setAttribute('aria-invalid','true');refocus=true;}
+        else if(response.status===409){showError('Printing access changed or another check is finishing. Please try again.');refocus=true;}
+        else throw Error('unavailable');
+        return;
       }
+      if(typeof data.instructions!=='string'||!data.instructions.trim()||data.instructions.length>16384)throw Error('unavailable');
+      instructions.textContent=data.instructions;
+      gate.hidden=true;instructions.hidden=false;lockRow.hidden=false;instructions.focus();
+    }catch(_){
+      if(current!==serial)return;
+      state=null;retry.hidden=false;
+      showError('Printing access is unavailable. Check your connection and retry, or contact Yaakov Bryks.');
+    }finally{
+      if(current===serial){pending=false;active=null;renderStatus();if(refocus&&!pin.disabled)pin.focus();}
     }
   });
-  lockButton.addEventListener('click', () => lock(true));
-  window.addEventListener('pagehide', () => lock());
+  tools.addEventListener('toggle',()=>{if(tools.open){refreshStatus();if(!pin.disabled)pin.focus();}else lock();});
+  retry.addEventListener('click',refreshStatus);
+  lockButton.addEventListener('click',()=>lock(true));
+  window.addEventListener('pagehide',()=>{tools.open=false;lock();});
+  window.addEventListener('pageshow',event=>{if(event.persisted){tools.open=false;lock();}});
+  updateStars();renderStatus();
 })();
 </script>
 </body>
