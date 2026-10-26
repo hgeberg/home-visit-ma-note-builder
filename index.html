@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.5">
+<meta name="note-builder-version" content="v9.0.6">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -109,6 +109,11 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .office-reference-list{margin:0;padding:0 16px 16px 38px;display:grid;gap:10px}
 .office-reference-list .small{margin-top:2px}
 .office-summary{margin:8px 0;color:var(--muted)}
+.office-printing code{font-size:inherit;overflow-wrap:anywhere}
+.office-printing-form{display:grid;gap:10px;margin-top:12px}
+.office-printing-unlock{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.office-printing-unlock .inp{flex:1 1 100px;max-width:180px}
+.office-printing-unlock .btn{flex:1 1 180px}
 .patient-status{min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
 .patient-status.bad{color:var(--danger)}
 .patient-status.warn{color:var(--warn)}
@@ -325,7 +330,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.5</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.6</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -370,6 +375,22 @@ dialog.scrim::backdrop{background:transparent}
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
     <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
     <div id="officeContent"></div>
+    <section class="card office-printing" aria-labelledby="officePrintingHeading">
+      <h3 id="officePrintingHeading" class="sec-title">Print requisitions for Lakewood Field</h3>
+      <div id="officePrintingGate" class="pad">
+        <p>Enter the printing PIN to view the office-computer instructions.</p>
+        <form id="officePrintingForm" class="office-printing-form" novalidate>
+          <label class="flabel" for="officePrintingPin">Printing PIN</label>
+          <div class="office-printing-unlock">
+            <input id="officePrintingPin" class="inp" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required aria-describedby="officePrintingError">
+            <button class="btn primary" type="submit">Unlock instructions</button>
+          </div>
+          <p id="officePrintingError" class="err" role="alert" hidden></p>
+        </form>
+      </div>
+      <div id="officePrintingInstructions" class="office-printing-body" role="region" aria-labelledby="officePrintingHeading" tabindex="-1" hidden></div>
+      <div id="officePrintingLockRow" class="row pad" hidden><button id="officePrintingLock" class="btn small" type="button">Lock instructions</button></div>
+    </section>
   </section>
   <div id="undoNotice" class="banner info undo-notice" hidden><span id="undoText" role="status"></span><button id="undoAction" class="btn" type="button">Undo</button><button id="dismissUndo" class="btn small" type="button" aria-label="Dismiss Undo">Dismiss</button></div>
 </main>
@@ -2786,6 +2807,82 @@ openCurrentApp();
       }
     }, {signal: lifecycle.signal})).catch(() => {});
   } catch (_) {}
+})();
+</script>
+<script>
+(() => {
+  // Only authenticated ciphertext ships with the public app. The PIN is never stored.
+  const encrypted = null; // Archived printing payload removed.
+  const form = document.getElementById('officePrintingForm');
+  const pin = document.getElementById('officePrintingPin');
+  const gate = document.getElementById('officePrintingGate');
+  const instructions = document.getElementById('officePrintingInstructions');
+  const lockRow = document.getElementById('officePrintingLockRow');
+  const lockButton = document.getElementById('officePrintingLock');
+  const error = document.getElementById('officePrintingError');
+  const submit = form.querySelector('button[type="submit"]');
+  const bytes = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
+  let attempt = 0;
+  function lock(focus = false){
+    attempt++;
+    instructions.replaceChildren();
+    instructions.hidden = true;
+    lockRow.hidden = true;
+    gate.hidden = false;
+    pin.value = '';
+    pin.removeAttribute('aria-invalid');
+    error.textContent = '';
+    error.hidden = true;
+    submit.disabled = false;
+    submit.textContent = 'Unlock instructions';
+    if(focus) pin.focus();
+  }
+  function showError(message){
+    error.textContent = message;
+    error.hidden = false;
+    pin.setAttribute('aria-invalid', 'true');
+    pin.focus();
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if(submit.disabled) return;
+    error.hidden = true;
+    pin.removeAttribute('aria-invalid');
+    if(!/^[0-9]{4}$/.test(pin.value)){
+      showError('Enter the four-digit printing PIN.');
+      return;
+    }
+    if(!window.crypto?.subtle){
+      showError('Unlocking requires HTTPS or localhost and a browser with secure encryption support.');
+      return;
+    }
+    const current = ++attempt;
+    submit.disabled = true;
+    submit.textContent = 'Unlocking…';
+    try{
+      const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin.value), 'PBKDF2', false, ['deriveKey']);
+      pin.value = '';
+      const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:bytes(encrypted.salt), iterations:600000, hash:'SHA-256'}, material, {name:'AES-GCM', length:256}, false, ['decrypt']);
+      const plaintext = await crypto.subtle.decrypt({name:'AES-GCM', iv:bytes(encrypted.iv)}, key, bytes(encrypted.ciphertext));
+      if(current !== attempt) return;
+      // This HTML is the fixed, authenticated instructions authored with the app.
+      instructions.innerHTML = new TextDecoder().decode(plaintext);
+      gate.hidden = true;
+      instructions.hidden = false;
+      lockRow.hidden = false;
+      instructions.focus();
+    }catch(_){
+      if(current === attempt) showError('Incorrect printing PIN. Try again.');
+    }finally{
+      if(current === attempt){
+        pin.value = '';
+        submit.disabled = false;
+        submit.textContent = 'Unlock instructions';
+      }
+    }
+  });
+  lockButton.addEventListener('click', () => lock(true));
+  window.addEventListener('pagehide', () => lock());
 })();
 </script>
 </body>

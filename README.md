@@ -1,6 +1,6 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.5.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.6.
 
 Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
 
@@ -14,6 +14,8 @@ Edit saved entry in Office includes Open visit page. It opens the linked patient
 
 Open `index.html` through a local or hosted web server. Installed-app recovery and offline caching require a secure origin (HTTPS, or localhost for testing). Patient information stays in browser storage on that device.
 
+Office includes PIN-protected instructions for printing Lakewood Field requisitions from the office computer. The instructions are encrypted using PBKDF2-SHA256 and AES-256-GCM; the PIN and decrypted content are never saved in browser storage. Lock instructions hides and clears them, and reopening the app requires the PIN again. A four-digit PIN offers limited protection on a public static site because offline guessing remains possible.
+
 ## Regression checks
 
 Use Node 24 and install the pinned test dependency and Chromium:
@@ -23,6 +25,8 @@ npm ci
 npx playwright install --with-deps chromium
 npm test
 ```
+
+`node qa/printing-checks.cjs` runs focused printing-gate checks when `PRINTING_TEST_PIN` is supplied through the process environment. Keep the PIN out of committed files and CI logs.
 
 `npm run test:source` runs deterministic recovery, antibiotic, and service-worker checks without a browser. `node qa/run-checks.cjs storage` runs one browser group; the other groups are `layout`, `features`, and `installed`.
 

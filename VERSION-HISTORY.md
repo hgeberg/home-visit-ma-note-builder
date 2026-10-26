@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.6 — Lakewood Field requisition printing (October 26, 2026)
+
+Added a PIN-protected Office reference card with the office-computer sign-in steps, Microsoft Teams file location, fallback credentials, and contact guidance for printing Lakewood Field requisitions. Only encrypted instructions are included in the public app. Unlocking is temporary; Lock instructions and reopening the app clear the displayed instructions. Release metadata, package version, and the offline cache advance to v9.0.6.
+
+Validation: all 21 deterministic reliability checks, 18 Office browser checks, and four focused printing-gate checks passed. The printing checks cover empty and incorrect PINs, unlocking, no browser-storage changes, locking, reload, keyboard focus, and desktop/320px layouts. A separate check verified exact credential recovery and their absence from the public HTML.
+
 ## v9.0.5 — shift review and searchable patient status (October 26, 2026)
 
 Patients today can be searched by name or DOB across every house, including dates typed without separators. Each result shows its DOB, message-copy state, and relevant Office-save state. Filtering leaves the current house and patient forms unchanged.
