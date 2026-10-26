@@ -26,6 +26,21 @@ const unlock = async page => {
 };
 const focusIs = (page, id) => page.evaluate(expected => document.activeElement?.id === expected, id);
 
+test('PIN entry shows ten placeholder stars and accepts up to ten visible digits', async page => {
+  await locked(page);
+  assert.equal(await pin(page).getAttribute('placeholder'), '*'.repeat(10), 'Empty input shows ten stars');
+  assert.equal(await pin(page).getAttribute('type'), 'text', 'Entered digits remain visible');
+  assert.equal(await pin(page).getAttribute('maxlength'), '10', 'Input allows ten digits');
+  assert.equal(await pin(page).getAttribute('inputmode'), 'numeric', 'Phones offer a numeric keyboard');
+  const tenDigits = '1'.repeat(10);
+  await pin(page).pressSequentially(tenDigits + '1');
+  assert.ok(await pin(page).inputValue() === tenDigits, 'Typing an eleventh digit stops at the ten-digit limit');
+  await pin(page).press('Enter');
+  await page.locator('#officePrintingError').waitFor({state:'visible'});
+  await locked(page);
+  assert.ok(!(await page.locator('#officePrintingError').innerText()).includes('four'), 'Errors do not require a four-digit entry');
+});
+
 test('Office starts locked and empty or incorrect PINs reveal no instructions', async page => {
   await locked(page);
   await pin(page).fill('');

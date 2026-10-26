@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.8 — ten-digit printing PIN entry (October 26, 2026)
+
+The empty printing PIN field shows ten star placeholders and accepts up to ten digits. Entered digits are visible, and the existing printing PIN still unlocks the same encrypted instructions. The entered PIN is cleared after submission and is never saved in browser storage. Validation messages no longer specify a four-digit length. Release metadata, package version, and the offline cache advance to v9.0.8.
+
+Validation: all 21 reliability checks and five printing-gate browser checks passed, including ten-star placeholders, visible entry, the ten-digit typing limit, existing-PIN unlocking, locking/reload, and phone layouts.
+
 ## v9.0.7 — printing contact name (October 26, 2026)
 
 The protected printing instructions now end with “If you have any issues accessing the account or locating the file, please contact Yaakov Bryks.” The same printing PIN unlocks the instructions. Release metadata, package version, and the offline cache advance to v9.0.7.
