@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.3 — separate and additional symptom choices (October 25, 2026)
+
+Replaced the combined Nausea/vomiting shortcut with separate Nausea and Vomiting choices, and added Fussy, Not sleeping, and Sinus pain. Previously saved forms and recovered draft layouts gain the new choices while retaining custom shortcuts. Existing entered symptom text, including Nausea/vomiting, remains unchanged.
+
+Release metadata, package version, and the offline cache advance to v9.0.3.
+
+Validation: all 21 existing source checks passed. Focused checks verified separate symptom output, saved-form upgrades, custom-choice retention, and unchanged historical symptom text. Browser checks confirmed the five choices work independently and update the message preview.
+
 ## v9.0.2 — open linked visits from Office (October 24, 2026)
 
 The Edit saved entry dialog now includes Open visit page. It locates the original form by its saved Office association, opens the correct house, expands the patient, selects Visit, and focuses the patient heading. Matching survives draft recovery and independent name edits, including patients sharing a name and DOB. Navigation retains the current patient answers and does not recopy or change the saved Office entry.

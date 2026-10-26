@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.2">
+<meta name="note-builder-version" content="v9.0.3">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -311,7 +311,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.2</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.3</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -622,7 +622,7 @@ function validDob(v){
 /* ---------- default layout ---------- */
 
 function defaultLayout(){
-  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, sections: [
+  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, sections: [
     { id:'s_door', tab:'visit', title:'At the door', fields:[
       { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
       { id:'dob', type:'dob', label:'DOB', req:true },
@@ -632,7 +632,7 @@ function defaultLayout(){
     ]},
     { id:'s_hx', tab:'visit', title:'Symptoms & history', fields:[
       { id:'symptoms', type:'textarea', label:'Symptoms', ph:'Type symptoms or tap common ones',
-        chips: chips('+Sore throat, +Cough, +Congestion, +Fever, +Headache, +Ear pain, +Ear pulling, +Nausea/vomiting, +Diarrhea, +Rash') },
+        chips: chips('+Sore throat, +Cough, +Congestion, +Fever, +Headache, +Ear pain, +Ear pulling, +Nausea, +Vomiting, +Diarrhea, +Rash, +Fussy, +Not sleeping, +Sinus pain') },
       { id:'duration', type:'text', label:'Duration', ph:'2 days', chips: chips('1 day, 2 days, 3 days, 1 week') },
       { id:'exposure', type:'choice', label:'Exposure', opts:['No','Yes','Unknown'], detail:{ id:'exposureto', on:'Yes', ph:'Exposed to what?' } },
       { id:'allergies', type:'text', label:'Medication allergies', ph:'Medication or food allergy', chips: chips('NKDA, None') },
@@ -831,6 +831,16 @@ function loadLayout(){
   committedLayout = clone(L);
 }
 function normalizeLayout(){
+  if(L.symptomPresetsVersion !== 1){
+    const symptoms = fieldById('symptoms');
+    if(symptoms && ['text', 'textarea'].includes(symptoms.type)){
+      symptoms.chips = (symptoms.chips || []).filter(c => norm(c.v) !== 'nausea/vomiting');
+      for(const name of ['Nausea', 'Vomiting', 'Fussy', 'Not sleeping', 'Sinus pain']){
+        if(!symptoms.chips.some(c => norm(c.v) === norm(name))) symptoms.chips.push({v:name, m:'add'});
+      }
+    }
+    L.symptomPresetsVersion = 1;
+  }
   if(L.recentAntibioticsVersion !== 1){
     for(const section of L.sections){
       const index = section.fields.findIndex(f => f.id === 'abx' && ['text', 'textarea'].includes(f.type));
