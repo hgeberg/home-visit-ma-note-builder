@@ -1,6 +1,6 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.6.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.0.7.
 
 Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
 

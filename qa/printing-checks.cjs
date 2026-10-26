@@ -50,7 +50,7 @@ test('Correct PIN reveals the complete instructions without persisting them', as
       /file that needs to be printed/i.test(text) && /PIN no longer works|PIN.*timed out/i.test(text) &&
       /Other User/i.test(text) && /Username/i.test(text) && /Password/i.test(text) &&
       /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text) &&
-      el.querySelectorAll('code').length >= 3 && /contact me/i.test(text);
+      el.querySelectorAll('code').length >= 3 && /contact Yaakov Bryks/i.test(text);
   });
   assert.ok(complete, 'Unlocked content includes printing, fallback sign-in, and contact instructions');
   assert.ok(await storage(page) === before, 'Unlocking leaves browser storage unchanged');

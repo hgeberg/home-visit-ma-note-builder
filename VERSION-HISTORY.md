@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.7 — printing contact name (October 26, 2026)
+
+The protected printing instructions now end with “If you have any issues accessing the account or locating the file, please contact Yaakov Bryks.” The same printing PIN unlocks the instructions. Release metadata, package version, and the offline cache advance to v9.0.7.
+
+Validation: all 21 reliability checks and four printing-gate browser checks passed, including the updated contact sentence after unlocking.
+
 ## v9.0.6 — Lakewood Field requisition printing (October 26, 2026)
 
 Added a PIN-protected Office reference card with the office-computer sign-in steps, Microsoft Teams file location, fallback credentials, and contact guidance for printing Lakewood Field requisitions. Only encrypted instructions are included in the public app. Unlocking is temporary; Lock instructions and reopening the app clear the displayed instructions. Release metadata, package version, and the offline cache advance to v9.0.6.

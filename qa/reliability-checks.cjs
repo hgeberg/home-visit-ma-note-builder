@@ -46,7 +46,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9.0.6';
+const release='v9.0.7';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
