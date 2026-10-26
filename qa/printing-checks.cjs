@@ -28,17 +28,33 @@ const focusIs = (page, id) => page.evaluate(expected => document.activeElement?.
 
 test('PIN entry shows ten placeholder stars and accepts up to ten visible digits', async page => {
   await locked(page);
-  assert.equal(await pin(page).getAttribute('placeholder'), '*'.repeat(10), 'Empty input shows ten stars');
+  const stars = page.locator('#officePrintingStars');
+  assert.equal(await stars.textContent(), '*'.repeat(10), 'Empty input shows ten stars');
+  await pin(page).pressSequentially('1');
+  assert.equal(await stars.textContent(), ' ' + '*'.repeat(9), 'First digit replaces one star');
+  await pin(page).pressSequentially('2');
+  assert.equal(await stars.textContent(), '  ' + '*'.repeat(8), 'Second digit replaces one more star');
+  await page.setViewportSize({width:320, height:900});
+  const starBox = await stars.boundingBox(), inputBox = await pin(page).boundingBox();
+  assert.ok(starBox.x >= inputBox.x && starBox.x + starBox.width <= inputBox.x + inputBox.width, 'All ten positions fit in the phone input');
+  await page.locator('.office-printing-pin').screenshot({path:path.join(root, 'qa', 'printing-pin-entry.png')});
+  await page.setViewportSize({width:1280, height:900});
+  await pin(page).press('Backspace');
+  assert.equal(await stars.textContent(), ' ' + '*'.repeat(9), 'Deleting a digit restores its star');
+  await pin(page).fill('');
+  assert.equal(await stars.textContent(), '*'.repeat(10), 'Clearing restores all ten stars');
   assert.equal(await pin(page).getAttribute('type'), 'text', 'Entered digits remain visible');
   assert.equal(await pin(page).getAttribute('maxlength'), '10', 'Input allows ten digits');
   assert.equal(await pin(page).getAttribute('inputmode'), 'numeric', 'Phones offer a numeric keyboard');
   const tenDigits = '1'.repeat(10);
   await pin(page).pressSequentially(tenDigits + '1');
   assert.ok(await pin(page).inputValue() === tenDigits, 'Typing an eleventh digit stops at the ten-digit limit');
+  assert.equal((await stars.textContent()).trim(), '', 'Ten digits replace all ten stars');
   await pin(page).press('Enter');
   await page.locator('#officePrintingError').waitFor({state:'visible'});
   await locked(page);
   assert.ok(!(await page.locator('#officePrintingError').innerText()).includes('four'), 'Errors do not require a four-digit entry');
+  assert.equal(await stars.textContent(), '*'.repeat(10), 'Failed unlock restores all stars');
 });
 
 test('Office starts locked and empty or incorrect PINs reveal no instructions', async page => {
@@ -79,6 +95,7 @@ test('Lock clears decrypted content and restores PIN focus, and reload stays loc
   await locked(page);
   assert.ok(await focusIs(page, 'officePrintingPin'), 'Lock returns focus to the PIN field');
   assert.ok(await pin(page).inputValue() === '', 'Lock clears the PIN field');
+  assert.equal(await page.locator('#officePrintingStars').textContent(), '*'.repeat(10), 'Lock restores all ten stars');
   assert.ok(await storage(page) === before, 'Lock leaves browser storage unchanged');
   await unlock(page);
   await page.reload();

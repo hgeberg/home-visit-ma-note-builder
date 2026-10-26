@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.0.8">
+<meta name="note-builder-version" content="v9.0.9">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -112,7 +112,9 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .office-printing code{font-size:inherit;overflow-wrap:anywhere}
 .office-printing-form{display:grid;gap:10px;margin-top:12px}
 .office-printing-unlock{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.office-printing-unlock .inp{flex:1 1 100px;max-width:180px}
+.office-printing-pin{position:relative;flex:1 1 160px;max-width:180px;min-width:0}
+.office-printing-pin .inp,.office-printing-stars{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.5;letter-spacing:.12em}
+.office-printing-stars{position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);white-space:pre;pointer-events:none;color:var(--muted)}
 .office-printing-unlock .btn{flex:1 1 180px}
 .patient-status{min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
 .patient-status.bad{color:var(--danger)}
@@ -330,7 +332,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.0.8</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.0.9</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -382,7 +384,10 @@ dialog.scrim::backdrop{background:transparent}
         <form id="officePrintingForm" class="office-printing-form" novalidate>
           <label class="flabel" for="officePrintingPin">Printing PIN</label>
           <div class="office-printing-unlock">
-            <input id="officePrintingPin" class="inp" type="text" inputmode="numeric" pattern="[0-9]{1,10}" minlength="1" maxlength="10" placeholder="**********" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-describedby="officePrintingError">
+            <div class="office-printing-pin" dir="ltr">
+              <input id="officePrintingPin" class="inp" type="text" inputmode="numeric" pattern="[0-9]{1,10}" minlength="1" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-describedby="officePrintingError">
+              <span id="officePrintingStars" class="office-printing-stars" aria-hidden="true">**********</span>
+            </div>
             <button class="btn primary" type="submit">Unlock instructions</button>
           </div>
           <p id="officePrintingError" class="err" role="alert" hidden></p>
@@ -2815,6 +2820,7 @@ openCurrentApp();
   const encrypted = null; // Archived printing payload removed.
   const form = document.getElementById('officePrintingForm');
   const pin = document.getElementById('officePrintingPin');
+  const stars = document.getElementById('officePrintingStars');
   const gate = document.getElementById('officePrintingGate');
   const instructions = document.getElementById('officePrintingInstructions');
   const lockRow = document.getElementById('officePrintingLockRow');
@@ -2823,6 +2829,12 @@ openCurrentApp();
   const submit = form.querySelector('button[type="submit"]');
   const bytes = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
   let attempt = 0;
+  function updatePinStars(){
+    const count = Math.min(pin.value.length, 10);
+    stars.textContent = ' '.repeat(count) + '*'.repeat(10 - count);
+  }
+  pin.addEventListener('input', updatePinStars);
+  updatePinStars();
   function lock(focus = false){
     attempt++;
     instructions.replaceChildren();
@@ -2830,6 +2842,7 @@ openCurrentApp();
     lockRow.hidden = true;
     gate.hidden = false;
     pin.value = '';
+    updatePinStars();
     pin.removeAttribute('aria-invalid');
     error.textContent = '';
     error.hidden = true;
@@ -2862,6 +2875,7 @@ openCurrentApp();
     try{
       const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin.value), 'PBKDF2', false, ['deriveKey']);
       pin.value = '';
+      updatePinStars();
       const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:bytes(encrypted.salt), iterations:600000, hash:'SHA-256'}, material, {name:'AES-GCM', length:256}, false, ['decrypt']);
       const plaintext = await crypto.subtle.decrypt({name:'AES-GCM', iv:bytes(encrypted.iv)}, key, bytes(encrypted.ciphertext));
       if(current !== attempt) return;
@@ -2876,6 +2890,7 @@ openCurrentApp();
     }finally{
       if(current === attempt){
         pin.value = '';
+        updatePinStars();
         submit.disabled = false;
         submit.textContent = 'Unlock instructions';
       }

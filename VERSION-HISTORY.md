@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.0.9 — replace PIN stars one at a time (October 26, 2026)
+
+The printing PIN field starts with ten stars. Each entered digit replaces one star while remaining visible; deleting digits restores the corresponding stars. Submission and Lock instructions restore all ten stars when clearing the entered PIN. The existing printing PIN and ten-digit input limit remain. Release metadata, package version, and the offline cache advance to v9.0.9.
+
+Validation: all 21 reliability checks and five printing-gate browser checks passed. Checks cover individual star replacement, Backspace/clearing, ten-digit entry, failed-attempt and Lock resets, existing-PIN unlocking, and phone alignment. A cropped phone screenshot confirmed visible digits with trailing stars.
+
 ## v9.0.8 — ten-digit printing PIN entry (October 26, 2026)
 
 The empty printing PIN field shows ten star placeholders and accepts up to ten digits. Entered digits are visible, and the existing printing PIN still unlocks the same encrypted instructions. The entered PIN is cleared after submission and is never saved in browser storage. Validation messages no longer specify a four-digit length. Release metadata, package version, and the offline cache advance to v9.0.8.
