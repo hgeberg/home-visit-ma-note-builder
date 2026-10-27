@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.1.1 — printing browser tracking and access refresh (October 26, 2026)
+
+Office tools shows a short Device code from a random UUID stored only for printing access. Status checks and PIN submissions send the same identifier so the owner can identify a browser when granting extra attempts. The network limit remains enforced by the backend. Blocked browser storage uses an in-memory identifier, and browsers without secure UUID generation retain the original access calls.
+
+During cooldown, the open, visible Office tools panel refreshes server status every 15 seconds to pick up owner changes. Check printing access also refreshes it manually. Closing tools, leaving Office, hiding the page, or submitting a PIN stops polling; returning checks access again. Status responses cannot override newer submissions, and no PIN is automatically retried. Release metadata and the offline cache advance to v9.1.1.
+
+Validation: 21 reliability checks and 11 deterministic printing-controller checks passed without browser automation. Coverage includes identifier persistence, blocked storage, crypto fallbacks, matching GET/POST identity, owner-reset polling, temporary network failures, manual refresh, stale requests, page visibility/navigation, and preserving the browser identifier when clearing a shift. The existing browser regression request assertions also include the identifier.
+
 ## v9.1.0 — server-verified printing PIN and owner settings (October 26, 2026)
 
 Office tools opens the printing PIN prompt. Instructions are delivered by the Sites backend only after server verification; the public app no longer contains the encrypted instructions or local decryption code. The existing printing PIN is retained initially. Two failed attempts cause a server-enforced 15-minute cooldown. PIN entry keeps ten stars and replaces them one at a time with visible digits.

@@ -1,6 +1,6 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.1.0.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.1.1.
 
 Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
 
@@ -14,7 +14,9 @@ Edit saved entry in Office includes Open visit page. It opens the linked patient
 
 Open `index.html` through a local or hosted web server. Installed-app recovery and offline caching require a secure origin (HTTPS, or localhost for testing). Patient information stays in browser storage on that device.
 
-Office tools contains a server-verified PIN prompt for Lakewood Field printing instructions. Instructions are requested from the Sites backend after verification and are never embedded or cached in the public app. Two failures trigger a 15-minute server cooldown; anonymous visitors on a shared network may share that limit. The owner can change the PIN through the backend’s /admin page after ChatGPT sign-in. Printing access requires internet. Historical encrypted copies remain in Git history, so the printing PIN and underlying office credentials should be rotated when retiring those older copies.
+Office tools contains a server-verified PIN prompt for Lakewood Field printing instructions. Instructions are requested from the Sites backend after verification and are never embedded or cached in the public app. Two failures trigger a 15-minute server cooldown; anonymous visitors on a shared network may share that limit. The owner can change the PIN through the backend’s /admin page after ChatGPT sign-in. Printing access requires internet.
+
+Printing access keeps one random browser identifier in its own local-storage key and shows a short Device code beside the PIN prompt. The identifier lets the owner identify a browser when granting extra attempts; it does not bypass the network limit. Storage failures keep the identifier in memory for the current page. During cooldown, an open, visible Office tools panel checks access every 15 seconds so an owner reset can appear without reloading. Check printing access refreshes the state manually. No PIN or instructions are stored, and status checks never retry a PIN.
 
 ## Regression checks
 

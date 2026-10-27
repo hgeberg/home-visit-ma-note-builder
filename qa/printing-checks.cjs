@@ -111,7 +111,10 @@ test('only a successful server response reveals literal text and Lock and reload
   assert.equal(await focused(page, 'officePrintingInstructions'), true);
   assert.equal(await pin(page).inputValue(), '');
   assert.equal(mock.posts.length, 1);
-  assert.deepEqual(mock.posts[0].body, {pin:syntheticPin}, 'Request sends only the printing PIN');
+  assert.deepEqual(Object.keys(mock.posts[0].body).sort(), ['deviceId', 'pin'], 'Request sends the printing PIN and browser identifier only');
+  assert.equal(mock.posts[0].body.pin, syntheticPin);
+  assert.match(mock.posts[0].body.deviceId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  assert.equal(await page.locator('#officePrintingDevice').innerText(), 'Device ' + mock.posts[0].body.deviceId.replace(/-/g, '').slice(0,8).toUpperCase());
   assert.equal(new URL(mock.posts[0].url).search, '', 'No PIN is placed in a URL');
   assert.equal(mock.posts[0].headers.cookie, undefined, 'Public unlock request does not include cookies');
   await noStoredSecrets(page);

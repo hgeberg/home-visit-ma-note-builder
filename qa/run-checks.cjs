@@ -10,7 +10,7 @@ const groups = {
 };
 const selected = process.argv[2];
 if(selected && !Object.hasOwn(groups, selected)) throw Error('Unknown check group: ' + selected);
-const suites = selected ? groups[selected] : ['qa/reliability-checks.cjs', ...Object.values(groups).flat()];
+const suites = selected ? groups[selected] : ['qa/reliability-checks.cjs', 'qa/printing-device-checks.cjs', ...Object.values(groups).flat()];
 let failed = 0;
 for(const suite of suites){
   console.log('\n::group::' + suite);

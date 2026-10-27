@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.1.0">
+<meta name="note-builder-version" content="v9.1.1">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -334,7 +334,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.1.0</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.1.1</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -388,12 +388,13 @@ dialog.scrim::backdrop{background:transparent}
           <label class="flabel" for="officePrintingPin">Printing PIN</label>
           <div class="office-printing-unlock">
             <div class="office-printing-pin" dir="ltr">
-              <input id="officePrintingPin" class="inp" type="text" inputmode="numeric" pattern="[0-9]{1,10}" minlength="1" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-describedby="officePrintingError">
+              <input id="officePrintingPin" class="inp" type="text" inputmode="numeric" pattern="[0-9]{1,10}" minlength="1" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-describedby="officePrintingError officePrintingDevice">
               <span id="officePrintingStars" class="office-printing-stars" aria-hidden="true">**********</span>
             </div>
             <button class="btn primary" type="submit">Unlock instructions</button>
           </div>
           <p id="officePrintingError" class="err" role="alert" hidden></p>
+          <p id="officePrintingDevice" class="small"></p>
           <p id="officePrintingStatus" class="small" role="status" tabindex="-1">Connect to check printing access.</p>
           <button id="officePrintingRetry" class="btn small" type="button" hidden>Retry connection</button>
         </form>
@@ -2832,31 +2833,61 @@ openCurrentApp();
   const lockRow = document.getElementById('officePrintingLockRow');
   const lockButton = document.getElementById('officePrintingLock');
   const error = document.getElementById('officePrintingError');
+  const deviceLabel = document.getElementById('officePrintingDevice');
   const status = document.getElementById('officePrintingStatus');
   const retry = document.getElementById('officePrintingRetry');
+  const officeSection = document.getElementById('officeSection');
   const submit = form.querySelector('button[type="submit"]');
-  let state = null, pending = false, serial = 0, statusSerial = 0, active = null, timer = null;
+  const deviceKey = 'hvnb_current_printing_device_v1';
+  const validDevice = value => typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  function createDeviceId(){
+    try{const value=window.crypto?.randomUUID?.();if(validDevice(value))return value.toLowerCase();}catch(_){}
+    try{
+      const bytes=new Uint8Array(16);window.crypto.getRandomValues(bytes);
+      bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+      const hex=Array.from(bytes,value=>value.toString(16).padStart(2,'0')).join('');
+      return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
+    }catch(_){return null;}
+  }
+  function getDeviceId(){
+    try{const saved=localStorage.getItem(deviceKey);if(validDevice(saved))return saved.toLowerCase();}catch(_){}
+    const value=createDeviceId();
+    if(value)try{localStorage.setItem(deviceKey,value);}catch(_){}
+    return value;
+  }
+  // This random browser label is for owner tracking only, never authentication.
+  const deviceId=getDeviceId();
+  deviceLabel.textContent=deviceId?'Device '+deviceId.replace(/-/g,'').slice(0,8).toUpperCase():'Browser tracking unavailable.';
+  let state = null, pending = false, serial = 0, statusSerial = 0, active = null, statusActive = null, timer = null, pollTimer = null;
   const isLocked = () => !!state?.lockedUntil && state.lockedUntil > Date.now();
+  const toolsVisible = () => tools.open&&!officeSection.hidden&&document.visibilityState==='visible';
+  function stopTimers(){if(timer)clearInterval(timer);if(pollTimer)clearInterval(pollTimer);timer=null;pollTimer=null;}
+  function cancelStatus(){statusSerial++;statusActive?.abort();statusActive=null;}
+  function syncTimers(){
+    stopTimers();
+    if(!toolsVisible()||!isLocked()||pending)return;
+    timer=setInterval(()=>{
+      if(!toolsVisible()){stopTimers();return;}
+      if(!isLocked()){stopTimers();state=null;renderStatus();refreshStatus();}
+      else renderStatus();
+    },1000);
+    pollTimer=setInterval(()=>{if(toolsVisible()&&isLocked()&&!pending&&!statusActive)refreshStatus();},15000);
+  }
   function updateStars(){const count=Math.min(pin.value.length,10);stars.textContent=' '.repeat(count)+'*'.repeat(10-count);}
   function renderStatus(){
     const locked=isLocked();
     pin.disabled=pending||locked;
     submit.disabled=pending||locked||!state;
+    retry.disabled=pending;
     submit.textContent=pending?'Checking PIN…':locked?'Please wait':'Unlock instructions';
     if(locked){const seconds=Math.max(0,Math.ceil((state.lockedUntil-Date.now())/1000));status.textContent='Try again in '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')+'.';}
     else status.textContent=state?state.attemptsRemaining+' '+(state.attemptsRemaining===1?'attempt':'attempts')+' remaining.':'Connect to check printing access.';
   }
   function acceptState(data){
-    if(!data||!Number.isInteger(data.attemptsRemaining)||data.attemptsRemaining<0||data.attemptsRemaining>2||!(data.lockedUntil===null||Number.isFinite(data.lockedUntil)))return false;
+    if(!data||!Number.isSafeInteger(data.attemptsRemaining)||data.attemptsRemaining<0||data.attemptsRemaining>2||!(data.lockedUntil===null||Number.isFinite(data.lockedUntil)))return false;
     state={attemptsRemaining:data.attemptsRemaining,lockedUntil:data.lockedUntil};
-    retry.hidden=true;
-    if(timer)clearInterval(timer);
-    timer=null;
-    if(isLocked())timer=setInterval(()=>{
-      if(!isLocked()){clearInterval(timer);timer=null;state=null;refreshStatus();}
-      else renderStatus();
-    },1000);
-    renderStatus();return true;
+    retry.hidden=false;retry.textContent='Check printing access';
+    syncTimers();renderStatus();return true;
   }
   function showError(message){error.textContent=message;error.hidden=false;}
   async function request(path, method='GET', body, controller=new AbortController()){
@@ -2867,20 +2898,26 @@ openCurrentApp();
     }finally{clearTimeout(timeout);}
   }
   async function refreshStatus(){
-    const current=serial,check=++statusSerial;
+    if(pending||!toolsVisible())return;
+    statusActive?.abort();
+    const current=serial,check=++statusSerial,controller=new AbortController();
+    statusActive=controller;
     try{
-      const {response,data}=await request('/api/pin/status');
+      const {response,data}=await request('/api/pin/status'+(deviceId?'?device='+encodeURIComponent(deviceId):''),'GET',undefined,controller);
       if(current!==serial||check!==statusSerial)return;
       if(!response.ok||!acceptState(data))throw Error('unavailable');
       if(!isLocked()){error.hidden=true;error.textContent='';}
     }catch(_){
       if(current!==serial||check!==statusSerial)return;
-      state=null;retry.hidden=false;renderStatus();
+      if(!isLocked())state=null;
+      syncTimers();retry.hidden=false;retry.textContent='Retry connection';renderStatus();
       showError('Connect to the internet to unlock printing instructions. If access is unavailable, retry or contact Yaakov Bryks.');
+    }finally{
+      if(statusActive===controller)statusActive=null;
     }
   }
   function lock(focus=false){
-    serial++;active?.abort();active=null;pending=false;
+    serial++;active?.abort();active=null;cancelStatus();stopTimers();pending=false;
     instructions.replaceChildren();instructions.hidden=true;lockRow.hidden=true;gate.hidden=false;
     pin.value='';updateStars();error.textContent='';error.hidden=true;pin.removeAttribute('aria-invalid');renderStatus();
     if(focus&&!pin.disabled)pin.focus();
@@ -2890,10 +2927,10 @@ openCurrentApp();
     event.preventDefault();if(pending||isLocked()||!state)return;
     if(!/^[0-9]{1,10}$/.test(pin.value)){showError('Enter the printing PIN using up to 10 digits.');pin.setAttribute('aria-invalid','true');pin.focus();return;}
     const entered=pin.value,current=++serial,controller=new AbortController();
-    active=controller;pending=true;pin.value='';updateStars();pin.removeAttribute('aria-invalid');error.hidden=true;renderStatus();
+    cancelStatus();stopTimers();active=controller;pending=true;pin.value='';updateStars();pin.removeAttribute('aria-invalid');error.hidden=true;renderStatus();
     let refocus=false;
     try{
-      const {response,data}=await request('/api/pin/unlock','POST',{pin:entered},controller);
+      const {response,data}=await request('/api/pin/unlock','POST',{pin:entered,...(deviceId?{deviceId}:{})},controller);
       if(current!==serial)return;
       if(!acceptState(data))throw Error('unavailable');
       if(!response.ok){
@@ -2908,15 +2945,22 @@ openCurrentApp();
       gate.hidden=true;instructions.hidden=false;lockRow.hidden=false;instructions.focus();
     }catch(_){
       if(current!==serial)return;
-      state=null;retry.hidden=false;
+      state=null;stopTimers();retry.hidden=false;retry.textContent='Retry connection';
       showError('Printing access is unavailable. Check your connection and retry, or contact Yaakov Bryks.');
     }finally{
-      if(current===serial){pending=false;active=null;renderStatus();if(refocus&&!pin.disabled)pin.focus();}
+      if(current===serial){pending=false;active=null;syncTimers();renderStatus();if(refocus&&!pin.disabled)pin.focus();}
     }
   });
   tools.addEventListener('toggle',()=>{if(tools.open){refreshStatus();if(!pin.disabled)pin.focus();}else lock();});
   retry.addEventListener('click',refreshStatus);
   lockButton.addEventListener('click',()=>lock(true));
+  function visibilityChanged(){
+    if(!toolsVisible()){cancelStatus();stopTimers();return;}
+    syncTimers();renderStatus();refreshStatus();
+  }
+  document.addEventListener('visibilitychange',visibilityChanged);
+  if(typeof MutationObserver==='function')new MutationObserver(visibilityChanged).observe(officeSection,{attributes:true,attributeFilter:['hidden']});
+  else for(const id of ['view-office','view-patients'])document.getElementById(id).addEventListener('click',visibilityChanged);
   window.addEventListener('pagehide',()=>{tools.open=false;lock();});
   window.addEventListener('pageshow',event=>{if(event.persisted){tools.open=false;lock();}});
   updateStars();renderStatus();

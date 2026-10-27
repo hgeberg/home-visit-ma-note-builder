@@ -46,7 +46,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9.1.0';
+const release='v9.1.1';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
@@ -155,7 +155,7 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
   const ordinary=new MemoryStorage(),tabSession=new MemoryStorage();a=app(ordinary,tabSession,clock,false);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();assert.equal(ordinary.getItem('hvnb_current_app_draft'),null);clock.now+=9*60*60*1000;a=app(ordinary,tabSession,clock,false);assert.equal(a.offered,undefined);
  });
  await check('Clear shift removes both recovery copies and unblocks the next shift',()=>{
-  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};const a=app(local,session,clock);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();a.page.clearShift();assert.equal(local.getItem('hvnb_current_app_draft'),null);assert.equal(session.getItem('hvnb_current_draft'),null);a.lastPatient.vals.name='NEXT SHIFT';a.page.saveDraft();assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).patients[0].vals.name,'NEXT SHIFT');
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};const device='01234567-89ab-4cde-8fab-0123456789ab';local.setItem('hvnb_current_printing_device_v1',device);const a=app(local,session,clock);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();a.page.clearShift();assert.equal(local.getItem('hvnb_current_app_draft'),null);assert.equal(session.getItem('hvnb_current_draft'),null);assert.equal(local.getItem('hvnb_current_printing_device_v1'),device,'Clear shift preserves printing browser identity');a.lastPatient.vals.name='NEXT SHIFT';a.page.saveDraft();assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).patients[0].vals.name,'NEXT SHIFT');
  });
  await check('Inline scripts, service worker and regression scripts parse',()=>{
   const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(m=>!/\bsrc\s*=/.test(m[1]));scripts.forEach((m,i)=>new vm.Script(m[2],{filename:'index-inline-'+i}));new vm.Script(sw,{filename:'sw.js'});
