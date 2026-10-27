@@ -2,4 +2,5 @@ node_modules/
 qa/*.png
 qa/antibiotics/
 qa/houses/
+qa/persistence-review/
 test-results/

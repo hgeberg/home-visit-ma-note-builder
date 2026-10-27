@@ -56,7 +56,7 @@ test('Undo clear transfers pending copied recovery without creating duplicate Of
 });
 test('Undo Office removal restores that entry without overwriting another tab', async(p,c,url)=>{
   await seed(p);await copy(p);const original=(await stored(p))[0];await remove(p);
-  const q=await c.newPage();await q.goto(url);await seed(q,'SYNTHETIC OTHER');await copy(q);
+  const q=await c.newPage();await q.goto(url);await q.getByRole('button',{name:'Start fresh',exact:true}).click();await seed(q,'SYNTHETIC OTHER');await copy(q);
   await p.locator('#undoAction').click();const result=await stored(p);assert.equal(result.length,2);assert.deepEqual(result.find(o=>o.id===original.id),original);
 });
 test('Undo is invalidated by Clear shift, including a shift cleared in another tab', async(p,c,url)=>{

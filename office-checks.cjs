@@ -110,7 +110,7 @@ test('Open visit page retains exact identity across houses, duplicate names, Off
   assert.equal((await records(page)).find(o => o.id === firstId).name, 'TEST RENAMED OFFICE ENTRY');
 });
 
-test('A cleared visit cannot be confused with an unrelated form having the same name and DOB', async ({ page }) => {
+test('A saved cleared visit reopens without confusing another form having the same name and DOB', async ({ page }) => {
   const root = patient(page);
   await fillPatient(root, 'TEST SAME NAME', 'RPP');
   await copyPatient(page, root, 1);
@@ -119,14 +119,20 @@ test('A cleared visit cannot be confused with an unrelated form having the same 
   await fillPatient(root, 'TEST SAME NAME', '4plex');
   await showOffice(page);
   await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
-  assert.equal(await page.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), false);
-  assert.match(await page.getByRole('dialog').innerText(), /visit form is no longer open here/);
+  assert.equal(await page.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), true);
   await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Urine culture');
   await page.getByRole('button', {name:'Save changes', exact:true}).click();
   assert.equal((await records(page))[0].id, id);
   assert.equal((await records(page))[0].overnights, 'Urine culture');
   await showPatients(page);
   assert.equal(await local(root, 'f_overnights').inputValue(), '4plex');
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.getByRole('button', {name:'Open visit page', exact:true}).click();
+  assert.equal(await patients(page).count(), 2);
+  assert.equal(await local(root, 'f_overnights').inputValue(), '4plex');
+  assert.equal(await local(patient(page, 1), 'f_overnights').inputValue(), 'RPP');
+  assert.equal((await draft(page)).patients[1].meta.officeId, id);
 });
 
 test('Keep editing and Escape preserve unsaved Office values before opening a visit', async ({ page }) => {
@@ -399,8 +405,10 @@ test('another open tab receives Office changes without altering its unfinished p
   assert.equal(await local(patient(secondTab), 'f_overnights').inputValue(), 'Uncopied custom test');
   await showOffice(secondTab);
   await cards(secondTab).getByRole('button', {name:'Edit saved entry', exact:true}).click();
-  assert.equal(await secondTab.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), false);
-  await secondTab.getByRole('button', {name:'Cancel', exact:true}).click();
+  assert.equal(await secondTab.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), true);
+  await secondTab.getByRole('button', {name:'Open visit page', exact:true}).click();
+  assert.equal(await local(patient(secondTab), 'f_name').inputValue(), 'TEST SEPARATE TAB DRAFT');
+  assert.equal(await local(patient(secondTab, 1), 'f_name').inputValue(), 'TEST CROSS TAB COPIED');
 });
 
 test('retrying a failed Copy save merges another tab\'s newly saved patient', async ({ page, origin }) => {
@@ -444,6 +452,7 @@ test('retrying a failed removal keeps the deletion and another tab\'s newly save
   const removedId = (await records(page))[0].id;
   const secondTab = await page.context().newPage();
   await secondTab.goto(origin);
+  await secondTab.getByRole('button', {name:'Start fresh', exact:true}).click();
   await fillPatient(patient(secondTab), 'TEST KEEP TAB BETA', 'Urine culture');
   await page.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
@@ -501,6 +510,8 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
 });
 
 (async () => {
+  const selected = tests.filter(entry => !process.env.TEST_FILTER || entry.name.includes(process.env.TEST_FILTER));
+  if (!selected.length) throw Error('No Office browser checks matched ' + process.env.TEST_FILTER);
   const server = http.createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     response.end(fs.readFileSync(path.join(__dirname, 'index.html')));
@@ -511,7 +522,7 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
   let failed = 0;
   try {
     browser = await chromium.launch(launchOptions);
-    for (const entry of tests) {
+    for (const entry of selected) {
       const context = await browser.newContext();
       const errors = [];
       await context.addInitScript(() => {
@@ -546,7 +557,7 @@ test('Office cards and the bottom reference fit desktop and 375px screens', asyn
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));
   }
-  console.log(`\n${tests.length - failed}/${tests.length} Office browser checks passed.`);
+  console.log(`\n${selected.length - failed}/${selected.length} Office browser checks passed.`);
   if (failed) process.exitCode = 1;
 })().catch(error => { console.error(error); process.exitCode = 1; });
 

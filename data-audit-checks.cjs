@@ -29,7 +29,7 @@ async function unreadDraftPage(c,url,{installed=false,kind='session',once=false}
   Object.defineProperty(navigator,'standalone',{configurable:true,value:installed});
   const draft=notes=>JSON.stringify({version:4,t:Date.now()-(notes==='DEVICE'?2000:1000),patients:[{vals:{name:'SYNTHETIC '+notes,notes,k_pa:true}}]});
   sessionStorage.setItem('hvnb_current_draft',draft('WINDOW'));
-  if(installed)localStorage.setItem('hvnb_current_app_draft',draft('DEVICE'));
+  if(installed||kind==='device')localStorage.setItem('hvnb_current_app_draft',draft('DEVICE'));
   const read=Storage.prototype.getItem;
   window.syntheticDraftBytes=()=>({session:read.call(sessionStorage,'hvnb_current_draft'),device:read.call(localStorage,'hvnb_current_app_draft')});
   window.originalDraftBytes=window.syntheticDraftBytes();window.failDraftRead=true;
@@ -66,15 +66,20 @@ test('Repeated failed draft reads keep the original draft intact until a success
  await p.getByRole('button',{name:'Restore this visit',exact:true}).click();assert.equal(await field(p,'name').inputValue(),'SYNTHETIC WINDOW');
 });
 
-for(const kind of ['session','device'])test('Installed '+kind+' draft read failures preserve both copies and recover the selected shift',async(c,url)=>{
- const p=await unreadDraftPage(c,url,{installed:true,kind});
+for(const installed of [false,true])for(const kind of ['session','device'])test((installed?'Installed':'Ordinary')+' '+kind+' draft read failures preserve saved copies and recover the selected shift',async(c,url)=>{
+ const p=await unreadDraftPage(c,url,{installed,kind});
  assert.equal(await p.locator('.patient').count(),0);await p.locator('#retryDraftRead').click();
  await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
  assert.deepEqual(await p.evaluate(()=>window.syntheticDraftBytes()),await p.evaluate(()=>window.originalDraftBytes));
  await p.evaluate(()=>window.failDraftRead=false);await p.locator('#retryDraftRead').click();
- assert.match(await p.locator('dialog[open]').innerText(),/Different saved shifts/);
- await p.getByRole('button',{name:'Restore saved device shift',exact:true}).click();
- assert.equal(await field(p,'name').inputValue(),'SYNTHETIC DEVICE');assert.equal(await field(p,'notes').inputValue(),'DEVICE');
+ if(installed||kind==='device'){
+  assert.match(await p.locator('dialog[open]').innerText(),/Different saved shifts/);
+  await p.getByRole('button',{name:'Restore saved device shift',exact:true}).click();
+  assert.equal(await field(p,'name').inputValue(),'SYNTHETIC DEVICE');assert.equal(await field(p,'notes').inputValue(),'DEVICE');
+ }else{
+  await p.getByRole('button',{name:'Restore this visit',exact:true}).click();
+  assert.equal(await field(p,'name').inputValue(),'SYNTHETIC WINDOW');
+ }
  assert.equal(await p.locator('#draftReadWarning').isVisible(),false);
 });
 
@@ -114,10 +119,10 @@ test('Retry applies pending copied entries from every patient',async(c,url)=>{
  const p=await fresh(c,url);await clipboard(p);await seed(p);await failRead(p);await copy(p);await button(p,'addPatientBtn').click();await seed(p,'SYNTHETIC SECOND','RPP',1);await copy(p,1);await retry(p);assert.equal((await stored(p)).length,2);
 });
 test('Concurrent saved-entry edits preserve fields unchanged by the second editor',async(c,url)=>{
- const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);const q=await fresh(c,url);for(const x of[p,q]){await x.locator('#view-office').click();await x.getByRole('button',{name:'Edit saved entry',exact:true}).click();}await p.locator('[data-local-id="sheet_overnights"]').fill('RPP');await p.getByRole('button',{name:'Save changes',exact:true}).click();await q.locator('[data-local-id="sheet_name"]').fill('SYNTHETIC CORRECTED');await q.getByRole('button',{name:'Save changes',exact:true}).click();const result=await stored(q);assert.equal(result[0].overnights,'RPP');assert.equal(result[0].name,'SYNTHETIC CORRECTED');
+ const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);const q=await fresh(c,url);await q.getByRole('button',{name:'Restore this visit',exact:true}).click();for(const x of[p,q]){await x.locator('#view-office').click();await x.getByRole('button',{name:'Edit saved entry',exact:true}).click();}await p.locator('[data-local-id="sheet_overnights"]').fill('RPP');await p.getByRole('button',{name:'Save changes',exact:true}).click();await q.locator('[data-local-id="sheet_name"]').fill('SYNTHETIC CORRECTED');await q.getByRole('button',{name:'Save changes',exact:true}).click();const result=await stored(q);assert.equal(result[0].overnights,'RPP');assert.equal(result[0].name,'SYNTHETIC CORRECTED');
 });
 test('Retry after write failure merges only locally changed record fields',async(c,url)=>{
- const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);const q=await fresh(c,url);await p.evaluate(()=>{window.failOfficeWrites=true;const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(this===localStorage&&k==='hvnb_current_office'&&window.failOfficeWrites)throw Error('Synthetic quota failure');return original.call(this,k,v);};});await p.locator('#view-office').click();await p.getByRole('button',{name:'Edit saved entry',exact:true}).click();await p.locator('[data-local-id="sheet_name"]').fill('SYNTHETIC RENAMED');await p.getByRole('button',{name:'Save changes',exact:true}).click();await q.locator('#view-office').click();await q.getByRole('button',{name:'Edit saved entry',exact:true}).click();await q.locator('[data-local-id="sheet_overnights"]').fill('RPP');await q.getByRole('button',{name:'Save changes',exact:true}).click();await p.evaluate(()=>window.failOfficeWrites=false);await p.locator('#retryOfficeSave').click();const result=await stored(p);assert.equal(result[0].name,'SYNTHETIC RENAMED');assert.equal(result[0].overnights,'RPP');
+ const p=await fresh(c,url);await clipboard(p);await seed(p);await copy(p);const q=await fresh(c,url);await q.getByRole('button',{name:'Restore this visit',exact:true}).click();await p.evaluate(()=>{window.failOfficeWrites=true;const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(this===localStorage&&k==='hvnb_current_office'&&window.failOfficeWrites)throw Error('Synthetic quota failure');return original.call(this,k,v);};});await p.locator('#view-office').click();await p.getByRole('button',{name:'Edit saved entry',exact:true}).click();await p.locator('[data-local-id="sheet_name"]').fill('SYNTHETIC RENAMED');await p.getByRole('button',{name:'Save changes',exact:true}).click();await q.locator('#view-office').click();await q.getByRole('button',{name:'Edit saved entry',exact:true}).click();await q.locator('[data-local-id="sheet_overnights"]').fill('RPP');await q.getByRole('button',{name:'Save changes',exact:true}).click();await p.evaluate(()=>window.failOfficeWrites=false);await p.locator('#retryOfficeSave').click();const result=await stored(p);assert.equal(result[0].name,'SYNTHETIC RENAMED');assert.equal(result[0].overnights,'RPP');
 });
 test('Corrupt Office JSON stays intact and reports a persistent startup warning',async(c,url)=>{
  const p=await fresh(c,url);const corrupt='{broken synthetic data';await p.evaluate(raw=>localStorage.setItem('hvnb_current_office',raw),corrupt);await p.reload();assert.equal(await p.locator('#officeSaveWarning').getAttribute('hidden'),null);await clipboard(p);await seed(p);await copy(p);await retry(p);assert.equal(await p.evaluate(()=>localStorage.getItem('hvnb_current_office')),corrupt);assert.equal(await p.locator('#officeSaveWarning').getAttribute('hidden'),null);await p.evaluate(()=>localStorage.setItem('hvnb_current_office','[]'));await p.locator('#retryOfficeSave').click();assert.equal((await stored(p))[0].name,'SYNTHETIC AUDIT ONLY');

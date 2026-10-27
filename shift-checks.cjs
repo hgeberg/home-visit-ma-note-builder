@@ -181,6 +181,7 @@ test('clearing resets other tabs including pending copies and unfinished patient
   await fillTwoSaved(page);
   const second = await page.context().newPage();
   await second.goto(origin);
+  await second.getByRole('button', {name:'Start fresh', exact:true}).click();
   await fillPatient(second, 'TEST OTHER TAB PENDING', 'RPP');
   await addPatient(second);
   await fillPatient(second, 'TEST OTHER TAB UNFINISHED', 'Urine culture', 1);

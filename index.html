@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.1.1">
+<meta name="note-builder-version" content="v9.1.2">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -334,7 +334,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.1.1</b> · One page per house. Copy a message to save its overnight tests to Office.</p>
+    <p class="sub"><b>v9.1.2</b> · Visits save on this device. Copy a message with overnight tests to save its complete visit to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -868,7 +868,8 @@ function restoreMeta(value){
 function restorePendingOffice(list, linkCurrent = true){
   if(!Array.isArray(list)) return [];
   return list.filter(p => p && p.values && typeof p.values === 'object' && !Array.isArray(p.values))
-    .map(p => ({values:p.values, meta:linkCurrent && p.current === true ? M : restoreMeta(p.meta)}));
+    .map(p => ({values:p.values, meta:linkCurrent && p.current === true ? M : restoreMeta(p.meta),
+      ...(p.visit && typeof p.visit === 'object' && !Array.isArray(p.visit) ? {visit:p.visit} : {})}));
 }
 
 function secsOf(t){ return L.sections.filter(s => s.tab === t); }
@@ -1871,12 +1872,18 @@ function afterCopy(text, copiedValues = V, copiedMeta = M){
   flash(officeWritable ? msg : 'Copied, but the office list could not be saved in this browser', officeWritable ? '' : 'bad');
 }
 
-function saveCopiedOffice(copiedValues, copiedMeta){
+function copiedVisitSnapshot(vals, meta){
+  return clone({version:1, vals, meta, layout:L, tab, collapsed, preservedAnswers, houseId:root.dataset.houseId});
+}
+
+function saveCopiedOffice(copiedValues, copiedMeta, savedVisit = copiedVisitSnapshot(copiedValues, copiedMeta)){
   if(lifecycle.signal.aborted || !page.isCurrentShift()) return 'Copied';
+  if(!savedVisit || !savedVisit.meta || typeof savedVisit.meta !== 'object' || Array.isArray(savedVisit.meta) || !validLayout(savedVisit.layout)) savedVisit = copiedVisitSnapshot(copiedValues, copiedMeta);
+  savedVisit = {...savedVisit, vals:clone(copiedValues)};
   pendingOfficeSync = pendingOfficeSync.filter(pending => pending.meta !== copiedMeta);
   if(!loadOffice()){
     // Retry needs the exact copied snapshot, even if the form changes afterward.
-    pendingOfficeSync.push({values:JSON.parse(JSON.stringify(copiedValues)), meta:copiedMeta});
+    pendingOfficeSync.push({values:clone(copiedValues), meta:copiedMeta, visit:clone(savedVisit)});
     renderOfficePanel();
     page.officeChanged(root, office);
     return 'Copied';
@@ -1892,17 +1899,17 @@ function saveCopiedOffice(copiedValues, copiedMeta){
       msg = 'Copied. No overnight tests — removed from Office';
     }
   }else if(copiedMeta.officeId){
-    syncOfficeCard(steps, copiedValues, copiedMeta);
+    syncOfficeCard(steps, copiedValues, copiedMeta, savedVisit);
     msg = 'Copied. Overnight tests updated in Office';
   }else{
     const nm = String(copiedValues.name || '').trim(), db = String(copiedValues.dob || '').trim();
-    addToOffice(nm, db, copiedValues, copiedMeta);
+    addToOffice(nm, db, copiedValues, copiedMeta, savedVisit);
     msg = 'Copied. Overnight tests saved to Office';
   }
   return msg;
 }
 
-function syncOfficeCard(steps, vals = V, meta = M){
+function syncOfficeCard(steps, vals = V, meta = M, savedVisit = copiedVisitSnapshot(vals, meta)){
   let changed = false;
   mutateOffice(() => {
     const ov = office.find(o => o.id === meta.officeId);
@@ -1911,6 +1918,7 @@ function syncOfficeCard(steps, vals = V, meta = M){
     const details = officeDetails(vals);
     if(ov.overnights !== details.overnights || ov.bloodreason !== details.bloodreason) changed = true;
     Object.assign(ov, details);
+    ov.visit = {...clone(savedVisit), meta:{...clone(savedVisit.meta), officeId:ov.id}};
     ov.shift = page.generation();
     const nm = String(vals.name || '').trim(), db = String(vals.dob || '').trim();
     if(nm !== ov.name){ ov.name = nm; changed = true; }
@@ -1935,8 +1943,9 @@ function syncVisitSteps(ov, steps){
 
 /* ---------- office list ---------- */
 
-function addToOffice(name, dob, vals = V, meta = M){
+function addToOffice(name, dob, vals = V, meta = M, savedVisit = copiedVisitSnapshot(vals, meta)){
   const visit = { id: uid('v'), name, dob, t: Date.now(), shift:page.generation(), ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
+  visit.visit = {...clone(savedVisit), meta:{...clone(savedVisit.meta), officeId:visit.id}};
   mutateOffice(() => { office.push(visit); });
   meta.officeId = visit.id;
   saveDraft();
@@ -1960,13 +1969,14 @@ function editOfficeVisit(o, pending){
   const err = h('div', {class:'err', role:'alert'});
   const currentValues = () => ({name:f.nameIn.value, dob:f.dobIn.value, overnights:tests.value, bloodreason:reason.value});
   const changedKeys = edited => Object.keys(edited).filter(key => edited[key].trim() !== String(original[key]).trim());
-  const visitAvailable = !!page.patientForOffice(o.id);
+  const visitAvailable = page.canOpenOfficeVisit(o.id);
   const openVisit = () => page.openOfficeVisit(o.id);
   sheet({ title:'Edit saved entry', focus:'#sheet_name', body:[
     'Changes apply to this saved entry. Copying the patient again replaces it with the current visit details.', ...f.nodes,
     h('label', {class:'flabel', for:'sheet_overnights', text:'Overnight tests'}), tests,
     h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason,
-    !visitAvailable ? h('p', {class:'small', text:'This visit form is no longer open here. You can still edit the saved Office entry.'}) : null, err],
+    !visitAvailable ? h('p', {class:'small', text:'A complete visit form was not saved with this older Office entry. You can still edit its saved test details.'})
+      : !page.patientForOffice(o.id) ? h('p', {class:'small', text:'Open visit page restores the answers from the last copied message. Changes made only to this Office entry stay here.'}) : null, err],
     buttons:[ {label:'Save changes', kind:'primary', validate:() => {
                   if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
                   if(f.dobIn.value.trim() && !validDob(f.dobIn.value)){ err.textContent = 'DOB: enter a valid date (MM/DD/YYYY).'; return false; }
@@ -1981,8 +1991,8 @@ function editOfficeVisit(o, pending){
                   flash(officeWritable ? 'Saved changes' : 'Changes could not be saved. Keep this page open', officeWritable ? '' : 'bad'); }},
               {label:'Open visit page', disabled:!visitAvailable, restoreFocus:false, validate:() => {
                 if(!page.isCurrentShift()) return false;
-                if(page.patientForOffice(o.id)) return true;
-                err.textContent = 'This visit form is no longer open here.';
+                if(page.canOpenOfficeVisit(o.id)) return true;
+                err.textContent = 'The saved visit form is no longer available.';
                 return false;
               }, on:() => {
                 const values = currentValues();
@@ -2046,7 +2056,7 @@ function clearVisit(msg){
       const pending = pendingOfficeSync.filter(p => p.meta === savedMeta);
       pendingOfficeSync = pendingOfficeSync.filter(p => p.meta !== savedMeta);
       page.addPatient(root, {vals:savedValues, meta:savedMeta, preservedAnswers:savedAnswers,
-        pendingOfficeSync:pending.map(p => ({values:p.values, meta:p.meta, current:true}))});
+        pendingOfficeSync:pending.map(p => ({values:p.values, meta:p.meta, current:true, ...(p.visit ? {visit:p.visit} : {})}))});
     }else{
       V = savedValues; M = savedMeta; preservedAnswers = savedAnswers;
       setCollapsed(false); renderAll(); saveDraft();
@@ -2078,9 +2088,9 @@ function offerRestore(d, alternative){
     return;
   }
   const count = d.patients.length;
-  const savedAt = page.installedApp ? 'Saved on this device ' + new Date(d.t).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : 'Last change at ' + fmtTime(d.t);
-  sheet({ title:count === 1 ? (page.installedApp ? 'Saved patient on this device' : 'Unfinished patient in this tab') : count + (page.installedApp ? ' patients saved on this device' : ' patients saved in this tab'), dismissable:false,
-    body:[savedAt + '. Restore every patient’s inputs, checklist and separate message? Starting fresh discards patient inputs; saved Office entries and pending Office saves are kept.'],
+  const savedAt = 'Saved on this device ' + new Date(d.t).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
+  sheet({ title:count === 1 ? 'Saved patient on this device' : count + ' patients saved on this device', dismissable:false,
+    body:[savedAt + '. Restore every patient’s inputs, checklist and separate message? Starting fresh clears these forms; saved Office entries, their saved visit copies and pending Office saves are kept.'],
     buttons:[ {label:count === 1 ? 'Restore this visit' : 'Restore all ' + count + ' patients', kind:'primary', on:() => page.restore(d)},
               {label:'Start fresh', kind:'danger', on:() => page.startFresh()} ] });
 }
@@ -2149,7 +2159,7 @@ start();
 return {
   root,
   serialize:() => ({id:root.id, vals:V, meta:M, tab, collapsed, preservedAnswers,
-    ...(pendingOfficeSync.length ? {pendingOfficeSync:pendingOfficeSync.map(p => ({values:p.values, meta:p.meta, current:p.meta === M}))} : {})}),
+    ...(pendingOfficeSync.length ? {pendingOfficeSync:pendingOfficeSync.map(p => ({values:p.values, meta:p.meta, current:p.meta === M, ...(p.visit ? {visit:p.visit} : {})}))} : {})}),
   hasContent:() => hasContent(V) || preservedAnswers.length > 0,
   collapse:setCollapsed,
   name:() => String(V.name || '').trim(),
@@ -2183,7 +2193,7 @@ return {
   renderOffice:renderOfficePanel,
   retryOffice:() => { saveOffice(); if(lifecycle.signal.aborted) return; renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
   retryPendingOffice:() => {
-    for(const pending of pendingOfficeSync.slice()) saveCopiedOffice(pending.values, pending.meta);
+    for(const pending of pendingOfficeSync.slice()) saveCopiedOffice(pending.values, pending.meta, pending.visit);
     saveDraft();
   },
   getLayout:() => L,
@@ -2217,7 +2227,6 @@ function createPatientPage(){
   const readWarning = document.querySelector('#draftReadWarning');
   const key = 'hvnb_current_draft';
   const appDraftKey = 'hvnb_current_app_draft';
-  const installedApp = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
   let appDraftBaseline = null;
   let appDraftWriteBlocked = false;
   let appDraftSourceBase = {revision:null};
@@ -2250,7 +2259,6 @@ function createPatientPage(){
     return contents(a) === contents(b);
   };
   const page = {
-    installedApp,
     isDeviceDraft:value => sameDraft(value, parsedDraft(appDraftBaseline)),
     dialogHosts:document.querySelector('#dialogHosts'),
     officeContent:document.querySelector('#officeContent'),
@@ -2336,9 +2344,20 @@ function createPatientPage(){
       patient.focus();
     },
     patientForOffice:id => typeof id === 'string' && id ? patients.find(p => p.officeId() === id) : null,
+    savedOfficeVisit:id => {
+      const entry = patients[0]?.getOffice().values.find(o => o.id === id && page.matchesShift(o));
+      const visit = entry?.visit;
+      if(!object(visit) || !object(visit.vals) || !object(visit.meta) || visit.meta.officeId !== id || !patients[0].acceptsLayout(visit.layout)) return null;
+      return clone(visit);
+    },
+    canOpenOfficeVisit:id => !!page.patientForOffice(id) || !!page.savedOfficeVisit(id),
     openOfficeVisit:id => {
       if(!page.isCurrentShift()) return false;
-      const patient = page.patientForOffice(id);
+      let patient = page.patientForOffice(id);
+      if(!patient){
+        const saved = page.savedOfficeVisit(id);
+        if(saved) patient = page.addPatient(null, saved, false, true);
+      }
       if(!patient) return false;
       page.openPatient(patient);
       patient.showVisit();
@@ -2494,38 +2513,37 @@ function createPatientPage(){
       const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
       const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
       const empty = patients.length === 1 && !patients[0].hasContent() && !pending;
-      const snapshot = {version:4, revision:Date.now().toString(36) + '-' + Math.random().toString(36).slice(2), shift:generation, t:Date.now(), activeHouseId, layout:patients[0].getLayout(), patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId})), ...(officeRecovery ? {officeRecovery} : {})};
+      const layout = patients[0].getLayout(), serializedLayout = JSON.stringify(layout);
+      const snapshot = {version:4, revision:Date.now().toString(36) + '-' + Math.random().toString(36).slice(2), shift:generation, t:Date.now(), activeHouseId, layout,
+        patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId,
+          ...(JSON.stringify(p.getLayout()) !== serializedLayout ? {layout:p.getLayout()} : {})})), ...(officeRecovery ? {officeRecovery} : {})};
       const serialized = empty ? null : JSON.stringify(snapshot);
-      let sessionSaved = false, appSaved = !installedApp, appConflict = false;
-      if(installedApp){
-        try{
-          const current = window.localStorage.getItem(appDraftKey);
-          // An older app window must not overwrite a newer saved shift.
-          appConflict = appDraftWriteBlocked || current !== appDraftBaseline;
-          if(!appConflict){
-            if(serialized === null) window.localStorage.removeItem(appDraftKey);
-            else window.localStorage.setItem(appDraftKey, serialized);
-            appDraftBaseline = serialized;
-            appDraftSourceBase = draftBase(serialized);
-            appSaved = true;
-          }
-        }catch(e){}
-      }
+      let appSaved = false, appConflict = false;
+      try{
+        const current = window.localStorage.getItem(appDraftKey);
+        // An older browser or app window must not overwrite a newer saved shift.
+        appConflict = appDraftWriteBlocked || current !== appDraftBaseline;
+        if(!appConflict){
+          if(serialized === null) window.localStorage.removeItem(appDraftKey);
+          else window.localStorage.setItem(appDraftKey, serialized);
+          appDraftBaseline = serialized;
+          appDraftSourceBase = draftBase(serialized);
+          appSaved = true;
+        }
+      }catch(e){}
       try{
         if(serialized === null) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, installedApp ? JSON.stringify({...snapshot, appDraftBase:appDraftSourceBase}) : serialized);
-        sessionSaved = true;
+        else window.sessionStorage.setItem(key, JSON.stringify({...snapshot, appDraftBase:appDraftSourceBase}));
       }catch(e){}
-      warning.hidden = installedApp ? appSaved : sessionSaved;
+      warning.hidden = appSaved;
       if(!warning.hidden) warning.textContent = appConflict
-        ? 'Another app window changed the saved shift. This window has not replaced it. Keep this page open and copy your messages before closing it.'
-        : installedApp ? 'This shift could not be saved for reopening. Keep this app open and copy your messages before closing it.'
-        : 'Drafts could not be saved in this tab. Keep this page open and copy each patient’s message before refreshing or closing it.';
+        ? 'Another window changed the saved shift. This window has not replaced it. Keep this page open and copy your messages before closing it.'
+        : 'This shift could not be saved for reopening. Keep this page open and copy your messages before closing it.';
     },
-    addPatient:(after, seed = {}, focus = true) => {
+    addPatient:(after, seed = {}, focus = true, keepSavedLayout = false) => {
       if(!page.isCurrentShift()) return;
       const previous = patients.find(p => p.root === after) || page.housePatients().at(-1) || patients[0];
-      if(previous) seed = Object.assign({}, seed, {layout:clone(previous.getLayout())});
+      if(previous && !keepSavedLayout) seed = Object.assign({}, seed, {layout:clone(previous.getLayout())});
       const root = template.content.firstElementChild.cloneNode(true);
       root.dataset.houseId = typeof seed.houseId === 'string' && /^house-[a-z0-9-]+$/.test(seed.houseId) ? seed.houseId : (previous ? previous.root.dataset.houseId : activeHouseId);
       root.hidden = root.dataset.houseId !== activeHouseId;
@@ -2564,16 +2582,18 @@ function createPatientPage(){
     },
     restore:(draft) => {
       if(!page.isCurrentShift() || !page.matchesShift(draft)) return;
-      if(installedApp){
-        const fromDevice = page.isDeviceDraft(draft);
-        appDraftSourceBase = fromDevice ? draftBase(appDraftBaseline) : (object(draft.appDraftBase) ? draft.appDraftBase : {revision:null});
-        appDraftWriteBlocked = !fromDevice && !matchesBase(appDraftSourceBase, appDraftBaseline);
-      }
-      const layout = patients.length && patients[0].acceptsLayout(draft.layout) ? clone(draft.layout) : null;
+      const fromDevice = page.isDeviceDraft(draft);
+      appDraftSourceBase = fromDevice ? draftBase(appDraftBaseline) : (object(draft.appDraftBase) ? draft.appDraftBase : {revision:null});
+      appDraftWriteBlocked = !fromDevice && !matchesBase(appDraftSourceBase, appDraftBaseline);
+      const acceptsLayout = patients[0].acceptsLayout;
+      const layout = acceptsLayout(draft.layout) ? clone(draft.layout) : null;
       held = true;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
       activeHouseId = 'house-1';
-      for(const seed of draft.patients) page.addPatient(null, layout ? {...seed, layout} : seed, false);
+      for(const seed of draft.patients){
+        const savedLayout = acceptsLayout(seed.layout) ? clone(seed.layout) : layout;
+        page.addPatient(null, savedLayout ? {...seed, layout:savedLayout} : seed, false, true);
+      }
       page.restoreOfficeRecovery(draft);
       held = false;
       document.querySelector('#patientNavigator').open = false;
@@ -2662,7 +2682,7 @@ function createPatientPage(){
   const usableDraft = value => {
     if(!object(value)) return false;
     if(object(value.vals) && !value.patients) value.patients = [{vals:value.vals, meta:value.meta}];
-    return page.matchesShift(value) && Array.isArray(value.patients) && value.patients.length && value.patients.every(p => object(p) && object(p.vals)) && Number.isFinite(value.t) && value.t > 0 && (installedApp || Date.now() - value.t < 8 * 60 * 60 * 1000);
+    return page.matchesShift(value) && Array.isArray(value.patients) && value.patients.length && value.patients.every(p => object(p) && object(p.vals)) && Number.isFinite(value.t) && value.t > 0;
   };
   let draft = null, alternativeDraft = null;
   function readSavedDrafts(){
@@ -2670,7 +2690,7 @@ function createPatientPage(){
     let sessionRaw, deviceRaw = null;
     try{
       sessionRaw = window.sessionStorage.getItem(key);
-      if(installedApp) deviceRaw = window.localStorage.getItem(appDraftKey);
+      deviceRaw = window.localStorage.getItem(appDraftKey);
     }catch(e){
       held = true;
       draftReadBlocked = true;
@@ -2684,15 +2704,13 @@ function createPatientPage(){
     draft = null; alternativeDraft = null;
     const sessionDraft = parsedDraft(sessionRaw);
     if(usableDraft(sessionDraft)) draft = sessionDraft;
-    if(installedApp){
-      appDraftBaseline = deviceRaw;
-      appDraftSourceBase = draftBase(deviceRaw);
-      const saved = parsedDraft(deviceRaw);
-      if(usableDraft(saved)){
-        const diverged = draft && !sameDraft(draft, saved) && !matchesBase(draft.appDraftBase, appDraftBaseline);
-        if(!draft || saved.t >= draft.t){ if(diverged) alternativeDraft = draft; draft = saved; }
-        else if(diverged) alternativeDraft = saved;
-      }
+    appDraftBaseline = deviceRaw;
+    appDraftSourceBase = draftBase(deviceRaw);
+    const saved = parsedDraft(deviceRaw);
+    if(usableDraft(saved)){
+      const diverged = draft && !sameDraft(draft, saved) && !matchesBase(draft.appDraftBase, appDraftBaseline);
+      if(!draft || saved.t >= draft.t){ if(diverged) alternativeDraft = draft; draft = saved; }
+      else if(diverged) alternativeDraft = saved;
     }
     held = !!draft;
     if(generation !== 'initial') page.cleanupSavedData();

@@ -3,7 +3,7 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const groups = {
-  storage:['multi-patient-checks.cjs','office-checks.cjs','shift-checks.cjs','data-audit-checks.cjs','qa/shift-review-checks.cjs'],
+  storage:['multi-patient-checks.cjs','office-checks.cjs','shift-checks.cjs','data-audit-checks.cjs','qa/shift-review-checks.cjs','qa/persistent-visits-checks.cjs'],
   layout:['layout-audit-checks.cjs','browser-audit-checks.cjs','quality-audit-checks.cjs'],
   features:['improvements-checks.cjs','house-checks.cjs','antibiotic-checks.cjs','qa/message-rail-checks.cjs'],
   installed:['webapp-checks.cjs']

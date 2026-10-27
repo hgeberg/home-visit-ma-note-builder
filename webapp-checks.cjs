@@ -86,7 +86,7 @@ test('Durable recovery works when session storage itself cannot save',async(p,c,
 test('A stale app window cannot overwrite another window’s newer saved shift',async(p,c,url)=>{
  await seed(p);await flush(p);const q=await c.newPage();await q.goto(url);
  await field(p,'f_symptoms').fill('SYNTHETIC NEWEST SAVED HISTORY');await flush(p);await restore(q);await flush(q);
- assert.equal(await q.locator('#draftWarning').isVisible(),true);assert.match(await q.locator('#draftWarning').innerText(),/Another app window/);assert.equal((await backup(q)).patients[0].vals.symptoms,'SYNTHETIC NEWEST SAVED HISTORY');
+ assert.equal(await q.locator('#draftWarning').isVisible(),true);assert.match(await q.locator('#draftWarning').innerText(),/Another window/);assert.equal((await backup(q)).patients[0].vals.symptoms,'SYNTHETIC NEWEST SAVED HISTORY');
 });
 
 test('Reloading a conflicted window keeps both drafts and cannot replace the device shift',async(p,c,url)=>{
@@ -114,11 +114,11 @@ test('Pending copied Office recovery survives closing and can be retried after r
  const q=await c.newPage();await q.goto(url);await restore(q);await q.locator('#retryOfficeSave').click();await q.waitForFunction(()=>JSON.parse(localStorage.getItem('hvnb_current_office')||'[]').length===1);assert.equal((await q.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_office'))))[0].name,'SYNTHETIC APP ALPHA');
 });
 
-test('A regular Safari-style tab keeps its independent session behavior',async(p,c,url,browser)=>{
+test('A regular Safari-style tab restores complete visits from persistent storage',async(p,c,url,browser)=>{
  await seed(p);await flush(p);
  const plain=await browser.newContext({serviceWorkers:'block'}),q=await plain.newPage();
- await q.goto(url);await seed(q,'SYNTHETIC BROWSER TAB');await flush(q);assert.equal(await backup(q),null);await q.close();
- const r=await plain.newPage();await r.goto(url);assert.equal(await r.getByRole('button',{name:/^Restore/}).count(),0);assert.equal(await field(r,'f_name').inputValue(),'');await plain.close();
+ await q.goto(url);await seed(q,'SYNTHETIC BROWSER TAB');await flush(q);assert.equal((await backup(q)).patients[0].vals.name,'SYNTHETIC BROWSER TAB');await q.close();
+ const r=await plain.newPage();await r.goto(url);assert.equal(await r.getByRole('button',{name:/^Restore/}).count(),1);await restore(r);assert.equal(await field(r,'f_name').inputValue(),'SYNTHETIC BROWSER TAB');await plain.close();
 });
 
 test('Standard standalone display-mode detection enables durable recovery',async(p,c,url,browser)=>{

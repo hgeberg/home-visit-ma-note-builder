@@ -1,5 +1,15 @@
 # Home Visit MA Note Builder versions
 
+## v9.1.2 — persistent browser visits and complete Office saves (October 27, 2026)
+
+Ordinary browser tabs now save the complete shift persistently on this device, using the same recovery as the installed Home Screen app. Reopening restores patient answers, houses, checklists, copied-message history, and pending Office work without the former eight-hour cutoff. Legacy tab drafts migrate when restored. Storage-read failures preserve the saved copies, failed persistent writes show a warning, and older windows cannot overwrite a newer saved shift.
+
+Copying a message with overnight tests saves a complete visit copy with its Office entry. Open visit page opens the existing linked patient or restores that saved copy after Start fresh or Clear this patient, retaining its original identity, house, layout, answers, and copied-message history. Pending Office retries keep the exact copied snapshot even after later edits. Different saved form layouts survive subsequent reopening. Office-only edits stay separate from the saved visit answers; copying the visit again updates its saved copy.
+
+Older Office entries without complete visit copies remain editable and explain why the full visit is unavailable. Start fresh and Clear this patient retain Office entries and their saved copies; Clear shift removes the forms, recovery copies, and Office records for that shift. Browser-data removal still erases local information. Release metadata, package version, and the offline cache advance to v9.1.2.
+
+Validation: 22 deterministic reliability checks, 11 printing-controller checks, and 178 browser cases passed across full and targeted runs. Coverage includes regular-tab and installed recovery, three-day-old visits, exact copied snapshots through pending saves and Undo, mixed legacy layouts, conflicting windows, storage failures, and clearing every recovery copy. A disposable Chrome profile retained a previously saved complete visit and Office entry after forced shutdown and restart. The header and archived Office editor were visually checked at 320px. Physical iPhone/iPad Safari remains outside automated coverage.
+
 ## v9.1.1 — printing browser tracking and access refresh (October 26, 2026)
 
 Office tools shows a short Device code from a random UUID stored only for printing access. Status checks and PIN submissions send the same identifier so the owner can identify a browser when granting extra attempts. The network limit remains enforced by the backend. Blocked browser storage uses an in-memory identifier, and browsers without secure UUID generation retain the original access calls.

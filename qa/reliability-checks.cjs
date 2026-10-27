@@ -46,7 +46,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9.1.1';
+const release='v9.1.2';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
@@ -150,9 +150,15 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
  await check('Durable failures stay visible even when session saving succeeds',()=>{
   const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};const a=app(local,session,clock);const write=local.setItem.bind(local);local.setItem=(k,v)=>{if(k==='hvnb_current_app_draft')throw Error('Synthetic quota');write(k,v);};a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();assert(session.getItem('hvnb_current_draft'));assert.equal(a.document.querySelector('#draftWarning').hidden,false);
  });
- await check('Installed recovery survives three days while ordinary tabs remain session-only',()=>{
-  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};let a=app(local,session,clock);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();clock.now+=3*24*60*60*1000;a=app(local,new MemoryStorage(),clock);assert.equal(a.offered.patients[0].vals.name,'SYNTHETIC');
-  const ordinary=new MemoryStorage(),tabSession=new MemoryStorage();a=app(ordinary,tabSession,clock,false);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();assert.equal(ordinary.getItem('hvnb_current_app_draft'),null);clock.now+=9*60*60*1000;a=app(ordinary,tabSession,clock,false);assert.equal(a.offered,undefined);
+ for(const installed of [false,true])await check((installed?'Installed app':'Ordinary browser')+' restores complete copied visits after three days and a new session',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};
+  const meta={sentAt:900,sentText:'Patient: SYNTHETIC\nNotes: COMPLETE SAVED VISIT',sentVals:{name:'SYNTHETIC',notes:'COMPLETE SAVED VISIT'},officeId:'synthetic-office'};
+  session.setItem('hvnb_current_draft',JSON.stringify({version:4,t:900,patients:[{vals:{name:'SYNTHETIC',notes:'COMPLETE SAVED VISIT',k_pa:true},meta}]}));
+  let a=app(local,session,clock,installed);a.page.restore(a.offered);a.page.saveDraft();
+  assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).patients[0].vals.notes,'COMPLETE SAVED VISIT');
+  clock.now+=3*24*60*60*1000;a=app(local,new MemoryStorage(),clock,installed);
+  assert.equal(a.offered.patients[0].vals.name,'SYNTHETIC');assert.equal(a.offered.patients[0].vals.k_pa,true);
+  assert.deepEqual(a.offered.patients[0].meta,meta);a.page.restore(a.offered);assert.equal(a.lastPatient.vals.notes,'COMPLETE SAVED VISIT');
  });
  await check('Clear shift removes both recovery copies and unblocks the next shift',()=>{
   const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};const device='01234567-89ab-4cde-8fab-0123456789ab';local.setItem('hvnb_current_printing_device_v1',device);const a=app(local,session,clock);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();a.page.clearShift();assert.equal(local.getItem('hvnb_current_app_draft'),null);assert.equal(session.getItem('hvnb_current_draft'),null);assert.equal(local.getItem('hvnb_current_printing_device_v1'),device,'Clear shift preserves printing browser identity');a.lastPatient.vals.name='NEXT SHIFT';a.page.saveDraft();assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).patients[0].vals.name,'NEXT SHIFT');

@@ -253,7 +253,7 @@ test('clearing warns about uncopied changes and never saves an uncopied patient 
   assert.deepEqual(await office(page), []);
 });
 
-test('session-storage quota failure warns visibly and preserves both patients in memory', async ({ page }) => {
+test('persistent-storage quota failure warns visibly and preserves both patients in memory', async ({ page }) => {
   await fillPatient(patient(page, 0), 'TEST QUOTA ALPHA', 'alpha before quota');
   await addAfter(page, 0);
   await fillPatient(patient(page, 1), 'TEST QUOTA BETA', 'beta before quota');
@@ -261,14 +261,14 @@ test('session-storage quota failure warns visibly and preserves both patients in
   await page.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (this === sessionStorage && key === 'hvnb_current_draft') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
+      if (this === localStorage && key === 'hvnb_current_app_draft') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
   await local(patient(page, 0), 'f_symptoms').fill('alpha kept despite quota');
   await local(patient(page, 1), 'f_symptoms').fill('beta kept despite quota');
   await page.locator('#draftWarning').waitFor({ state: 'visible' });
-  assert.match(await page.locator('#draftWarning').innerText(), /Drafts could not be saved/);
+  assert.match(await page.locator('#draftWarning').innerText(), /could not be saved for reopening/);
   assert.equal(await patients(page).count(), 2);
   assert.equal(await local(patient(page, 0), 'f_symptoms').inputValue(), 'alpha kept despite quota');
   assert.equal(await local(patient(page, 1), 'f_symptoms').inputValue(), 'beta kept despite quota');

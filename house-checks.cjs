@@ -107,7 +107,13 @@ test('An empty new house survives reload and incomplete house metadata falls bac
   assert.equal(await field(p,'f_name',1).inputValue(),'');
   const saved=await draft(p);saved.activeHouseId='missing-house';
   saved.patients[0].houseId='invalid-house <script>';delete saved.patients[1].houseId;
-  const q=await c.newPage();await q.addInitScript(value=>sessionStorage.setItem('hvnb_current_draft',JSON.stringify(value)),saved);
+  // Seed both recovery copies so this case exercises invalid house metadata,
+  // rather than choosing between the original device shift and a changed tab.
+  const q=await c.newPage();await q.addInitScript(value=>{
+    const raw=JSON.stringify(value);
+    sessionStorage.setItem('hvnb_current_draft',raw);
+    localStorage.setItem('hvnb_current_app_draft',raw);
+  },saved);
   await q.goto(url);await restore(q);
   assert.equal(await q.locator('#houseHeading').innerText(),'House 1');assert.equal(await visibleCount(q),2);
   assert.equal(await field(q,'f_name').inputValue(),'SYNTHETIC ALPHA');
@@ -151,7 +157,7 @@ test('Collapse controls affect the current house and opening history expands its
 
 test('Clear shift removes every house and starts one blank page with history collapsed',async(p,c,url)=>{
   await seed(p,'SYNTHETIC ALPHA');await p.locator('#newHouseBtn').click();await seed(p,'SYNTHETIC BETA',1);
-  const q=await c.newPage();await q.goto(url);await seed(q,'SYNTHETIC OTHER TAB');
+  const q=await c.newPage();await q.goto(url);await q.getByRole('button',{name:'Start fresh',exact:true}).click();await seed(q,'SYNTHETIC OTHER TAB');
   await p.locator('#patientNavSummary').click();
   await p.locator('#clearShiftBtn').click();await p.locator('#confirmClearShift').click();
   await q.waitForFunction(()=>document.querySelector('[data-local-id="f_name"]').value==='');

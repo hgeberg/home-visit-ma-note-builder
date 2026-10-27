@@ -61,7 +61,15 @@ test('Old drafts preserve free text without inferring Yes and retain explicit No
   delete layout.recentAntibioticsVersion;
   for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx){delete abx.yesValue;Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}}
   const old={version:3,t:Date.now(),layout,patients:['No','None','Amoxicillin finished last week','Unknown'].map((abx,i)=>({vals:{name:'SYNTHETIC LEGACY '+i,abx},layout}))};
-  const q=await c.newPage();await q.addInitScript(value=>{if(!sessionStorage.getItem('hvnb_current_draft'))sessionStorage.setItem('hvnb_current_draft',JSON.stringify(value));},old);
+  const q=await c.newPage();await q.addInitScript(value=>{
+    if(!sessionStorage.getItem('hvnb_current_draft')){
+      // This case migrates one old shift, rather than choosing between it and
+      // the newer browser-wide shift used to obtain the layout fixture.
+      const raw=JSON.stringify(value);
+      sessionStorage.setItem('hvnb_current_draft',raw);
+      localStorage.setItem('hvnb_current_app_draft',raw);
+    }
+  },old);
   await q.goto(url);await restore(q);
   for(const n of [0,1])assert.equal(await choice(q,'No',n).getAttribute('aria-checked'),'true');
   for(const n of [2,3]){
@@ -78,7 +86,7 @@ test('Saved layouts gain the workflow without removing unrelated customization',
   await seed(p);const layout=(await flush(p)).layout;delete layout.recentAntibioticsVersion;
   for(const section of layout.sections){section.fields=section.fields.filter(f=>!['abx_name','abx_when'].includes(f.id));const abx=section.fields.find(f=>f.id==='abx');if(abx){delete abx.yesValue;Object.assign(abx,{type:'text',chips:[{v:'No',m:'fill'},{v:'None',m:'fill'}]});}}
   layout.sections[0].title='SYNTHETIC CUSTOM SECTION';
-  const q=await c.newPage();await q.goto(url);await q.evaluate(value=>localStorage.setItem('hvnb_current_layout',JSON.stringify(value)),layout);await q.reload();
+  const q=await c.newPage();await q.goto(url);await q.getByRole('button',{name:'Start fresh',exact:true}).click();await q.evaluate(value=>localStorage.setItem('hvnb_current_layout',JSON.stringify(value)),layout);await q.reload();
   assert.equal(await choice(q,'Yes').count(),1);assert.equal(await q.getByRole('heading',{name:'SYNTHETIC CUSTOM SECTION',exact:true}).count(),1);
   await choice(q,'Yes').click();await field(q,'f_abx_name').fill('Custom history medicine');await field(q,'f_abx_when').fill('Last week');await flush(q);
   await q.reload();await restore(q);assert.equal(await field(q,'f_abx_name').inputValue(),'Custom history medicine');

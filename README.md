@@ -1,6 +1,10 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.1.1.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.1.2.
+
+Complete shifts now save persistently on this device in ordinary browser tabs as well as the installed app. Reopening offers all patient answers, checklists, copied-message history, and houses without an eight-hour cutoff. Storage failures and conflicting windows remain visible; an older window cannot overwrite a newer saved shift.
+
+Copying a message with overnight tests saves a complete visit snapshot with its Office entry. Open visit page uses the current form when available, or reopens the saved copy after starting fresh or clearing a patient. The saved copy contains the answers from the last copied message; edits made only in Office stay in Office. Older test-only entries cannot recover answers they never saved. Start fresh and Clear this patient retain Office entries and their saved visit copies; Clear shift removes the shift's forms, recovery copies, and Office entries. Browser/device data clearing still removes local data; there is no patient-data cloud backup.
 
 Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
 
@@ -10,9 +14,9 @@ Symptoms has separate Nausea and Vomiting choices, plus Fussy, Not sleeping, and
 
 The website has a fixed form. Layout editing, field/section changes, and layout import/export/reset controls are removed. Form changes are made in the source. Previously saved forms and draft form snapshots remain readable, and Office saved-entry editing remains available.
 
-Edit saved entry in Office includes Open visit page. It opens the linked patient’s Visit tab, changing houses and expanding the form as needed. Cleared or unavailable forms are explained in the editor. Unsaved Office edits require confirmation before navigating away.
+Edit saved entry in Office includes Open visit page. It opens the linked patient’s Visit tab, changing houses and expanding the form as needed, or restores its saved visit copy when the original form is no longer open. Older entries without complete copies are explained in the editor. Unsaved Office edits require confirmation before navigating away.
 
-Open `index.html` through a local or hosted web server. Installed-app recovery and offline caching require a secure origin (HTTPS, or localhost for testing). Patient information stays in browser storage on that device.
+Open `index.html` through a local or hosted web server. Offline caching requires a secure origin (HTTPS, or localhost for testing). Patient information stays in browser storage on that device in both regular tabs and the installed app.
 
 Office tools contains a server-verified PIN prompt for Lakewood Field printing instructions. Instructions are requested from the Sites backend after verification and are never embedded or cached in the public app. Two failures trigger a 15-minute server cooldown; anonymous visitors on a shared network may share that limit. The owner can change the PIN through the backend’s /admin page after ChatGPT sign-in. Printing access requires internet.
 
