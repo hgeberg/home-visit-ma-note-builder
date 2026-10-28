@@ -50,9 +50,9 @@ test('The undecided recovery dialog cannot overwrite the saved shift with a blan
  const r=await c.newPage();await r.goto(url);await restore(r);assert.equal(await field(r,'f_name').inputValue(),'SYNTHETIC APP ALPHA');
 });
 
-test('Start fresh discards saved forms while retaining copied Office entries',async(p,c,url)=>{
+test('Start fresh clears active forms while retaining Patients Seen and copied Office entries',async(p,c,url)=>{
  await seed(p);await field(p,'f_overnights').fill('RPP');await copy(p);await p.close();
- const q=await c.newPage();await q.goto(url);await q.getByRole('button',{name:'Start fresh',exact:true}).click();assert.equal(await backup(q),null);
+ const q=await c.newPage();await q.goto(url);await q.getByRole('button',{name:'Start fresh',exact:true}).click();assert.equal((await backup(q)).seenVisits[0].vals.name,'SYNTHETIC APP ALPHA');assert.deepEqual((await backup(q)).patients[0].vals,{});
  await q.locator('#view-office').click();assert.equal(await q.locator('.office-patient').count(),1);await q.close();
  const r=await c.newPage();await r.goto(url);assert.equal(await r.getByRole('button',{name:/^Restore/}).count(),0);assert.equal(await field(r,'f_name').inputValue(),'');
 });

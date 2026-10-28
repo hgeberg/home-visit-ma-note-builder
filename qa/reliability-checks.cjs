@@ -46,7 +46,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9.1.2';
+const release='v9.2.0';
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
@@ -158,10 +158,69 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
   assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).patients[0].vals.notes,'COMPLETE SAVED VISIT');
   clock.now+=3*24*60*60*1000;a=app(local,new MemoryStorage(),clock,installed);
   assert.equal(a.offered.patients[0].vals.name,'SYNTHETIC');assert.equal(a.offered.patients[0].vals.k_pa,true);
-  assert.deepEqual(a.offered.patients[0].meta,meta);a.page.restore(a.offered);assert.equal(a.lastPatient.vals.notes,'COMPLETE SAVED VISIT');
+  assert.deepEqual(a.offered.patients[0].meta,{...meta,seenAt:900});a.page.restore(a.offered);assert.equal(a.lastPatient.vals.notes,'COMPLETE SAVED VISIT');
  });
  await check('Clear shift removes both recovery copies and unblocks the next shift',()=>{
   const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000};const device='01234567-89ab-4cde-8fab-0123456789ab';local.setItem('hvnb_current_printing_device_v1',device);const a=app(local,session,clock);a.lastPatient.vals.name='SYNTHETIC';a.page.saveDraft();a.page.clearShift();assert.equal(local.getItem('hvnb_current_app_draft'),null);assert.equal(session.getItem('hvnb_current_draft'),null);assert.equal(local.getItem('hvnb_current_printing_device_v1'),device,'Clear shift preserves printing browser identity');a.lastPatient.vals.name='NEXT SHIFT';a.page.saveDraft();assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).patients[0].vals.name,'NEXT SHIFT');
+ });
+ await check('Height joins the vitals output, including zero feet and fractional inches, without extra lines',()=>{
+  const p=abxEnv();
+  for(const [feet,inches] of [['5','10'],['6','0'],['0','8.5']]){
+   const result=p.buildOutput({name:'SYNTHETIC',temp:'98.6',height_ft:feet,height_in:inches,weight:'120'});
+   assert(result.text.includes('Height: '+feet+' ft '+inches+' in'));
+   assert(!result.text.includes('Height feet:'));assert(!result.text.includes('Height inches:'));
+   assert(!result.issues.some(issue=>issue.startsWith('Height:')));
+  }
+  for(const values of [{},{height_ft:'5'},{height_in:'10'},{height_ft:'5',height_in:'12'},{height_ft:'5',height_in:'-1'}]){
+   const result=p.buildOutput({name:'SYNTHETIC',...values});
+   assert(!result.text.includes('Height:'));
+   assert.equal(result.issues.some(issue=>issue.startsWith('Height:')),Object.keys(values).length>0);
+  }
+ });
+ await check('Older saved vital layouts gain height once without replacing entered values or custom fields',()=>{
+  const p=abxEnv(),vitals=p.layout.sections.find(s=>s.id==='s_vitals');
+  delete p.layout.heightFieldsVersion;vitals.fields=vitals.fields.filter(f=>!f.id.startsWith('height_'));
+  vitals.fields.push({id:'synthetic_vital',type:'text',label:'Synthetic vital'});
+  p.normalizeLayout();p.normalizeLayout();
+  for(const id of ['height_ft','height_in','synthetic_vital'])assert.equal(vitals.fields.filter(f=>f.id===id).length,1);
+  const values=p.reconcileValues({temp:'98.6',weight:'120',synthetic_vital:'KEEP',height_ft:'5',height_in:'4'},p.layout);
+  assert.equal(values.synthetic_vital,'KEEP');assert.equal(values.temp,'98.6');assert.equal(values.height_in,'4');
+ });
+ await check('A no-test visit archive survives blank forms, closing every tab, Restore, and Start fresh',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:2000};let a=app(local,session,clock,false);
+  const visit={meta:{visitId:'visit-synthetic-no-tests',seenAt:1000},vals:{name:'SYNTHETIC NO TESTS',notes:'KEEP ALL ANSWERS',height_ft:'5',height_in:'10',k_confirm:true},layout:a.lastPatient.getLayout(),houseId:'house-previous'};
+  a.page.archiveVisit(visit);a.page.saveDraft();
+  assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).seenVisits[0].vals.notes,'KEEP ALL ANSWERS');
+  assert.equal(local.getItem('hvnb_current_office'),null);
+  clock.now=3000;a=app(local,new MemoryStorage(),clock,false);assert.equal(a.offered,undefined);
+  assert.equal(a.page.seenVisits()[0].visit.vals.height_in,'10');assert.equal(a.page.seenVisits()[0].visit.vals.k_confirm,true);
+  clock.now=4000;a=app(local,new MemoryStorage(),clock,false);a.page.startFresh();
+  assert.equal(a.page.seenVisits().length,1);assert.equal(a.page.seenVisits()[0].visit.vals.notes,'KEEP ALL ANSWERS');
+ });
+ await check('Visit identities keep identical names separate and update the same archived visit without duplicates',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),a=app(local,session,{now:2000});
+  const visit=id=>({meta:{visitId:id},vals:{name:'SYNTHETIC SAME NAME',dob:'01/01/2000'},layout:a.lastPatient.getLayout()});
+  a.page.archiveVisit(visit('visit-first'));a.page.archiveVisit(visit('visit-second'));
+  a.page.archiveVisit({...visit('visit-first'),vals:{name:'SYNTHETIC CORRECTED NAME',height_ft:'6',height_in:'0'}});
+  assert.equal(a.page.seenVisits().length,2);a.page.saveDraft();
+  const history=JSON.parse(local.getItem('hvnb_current_app_draft')).seenVisits;
+  assert.equal(history.length,2);assert.equal(history.find(v=>v.meta.visitId==='visit-first').vals.height_ft,'6');
+ });
+ await check('Archived visits inherit durable failure warnings and stale-window protection',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),clock={now:1000},a=app(local,session,clock);
+  const visit=name=>({meta:{visitId:'visit-'+name.toLowerCase()},vals:{name},layout:a.lastPatient.getLayout()});
+  a.page.archiveVisit(visit('FIRST'));a.page.saveDraft();clock.now=2000;
+  const b=app(local,new MemoryStorage(),clock);b.page.restore(b.offered);b.page.archiveVisit(visit('NEWER'));b.page.saveDraft();
+  clock.now=3000;a.page.saveDraft();assert.equal(a.document.querySelector('#draftWarning').hidden,false);
+  assert.equal(JSON.parse(local.getItem('hvnb_current_app_draft')).seenVisits.length,2);
+  const write=local.setItem.bind(local);local.setItem=(k,v)=>{if(k==='hvnb_current_app_draft')throw Error('Synthetic quota');write(k,v);};
+  b.page.archiveVisit(visit('QUOTA'));b.page.saveDraft();assert.equal(b.document.querySelector('#draftWarning').hidden,false);
+ });
+ await check('Clear shift deletes Patients Seen history together with both recovery copies',()=>{
+  const local=new MemoryStorage(),session=new MemoryStorage(),a=app(local,session,{now:2000});
+  a.page.archiveVisit({meta:{visitId:'visit-synthetic-cleared'},vals:{name:'SYNTHETIC HISTORY'},layout:a.lastPatient.getLayout()});a.page.saveDraft();
+  assert.equal(a.page.seenVisits().length,1);a.page.clearShift();
+  assert.equal(a.page.seenVisits().length,0);assert.equal(local.getItem('hvnb_current_app_draft'),null);assert.equal(session.getItem('hvnb_current_draft'),null);
  });
  await check('Inline scripts, service worker and regression scripts parse',()=>{
   const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(m=>!/\bsrc\s*=/.test(m[1]));scripts.forEach((m,i)=>new vm.Script(m[2],{filename:'index-inline-'+i}));new vm.Script(sw,{filename:'sw.js'});

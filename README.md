@@ -1,6 +1,10 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.1.2.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.0.
+
+Patients Seen is a separate workspace section for every entered visit in the current shift, including visits with no tests and messages that have not been copied. Search by name or DOB and open the complete visit. Clearing one patient or choosing Start fresh keeps their answers in Patients Seen; Clear shift removes them. Entries persist on this browser/device and are not automatically removed at midnight. Previously discarded visits without an existing saved form or Office snapshot cannot be reconstructed.
+
+Vitals includes Height with separate Feet and Inches inputs. Entering one digit in Feet moves focus to Inches for that same patient. A complete height appears as `Height: 5 ft 10 in` alongside the other vitals. Empty height stays out of the message; incomplete heights and inches outside the range from 0 to less than 12 are flagged before copying. Existing saved forms gain the fields while keeping their answers.
 
 Complete shifts now save persistently on this device in ordinary browser tabs as well as the installed app. Reopening offers all patient answers, checklists, copied-message history, and houses without an eight-hour cutoff. Storage failures and conflicting windows remain visible; an older window cannot overwrite a newer saved shift.
 
