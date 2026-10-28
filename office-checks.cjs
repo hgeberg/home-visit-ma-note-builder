@@ -191,14 +191,15 @@ test('Office is its own view with one reference checklist beneath the saved pati
     return !!(document.querySelector('#officeContent').compareDocumentPosition(reference) & Node.DOCUMENT_POSITION_FOLLOWING);
   }), true, 'The shared reference appears below the saved Office patients');
   const first = patient(page);
-  await local(first, 'tab-office').click();
+  assert.equal(await page.locator('.patient [data-local-id="tab-office"]').count(), 0);
+  await showOffice(page);
   assert.equal(await page.locator('#officeSection').isVisible(), true);
   assert.equal(await page.locator('#patients').isVisible(), false);
   assert.equal(await local(first, 'tab-visit').getAttribute('aria-selected'), 'true');
   await showPatients(page);
   assert.equal(await local(first, 'panel-visit').isVisible(), true);
   await local(first, 'tab-check').click();
-  await local(first, 'tab-office').click();
+  await showOffice(page);
   assert.equal(await local(first, 'tab-check').getAttribute('aria-selected'), 'true');
   await showPatients(page);
   assert.equal(await local(first, 'panel-check').isVisible(), true);
@@ -383,7 +384,7 @@ test('failed Office storage warns visibly, keeps copied records in memory, and r
   assert.equal(await cards(page).count(), 2, 'Both records remain visible despite a write failure');
   assert.equal((await records(page)).length, 1, 'Failed storage did not silently overwrite persisted data');
   await showPatients(page);
-  await local(patient(page), 'tab-office').click();
+  await showOffice(page);
   assert.equal(await cards(page).count(), 2, 'Navigating to Office does not reload stale persisted data over unsaved records');
   await page.evaluate(() => { Storage.prototype.setItem = window.__originalStorageSetItem; });
   await page.locator('#retryOfficeSave').click();
@@ -439,7 +440,7 @@ test('retrying a failed Copy save merges another tab\'s newly saved patient', as
   assert.equal(merged.find(item => item.name === 'TEST RETRY TAB ALPHA').overnights, '4plex');
   assert.equal(merged.find(item => item.name === 'TEST RETRY TAB BETA').overnights, 'RPP');
   assert.equal(await cards(page).count(), 2);
-  assert.equal(await local(patient(page), 'badge-office').innerText(), '2');
+  assert.equal(await local(patient(page), 'badge-office').count(), 0);
   await secondTab.waitForFunction(() => document.querySelectorAll('#officeContent .office-patient').length === 2);
   await page.reload();
   assert.deepEqual(await records(page), merged);
@@ -477,7 +478,7 @@ test('retrying a failed removal keeps the deletion and another tab\'s newly save
   assert.equal(merged[0].overnights, 'Urine culture');
   assert.ok(!merged.some(item => item.id === removedId), 'Recovery must not resurrect the removed patient');
   assert.equal(await cards(page).count(), 1);
-  assert.equal(await local(patient(page), 'badge-office').innerText(), '1');
+  assert.equal(await local(patient(page), 'badge-office').count(), 0);
   await secondTab.waitForFunction(() => document.querySelectorAll('#officeContent .office-patient').length === 1);
   assert.match(await cards(secondTab).innerText(), /TEST KEEP TAB BETA/);
   await page.reload();

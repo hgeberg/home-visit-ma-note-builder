@@ -1,7 +1,7 @@
 {
   "name": "home-visit-ma-note-builder",
   "private": true,
-  "version": "9.2.0",
+  "version": "9.2.1",
   "scripts": {
     "test": "node qa/run-checks.cjs",
     "test:source": "node qa/reliability-checks.cjs && node qa/printing-device-checks.cjs"

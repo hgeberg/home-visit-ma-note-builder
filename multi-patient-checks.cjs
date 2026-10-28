@@ -146,7 +146,8 @@ test('copy buttons copy their own output and create separate shared office recor
   assert.doesNotMatch(saved.patients[0].meta.sentText, /beta only/);
   for (let index = 0; index < 2; index++) {
     await page.locator('#view-patients').click();
-    await local(patient(page, index), 'tab-office').click();
+    assert.equal(await local(patient(page, index), 'tab-office').count(), 0);
+    await page.locator('#view-office').click();
     assert.match(await page.locator('#officeContent').innerText(), /TEST COPY ALPHA/);
     assert.match(await page.locator('#officeContent').innerText(), /TEST COPY BETA/);
   }
