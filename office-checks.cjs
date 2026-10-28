@@ -176,6 +176,23 @@ test('Confirmed navigation discards only unsaved Office edits and opens the curr
   assert.deepEqual(await records(page), before);
 });
 
+test('Opening an Office editor preserves a field chosen before delayed initial focus', async ({ page }) => {
+  await fillPatient(patient(page), 'TEST EARLY OFFICE FOCUS', 'RPP');
+  await copyPatient(page, patient(page), 1);
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).evaluate(button => {
+    button.click();
+    document.querySelector('dialog[open] [data-local-id="sheet_bloodreason"]').focus();
+  });
+  await page.waitForTimeout(80);
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.localId), 'sheet_bloodreason');
+  await page.getByRole('dialog').getByLabel('Reason for blood work', {exact:true}).fill('Synthetic early field selection');
+  await page.getByRole('button', {name:'Save changes', exact:true}).click();
+  const saved = (await records(page))[0];
+  assert.equal(saved.name, 'TEST EARLY OFFICE FOCUS');
+  assert.equal(saved.bloodreason, 'Synthetic early field selection');
+});
+
 test('Office is its own view with one reference checklist beneath the saved patient list', async ({ page }) => {
   assert.equal(await page.locator('#officeSection').isVisible(), false);
   assert.equal(await page.locator('#patients').isVisible(), true);

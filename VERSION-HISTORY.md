@@ -2,7 +2,7 @@
 
 ## v9.2.1 — sticky Visit navigation (October 28, 2026)
 
-Renamed the main Patients tab to Visit and kept Visit, Patients Seen, and Office visible while scrolling. Removed the duplicate Office shortcut inside each patient, leaving Visit and Checklist. The navigation height adjusts for narrow screens and saved-draft warnings, keeping patient tabs, the desktop message preview, and scrolled-to fields below it. Advanced the app version and offline cache together.
+Renamed the main Patients tab to Visit and kept Visit, Patients Seen, and Office visible while scrolling. Removed the duplicate Office shortcut inside each patient, leaving Visit and Checklist. The navigation height adjusts for narrow screens and saved-draft warnings, keeping patient tabs, the desktop message preview, and scrolled-to fields below it. Dialogs preserve a field selected immediately after opening instead of letting delayed autofocus move typing to another field. Advanced the app version and offline cache together.
 
 ## v9.2.0 — Patients Seen and height in vitals (October 27, 2026)
 

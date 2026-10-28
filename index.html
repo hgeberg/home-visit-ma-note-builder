@@ -1393,8 +1393,9 @@ function openSheet(opts){
   sheetDialog = scrim;
   host.append(scrim);
   scrim.showModal();
+  const initialFocus = document.activeElement;
   setTimeout(() => {
-    if(lifecycle.signal.aborted || sheetDialog !== scrim) return;
+    if(lifecycle.signal.aborted || sheetDialog !== scrim || document.activeElement !== initialFocus) return;
     const target = opts.focus ? card.querySelector(localSelector(opts.focus)) : null;
     try{ (target || card.querySelector('.btn')).focus({preventScroll:true}); }catch(e){}
   }, 30);
