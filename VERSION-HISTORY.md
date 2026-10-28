@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.2.0 — Patients Seen and height in vitals (October 27, 2026)
+
+Added Patients Seen as its own workspace section, separate from the current house's forms and Office overnight tests. All entered visits appear automatically, including patients without tests and messages not yet copied. Search by name or DOB and open the full visit. Clearing a patient or choosing Start fresh keeps their entered answers and checklist in this shift's history. Visit identities prevent unrelated patients with the same name and DOB from being combined. Clear shift removes this history along with forms, recovery copies, and Office entries; visits are not automatically discarded at midnight.
+
+History uses the existing durable shift storage, recovery copies, storage-failure warnings, and conflicting-window protection. Existing full Office snapshots are included when their original form is unavailable. No patient data is uploaded. Previously discarded visits without any saved full copy remain unavailable.
+
+Added paired Feet and Inches inputs to Vitals. Typing one digit in Feet moves focus to that patient's Inches box. Complete heights join the message as `Height: 5 ft 10 in`; blank height is omitted, and incomplete or invalid heights are reviewed before copying. Older saved forms gain the fields without replacing entered answers. Release metadata, package version, and the offline cache advance together to v9.2.0.
+
 ## v9.1.2 — persistent browser visits and complete Office saves (October 27, 2026)
 
 Ordinary browser tabs now save the complete shift persistently on this device, using the same recovery as the installed Home Screen app. Reopening restores patient answers, houses, checklists, copied-message history, and pending Office work without the former eight-hour cutoff. Legacy tab drafts migrate when restored. Storage-read failures preserve the saved copies, failed persistent writes show a warning, and older windows cannot overwrite a newer saved shift.

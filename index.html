@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.1.2">
+<meta name="note-builder-version" content="v9.2.0">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -98,8 +98,17 @@ a{color:var(--accent-text)}
 .patient-caption{margin:0;color:var(--muted);font-size:13px}
 .office-section{margin-top:20px;scroll-margin-top:16px}
 .workspace-tools{display:flex;align-items:center;gap:10px;margin-top:16px}
-.workspace-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;background:var(--chip);border:1px solid var(--chip-line);border-radius:12px;padding:4px}
+.workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;flex:1;min-width:0;background:var(--chip);border:1px solid var(--chip-line);border-radius:12px;padding:4px}
 .workspace-tools>.btn{flex:none}
+@media(max-width:540px){.workspace-tools{flex-wrap:wrap}.workspace-tabs{flex-basis:100%}.workspace-tools>.btn{margin-left:auto}}
+.seen-section{margin-top:20px;scroll-margin-top:16px}
+.seen-section h2{margin:0;font-size:21px}
+.seen-list{display:grid;gap:10px;margin-top:14px}
+.seen-visit{display:grid;gap:8px;padding:14px 16px;margin:0;min-width:0;overflow-wrap:anywhere}
+.seen-visit h3,.seen-visit p{margin:0}
+.seen-visit h3{font-size:16px}
+.seen-visit .btn{justify-self:start}
+.height-inputs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 dialog.sheet{border:1px solid var(--line);margin:auto;width:calc(100% - 24px);max-width:560px}
 dialog.sheet::backdrop{background:var(--scrim)}
 .office-section h2{margin:0;font-size:21px}
@@ -334,7 +343,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.1.2</b> · Visits save on this device. Copy a message with overnight tests to save its complete visit to Office.</p>
+    <p class="sub"><b>v9.2.0</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -351,6 +360,7 @@ dialog.scrim::backdrop{background:transparent}
   <div class="workspace-tools">
     <nav class="workspace-tabs" role="tablist" aria-label="Workspace">
       <button type="button" class="tab" role="tab" id="view-patients" aria-controls="patients" aria-selected="true">Patients</button>
+      <button type="button" class="tab" role="tab" id="view-seen" aria-controls="seenSection" aria-selected="false" tabindex="-1">Patients Seen</button>
       <button type="button" class="tab" role="tab" id="view-office" aria-controls="officeSection" aria-selected="false" tabindex="-1">Office</button>
     </nav>
     <button type="button" class="btn danger" id="clearShiftBtn">Clear shift</button>
@@ -375,6 +385,16 @@ dialog.scrim::backdrop{background:transparent}
     <div class="row"><button class="btn small" type="button" id="collapsePatients">Collapse all</button><button class="btn small" type="button" id="expandPatients">Expand all</button></div>
   </section>
   <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
+  <section id="seenSection" class="seen-section" role="tabpanel" aria-labelledby="view-seen" hidden>
+    <h2 id="seenHeading" tabindex="-1">Patients Seen</h2>
+    <p class="office-summary">All patients from this shift, with or without tests. Visits save automatically as you enter them and stay here until you clear the shift.</p>
+    <div class="patient-search">
+      <label class="flabel" for="seenSearch">Find a saved visit</label>
+      <div class="patient-search-controls"><input class="inp" type="search" id="seenSearch" placeholder="Name or DOB" autocomplete="off" aria-controls="seenList"><button type="button" class="btn small" id="clearSeenSearch">Clear search</button></div>
+      <p class="small" id="seenStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div id="seenList" class="seen-list"></div>
+  </section>
   <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
     <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
@@ -411,7 +431,7 @@ dialog.scrim::backdrop{background:transparent}
   <h3 id="clearShiftTitle">Review this shift before clearing</h3>
   <p id="shiftReviewSummary" role="status"></p>
   <ul id="shiftReviewList" class="shift-review-list"></ul>
-  <p>This removes every patient form, saved draft and Office entry, including unfinished information. It starts one blank patient for your next shift. Your layout settings stay.</p>
+  <p>This removes every patient form, Patients Seen visit, saved draft and Office entry, including unfinished information. It starts one blank patient for your next shift. Your layout settings stay.</p>
   <p>Other tabs running this version in the same browser will also reset. This cannot be undone.</p>
   <div id="clearShiftError" class="err" role="alert"></div>
   <div class="btns">
@@ -676,7 +696,7 @@ function validDob(v){
 /* ---------- default layout ---------- */
 
 function defaultLayout(){
-  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, exposurePresetsVersion:1, allergyPresetsVersion:1, sections: [
+  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, exposurePresetsVersion:1, allergyPresetsVersion:1, heightFieldsVersion:1, sections: [
     { id:'s_door', tab:'visit', title:'At the door', fields:[
       { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
       { id:'dob', type:'dob', label:'DOB', req:true },
@@ -701,7 +721,8 @@ function defaultLayout(){
       { id:'o2', type:'text', label:'O2', ph:'98%', im:'numeric' },
       { id:'hr', type:'text', label:'HR', ph:'72 bpm', im:'numeric' },
       { id:'bp', type:'text', label:'BP', ph:'Only if the provider asks', chips: chips('N/A') },
-      { id:'weight', type:'text', label:'Weight', ph:'Peds or under 100 lb', im:'decimal', chips: chips('N/A') }
+      { id:'weight', type:'text', label:'Weight', ph:'Peds or under 100 lb', im:'decimal', chips: chips('N/A') },
+      ...heightFields()
     ]},
     { id:'s_rx', tab:'visit', title:'Pharmacy', fields:[
       { id:'pharmacy', type:'text', label:'Pharmacy', ph:'Pharmacy name', chips: chips(PHARMACY_PRESETS.join(', ')) },
@@ -769,6 +790,13 @@ function defaultLayout(){
       { id:'o_blank', type:'note', label:'There should be blank reqs. Fill in all the info off Teams, and the insurance info off the pic you took.' }
     ]}
   ]};
+}
+
+function heightFields(){
+  return [
+    {id:'height_ft', type:'text', label:'Height feet', ph:'Feet', im:'numeric'},
+    {id:'height_in', type:'text', label:'Height inches', ph:'Inches', im:'decimal'}
+  ];
 }
 
 function recentAntibioticFields(){
@@ -852,10 +880,13 @@ let preservedAnswers = Array.isArray(seed.preservedAnswers) ? seed.preservedAnsw
 const clone = value => JSON.parse(JSON.stringify(value));
 let previousValues = clone(V);
 
-function freshMeta(){ return { sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
+function freshMeta(){ return { visitId:uid('visit-'), seenAt:null, sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
 function restoreMeta(value){
   const meta = freshMeta();
   if(!value || typeof value !== 'object' || Array.isArray(value)) return meta;
+  if(typeof value.visitId === 'string' && /^visit-[a-z0-9-]+$/.test(value.visitId)) meta.visitId = value.visitId;
+  else if(typeof value.officeId === 'string' && /^[a-z0-9-]+$/i.test(value.officeId)) meta.visitId = 'visit-office-' + value.officeId;
+  if(Number.isFinite(value.seenAt) && value.seenAt > 0) meta.seenAt = value.seenAt;
   if(Number.isFinite(value.sentAt) && value.sentAt > 0 && typeof value.sentText === 'string'){
     meta.sentAt = value.sentAt;
     meta.sentText = value.sentText;
@@ -888,6 +919,11 @@ function loadLayout(){
   committedLayout = clone(L);
 }
 function normalizeLayout(){
+  if(L.heightFieldsVersion !== 1){
+    const vitals = L.sections.find(s => s.id === 's_vitals' && s.tab === 'visit');
+    if(vitals) vitals.fields.push(...heightFields().filter(f => !fieldById(f.id)));
+    L.heightFieldsVersion = 1;
+  }
   if(L.exposurePresetsVersion !== 1){
     const exposure = fieldById('exposure');
     if(exposure?.type === 'choice' && exposure.detail){
@@ -1192,11 +1228,23 @@ function buildOutput(vals){
   const antibioticChoice = visitFields.find(f => f.id === 'abx');
   const antibioticFields = ['abx_name', 'abx_when'].map(id => visitFields.find(f => f.id === id));
   const combineAntibiotics = antibioticChoice?.type === 'choice' && antibioticFields.every(f => f && ['text', 'textarea'].includes(f.type));
+  const height = ['height_ft', 'height_in'].map(id => visitFields.find(f => f.id === id));
+  const combineHeight = height.every(f => f?.type === 'text');
   let aware = '';   // printed in capitals under each positive test
   for(const sec of secsOf('visit')) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
   for(const sec of secsOf('visit')) for(const f of sec.fields){
     if(!whenOK(f.when, ctx)) continue;
     const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
+    if(combineHeight && f === height[1]) continue;
+    if(combineHeight && f === height[0]){
+      const feet = String(vals.height_ft || '').trim(), inches = String(vals.height_in || '').trim();
+      if(feet || inches){
+        const valid = /^\d$/.test(feet) && /^\d{1,2}(?:\.\d+)?$/.test(inches) && Number(inches) < 12;
+        if(valid) lines.push('Height: ' + feet + ' ft ' + inches + ' in');
+        else issues.push('Height: enter feet and inches (0 to less than 12 inches)');
+      }
+      continue;
+    }
     if(combineAntibiotics && antibioticFields.includes(f)) continue;
     if(combineAntibiotics && f === antibioticChoice && ctx.recentAntibiotics){
       const details = [];
@@ -1458,7 +1506,17 @@ function renderSection(sec){
   const card = h('section', {class:'card', data:{sec:sec.id}});
   card.append(h('h2', {class:'sec-title', text:sec.title, data:{secTitle:sec.id}}));
   const grid = h('div', {class:'grid'});
-  sec.fields.forEach(f => grid.append(renderField(sec, f)));
+  const feet = sec.fields.find(f => f.id === 'height_ft' && f.type === 'text');
+  const inches = sec.fields.find(f => f.id === 'height_in' && f.type === 'text');
+  for(const f of sec.fields){
+    if(feet && inches && f === inches) continue;
+    if(feet && inches && f === feet){
+      grid.append(h('div', {class:'field', data:{field:'height'}},
+        h('div', {class:'flabel', id:'heightLabel', text:'Height'}),
+        h('div', {class:'height-inputs', role:'group', 'aria-labelledby':'heightLabel'},
+          h('div', {}, ...textField({...feet, label:'Feet'})), h('div', {}, ...textField({...inches, label:'Inches'})))));
+    }else grid.append(renderField(sec, f));
+  }
   card.append(grid);
   return card;
 }
@@ -1505,11 +1563,17 @@ function textField(f){
   if(!isArea) inp.type = 'text';
   if(f.type === 'dob') inp.setAttribute('inputmode', 'numeric');
   else if(f.im) inp.setAttribute('inputmode', f.im);
+  if(f.id === 'height_ft') inp.maxLength = 1;
   inp.value = V[f.id] || '';
-  inp.addEventListener('input', () => {
+  inp.addEventListener('input', event => {
     if(f.type === 'dob'){ const m = maskDob(inp.value); if(m !== inp.value) inp.value = m; }
+    if(f.id === 'height_ft') inp.value = inp.value.replace(/\D/g, '').slice(0, 1);
     V[f.id] = inp.value;
     refresh({user:true});
+    if(f.id === 'height_ft' && /^\d$/.test(inp.value) && !event.isComposing && !String(event.inputType || '').startsWith('delete') && !sheetOpen){
+      const inches = $('#f_height_in');
+      if(inches){ inches.focus(); inches.select(); }
+    }
   });
   const parts = [h('label', {class:'flabel', for:id, text:f.label, data:{labelOf:f.id}}), inp];
   if(f.chips && f.chips.length) parts.push(shortcutRow(f, inp));
@@ -1610,6 +1674,7 @@ function testsField(f){
 
 function refresh(opts){
   opts = opts || {};
+  if(hasContent(V) && !M.seenAt) M.seenAt = Date.now();
   const beforeEdit = previousValues;
   previousValues = clone(V);
   const res = buildOutput(V);
@@ -1889,6 +1954,8 @@ function saveCopiedOffice(copiedValues, copiedMeta, savedVisit = copiedVisitSnap
     return 'Copied';
   }
   const steps = officeSteps(copiedValues);
+  // A visit reopened from Patients Seen may have completed an earlier Office retry.
+  if(!copiedMeta.officeId) copiedMeta.officeId = office.find(o => o.visit?.meta?.visitId === copiedMeta.visitId)?.id || null;
   if(copiedMeta.officeId && !office.some(o => o.id === copiedMeta.officeId)) copiedMeta.officeId = null;
   let msg = 'Copied';
   if(!overnightText(copiedValues)){
@@ -2034,7 +2101,7 @@ function newPatient(opts){
   }
   if(opts.confirmed || (M.sentAt && !changed)){ clearVisit(); return; }
   sheet({ title:'Clear this patient?',
-    body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied.' : 'This clears only this patient’s Visit tab and checklist. All other patients and the office list stay.' ],
+    body:[ changed ? 'You changed this visit after copying it at ' + fmtTime(M.sentAt) + '. Those changes haven’t been copied. The visit stays in Patients Seen.' : 'This resets this patient’s Visit tab and checklist. The entered visit stays in Patients Seen. All other patients and the office list stay.' ],
     buttons:[ changed ? {label:'Copy it again first', kind:'primary', on:() => onCopy()} : null,
               {label:'Clear this patient', kind:'solid danger', on:() => clearVisit()},
               {label:'Cancel'} ].filter(Boolean) });
@@ -2043,6 +2110,7 @@ function newPatient(opts){
 function clearVisit(msg){
   const savedValues = clone(V), savedMeta = M, savedAnswers = clone(preservedAnswers);
   const canUndo = hasContent(V) || preservedAnswers.length;
+  if(canUndo) page.archiveVisit({...copiedVisitSnapshot(V, M), id:root.id});
   page.cancelCopy(root);
   V = {};
   M = freshMeta();
@@ -2090,7 +2158,7 @@ function offerRestore(d, alternative){
   const count = d.patients.length;
   const savedAt = 'Saved on this device ' + new Date(d.t).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
   sheet({ title:count === 1 ? 'Saved patient on this device' : count + ' patients saved on this device', dismissable:false,
-    body:[savedAt + '. Restore every patient’s inputs, checklist and separate message? Starting fresh clears these forms; saved Office entries, their saved visit copies and pending Office saves are kept.'],
+    body:[savedAt + '. Restore every patient’s inputs, checklist and separate message? Starting fresh opens blank forms and keeps all entered visits in Patients Seen, along with Office entries and pending Office saves.'],
     buttons:[ {label:count === 1 ? 'Restore this visit' : 'Restore all ' + count + ' patients', kind:'primary', on:() => page.restore(d)},
               {label:'Start fresh', kind:'danger', on:() => page.startFresh()} ] });
 }
@@ -2163,6 +2231,8 @@ return {
   hasContent:() => hasContent(V) || preservedAnswers.length > 0,
   collapse:setCollapsed,
   name:() => String(V.name || '').trim(),
+  visitId:() => M.visitId,
+  snapshot:() => ({...copiedVisitSnapshot(V, M), id:root.id}),
   progress:visitProgress,
   officeId:() => M.officeId,
   showVisit:() => setTab('visit'),
@@ -2222,6 +2292,7 @@ return {
 function createPatientPage(){
   const host = document.querySelector('#patients');
   const officeSection = document.querySelector('#officeSection');
+  const seenSection = document.querySelector('#seenSection');
   const template = document.querySelector('#patientTemplate');
   const warning = document.querySelector('#draftWarning');
   const readWarning = document.querySelector('#draftReadWarning');
@@ -2236,12 +2307,12 @@ function createPatientPage(){
   const clearError = document.querySelector('#clearShiftError');
   const clearWarning = document.querySelector('#shiftClearWarning');
   const status = document.querySelector('#shiftStatus');
-  let patients = [], timer = null, held = false, serial = 0;
+  let patients = [], archivedVisits = [], timer = null, held = false, serial = 0;
   let activeHouseId = 'house-1';
   let activeCopy = null;
   let replayingOffice = false;
   let generation = 'initial', resetting = false;
-  let undo = null, undoTimer = null, navSignature = '', reviewSignature = '';
+  let undo = null, undoTimer = null, navSignature = '', seenSignature = '', reviewSignature = '';
   const readGeneration = () => { try{ return window.localStorage.getItem(shiftKey) || 'initial'; }catch(e){ return generation; } };
   generation = readGeneration();
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -2258,6 +2329,19 @@ function createPatientPage(){
     const contents = value => { const copy = {...value}; for(const key of ['t','revision','appDraftBase']) delete copy[key]; return JSON.stringify(copy); };
     return contents(a) === contents(b);
   };
+  const matchesSearch = (query, name, dob) => !query || name.toLowerCase().includes(query) || dob.toLowerCase().includes(query)
+    || (/^[\d\s/.-]+$/.test(query) && query.replace(/\D/g, '').length > 0 && dob.replace(/\D/g, '').includes(query.replace(/\D/g, '')));
+  const snapshotHasContent = visit => object(visit?.vals) && (Object.values(visit.vals).some(value =>
+    typeof value === 'string' ? !!value.trim() : value === true || (object(value) && Object.values(value).some(test => object(test) && test.on === true)))
+    || !!visit.meta?.sentAt || !!visit.preservedAnswers?.length);
+  const visitIdentity = visit => {
+    const id = visit?.meta?.visitId;
+    if(typeof id === 'string' && /^visit-[a-z0-9-]+$/.test(id)) return id;
+    const officeId = visit?.meta?.officeId;
+    if(typeof officeId === 'string' && /^[a-z0-9-]+$/i.test(officeId)) return 'visit-office-' + officeId;
+    return typeof visit?.id === 'string' && /^patient-[a-z0-9-]+$/.test(visit.id) ? 'visit-form-' + visit.id : null;
+  };
+  const patientSnapshot = p => p.snapshot ? p.snapshot() : {...p.serialize(), id:p.root.id, layout:p.getLayout(), houseId:p.root.dataset.houseId};
   const page = {
     isDeviceDraft:value => sameDraft(value, parsedDraft(appDraftBaseline)),
     dialogHosts:document.querySelector('#dialogHosts'),
@@ -2328,6 +2412,80 @@ function createPatientPage(){
       page.setView('office');
       document.querySelector('#officeHeading').focus({preventScroll:true});
     },
+    archiveVisit:(visit, fallbackLayout, savedAt = Date.now()) => {
+      if(!snapshotHasContent(visit)) return;
+      const accepts = patients[0]?.acceptsLayout;
+      const layout = accepts?.(visit.layout) ? visit.layout : fallbackLayout;
+      if(!accepts?.(layout)) return;
+      const id = visitIdentity(visit) || 'visit-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+      const saved = clone({...visit, layout, meta:{...visit.meta, visitId:id, seenAt:visit.meta?.seenAt || savedAt}});
+      const index = archivedVisits.findIndex(v => visitIdentity(v) === id);
+      if(index < 0) archivedVisits.push(saved); else archivedVisits[index] = saved;
+      seenSignature = '';
+    },
+    keepOfficeVisits:() => {
+      for(const entry of patients[0]?.getOffice().values || []){
+        const visit = entry.visit, id = visitIdentity(visit);
+        if(!id || archivedVisits.some(v => visitIdentity(v) === id) || patients.some(p => visitIdentity(patientSnapshot(p)) === id)) continue;
+        page.archiveVisit(visit, null, entry.t);
+      }
+    },
+    seenVisits:() => {
+      const visits = new Map(archivedVisits.map(visit => [visitIdentity(visit), {visit}]));
+      for(const patient of patients){
+        const visit = patientSnapshot(patient);
+        if(snapshotHasContent(visit)) visits.set(visitIdentity(visit), {visit, patient});
+      }
+      return Array.from(visits.values()).sort((a, b) => (a.visit.meta.seenAt || 0) - (b.visit.meta.seenAt || 0));
+    },
+    showSeen:() => {
+      if(!page.isCurrentShift()) return;
+      page.saveDraft();
+      page.setView('seen');
+      document.querySelector('#seenHeading').focus({preventScroll:true});
+    },
+    openSeenVisit:id => {
+      if(!page.isCurrentShift()) return;
+      const entry = page.seenVisits().find(({visit}) => visitIdentity(visit) === id);
+      if(!entry) return;
+      let patient = entry.patient;
+      if(!patient){
+        const seed = clone(entry.visit);
+        const office = patients[0].getOffice().values.find(o => o.visit?.meta?.visitId === id);
+        if(office) seed.meta.officeId = office.id;
+        patient = page.addPatient(null, seed, false, true);
+      }
+      if(patient){ page.openPatient(patient); patient.showVisit(); }
+    },
+    renderSeenVisits:() => {
+      if(seenSection.hidden) return;
+      const query = String(document.querySelector('#seenSearch').value || '').trim().toLowerCase();
+      const all = page.seenVisits();
+      const signature = JSON.stringify([query, all.map(({visit, patient}) => [visit, patient?.root.id])]);
+      if(signature === seenSignature) return;
+      seenSignature = signature;
+      const matches = all.filter(({visit}) => matchesSearch(query, String(visit.vals.name || '').trim(), String(visit.vals.dob || '').trim()));
+      document.querySelector('#seenStatus').textContent = query
+        ? matches.length + ' of ' + all.length + ' visits' + (!matches.length ? ' · No matches.' : '')
+        : all.length + (all.length === 1 ? ' patient' : ' patients') + ' in this shift.';
+      const list = document.querySelector('#seenList');
+      const focusedId = document.activeElement?.dataset?.seenVisit;
+      list.replaceChildren();
+      if(!all.length) list.append(progressNode('p', 'No patients entered yet. Start a visit in Patients; it will appear here automatically.', 'banner info'));
+      for(const {visit} of matches){
+        const card = document.createElement('article'); card.className = 'card seen-visit';
+        const name = String(visit.vals.name || '').trim() || 'Unnamed patient';
+        card.append(progressNode('h3', name));
+        card.append(progressNode('p', visit.vals.dob ? 'DOB ' + visit.vals.dob : 'DOB not entered', 'small'));
+        if(visit.meta.seenAt) card.append(progressNode('p', new Date(visit.meta.seenAt).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}), 'small'));
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn';
+        button.dataset.seenVisit = visitIdentity(visit);
+        button.textContent = 'Open visit'; button.setAttribute('aria-label', 'Open visit for ' + name);
+        button.addEventListener('click', () => page.openSeenVisit(visitIdentity(visit)));
+        card.append(button); list.append(card);
+      }
+      if(focusedId) Array.from(list.querySelectorAll('[data-seen-visit]')).find(b => b.dataset.seenVisit === focusedId)?.focus({preventScroll:true});
+    },
     houseIds:() => [...new Set(patients.map(p => p.root.dataset.houseId))],
     housePatients:() => patients.filter(p => p.root.dataset.houseId === activeHouseId),
     showHouse:(houseId, scroll = true) => {
@@ -2377,11 +2535,13 @@ function createPatientPage(){
       document.querySelector('#patientNavigator').hidden = view !== 'patients';
       document.querySelector('#houseToolbar').hidden = view !== 'patients';
       officeSection.hidden = view !== 'office';
-      for(const name of ['patients', 'office']){
+      seenSection.hidden = view !== 'seen';
+      for(const name of ['patients', 'seen', 'office']){
         const button = document.querySelector('#view-' + name);
         button.setAttribute('aria-selected', name === view ? 'true' : 'false');
         button.tabIndex = name === view ? 0 : -1;
       }
+      if(view === 'seen') page.renderSeenVisits();
       if(scroll) window.scrollTo(0, 0);
     },
     hasPatients:() => patients.length > 0,
@@ -2392,6 +2552,7 @@ function createPatientPage(){
       document.querySelector('#houseHeading').textContent = 'House ' + (houses.indexOf(activeHouseId) + 1);
       document.querySelector('#houseSummary').textContent = count + (count === 1 ? ' patient' : ' patients') + ' in this house · Only this house is shown.';
       page.renderPatientNavigation();
+      page.renderSeenVisits();
       if(clearDialog.open) page.renderShiftReview();
     },
     renderPatientNavigation:() => {
@@ -2402,11 +2563,7 @@ function createPatientPage(){
       if(signature === navSignature) return;
       navSignature = signature;
       document.querySelector('#patientNavSummary').textContent = 'Patients today (' + patients.length + ')';
-      const matches = states.filter(({p, state}) => {
-        if(!query) return true;
-        if(p.name().toLowerCase().includes(query) || state.dob.toLowerCase().includes(query)) return true;
-        return /^[\d\s/.-]+$/.test(query) && query.replace(/\D/g, '').length > 0 && state.dob.replace(/\D/g, '').includes(query.replace(/\D/g, ''));
-      });
+      const matches = states.filter(({p, state}) => matchesSearch(query, p.name(), state.dob));
       const resultText = matches.length + ' of ' + patients.length + ' patients' + (!matches.length ? ' · No matches.' : '');
       document.querySelector('#patientSearchStatus').textContent = resultText;
       const jumps = document.querySelector('#patientJumps');
@@ -2512,11 +2669,15 @@ function createPatientPage(){
       const state = patients[0].getOffice();
       const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
       const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
-      const empty = patients.length === 1 && !patients[0].hasContent() && !pending;
+      const liveIds = new Set(patients.map(p => visitIdentity(patientSnapshot(p))));
+      const history = archivedVisits.filter(visit => !liveIds.has(visitIdentity(visit)));
+      const empty = patients.length === 1 && !patients[0].hasContent() && !pending && !history.length;
       const layout = patients[0].getLayout(), serializedLayout = JSON.stringify(layout);
       const snapshot = {version:4, revision:Date.now().toString(36) + '-' + Math.random().toString(36).slice(2), shift:generation, t:Date.now(), activeHouseId, layout,
         patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId,
-          ...(JSON.stringify(p.getLayout()) !== serializedLayout ? {layout:p.getLayout()} : {})})), ...(officeRecovery ? {officeRecovery} : {})};
+          ...(JSON.stringify(p.getLayout()) !== serializedLayout ? {layout:p.getLayout()} : {})})),
+        ...(history.length ? {seenVisits:history.map(visit => { const saved = {...visit}; if(JSON.stringify(saved.layout) === serializedLayout) delete saved.layout; return saved; })} : {}),
+        ...(officeRecovery ? {officeRecovery} : {})};
       const serialized = empty ? null : JSON.stringify(snapshot);
       let appSaved = false, appConflict = false;
       try{
@@ -2554,6 +2715,7 @@ function createPatientPage(){
       const patient = mountPatient(root, seed, page);
       if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable, clone(state.baseline), state.readFailed); }
       patients.splice(index, 0, patient);
+      page.keepOfficeVisits();
       page.updateTitles();
       page.updateOfficeStatus();
       page.updateCopyButtons();
@@ -2588,11 +2750,14 @@ function createPatientPage(){
       const acceptsLayout = patients[0].acceptsLayout;
       const layout = acceptsLayout(draft.layout) ? clone(draft.layout) : null;
       held = true;
+      archivedVisits = [];
+      for(const visit of Array.isArray(draft.seenVisits) ? draft.seenVisits : []) page.archiveVisit(visit, layout, draft.t);
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
       activeHouseId = 'house-1';
       for(const seed of draft.patients){
         const savedLayout = acceptsLayout(seed.layout) ? clone(seed.layout) : layout;
-        page.addPatient(null, savedLayout ? {...seed, layout:savedLayout} : seed, false, true);
+        const timedSeed = {...seed, meta:{...seed.meta, seenAt:seed.meta?.seenAt || draft.t}};
+        page.addPatient(null, savedLayout ? {...timedSeed, layout:savedLayout} : timedSeed, false, true);
       }
       page.restoreOfficeRecovery(draft);
       held = false;
@@ -2601,9 +2766,11 @@ function createPatientPage(){
       document.querySelector('#houseHeading').scrollIntoView({block:'start'});
     },
     startFresh:() => {
-      // Starting new forms must not discard already-copied Office work.
+      // Start fresh opens blank forms without deleting the shift's visit history.
       if(!page.isCurrentShift()) return;
       if(draft){
+        for(const visit of Array.isArray(draft.seenVisits) ? draft.seenVisits : []) page.archiveVisit(visit, draft.layout, draft.t);
+        for(const visit of draft.patients) page.archiveVisit(visit, draft.layout || patients[0].getLayout(), draft.t);
         draft.patients.forEach(p => patients[0].keepPendingOffice(p.pendingOfficeSync));
         page.restoreOfficeRecovery(draft);
       }
@@ -2645,10 +2812,12 @@ function createPatientPage(){
       resetting = true; held = true; clearTimeout(timer);
       const layout = patients.length ? clone(patients[0].getLayout()) : null;
       patients.forEach(p => p.destroy()); patients = []; host.textContent = '';
+      archivedVisits = []; seenSignature = '';
       activeHouseId = 'house-1';
       document.querySelector('#patientNavigator').open = false;
       generation = nextGeneration;
       document.querySelector('#patientSearch').value = '';
+      document.querySelector('#seenSearch').value = '';
       if(clearDialog.open) clearDialog.close();
       const cleared = page.cleanupSavedData();
       appDraftSourceBase = draftBase(appDraftBaseline);
@@ -2716,12 +2885,20 @@ function createPatientPage(){
     if(generation !== 'initial') page.cleanupSavedData();
     setDraftReadBlocked(false);
     const first = page.addPatient(null, {}, false);
-    if(draft) first.offerRestore(draft, alternativeDraft);
+    const historyOnly = draft && !alternativeDraft && Array.isArray(draft.seenVisits) && draft.seenVisits.length
+      && draft.patients.length === 1 && !snapshotHasContent(draft.patients[0])
+      && !draft.officeRecovery && !draft.patients[0].pendingOfficeSync?.length;
+    if(historyOnly){
+      // A blank current form needs no recovery choice; keep its visit history
+      // while loading the current device form definition as usual.
+      for(const visit of draft.seenVisits) page.archiveVisit(visit, draft.layout, draft.t);
+      draft = null; held = false; page.saveDraft();
+    }else if(draft) first.offerRestore(draft, alternativeDraft);
     else if(wasBlocked) document.querySelector('#houseHeading').focus({preventScroll:true});
   }
   function setDraftReadBlocked(blocked){
     readWarning.hidden = !blocked;
-    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#patients', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
+    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#patients', '#seenSection', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
   }
   document.querySelector('#retryDraftRead').addEventListener('click', readSavedDrafts);
   document.querySelector('#retryOfficeSave').addEventListener('click', () => {
@@ -2737,13 +2914,19 @@ function createPatientPage(){
   document.querySelector('#newHouseBtn').addEventListener('click', page.newHouse);
   document.querySelector('#patientSearch').addEventListener('input', page.renderPatientNavigation);
   document.querySelector('#clearPatientSearch').addEventListener('click', () => { document.querySelector('#patientSearch').value = ''; page.renderPatientNavigation(); document.querySelector('#patientSearch').focus(); });
+  document.querySelector('#seenSearch').addEventListener('input', page.renderSeenVisits);
+  document.querySelector('#clearSeenSearch').addEventListener('click', () => { document.querySelector('#seenSearch').value = ''; page.renderSeenVisits(); document.querySelector('#seenSearch').focus(); });
   document.querySelector('#view-patients').addEventListener('click', () => { if(page.isCurrentShift()) page.showPatients(); });
+  document.querySelector('#view-seen').addEventListener('click', page.showSeen);
   document.querySelector('#view-office').addEventListener('click', page.showOffice);
   document.querySelector('.workspace-tabs').addEventListener('keydown', e => {
     if(!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
-    const office = e.key === 'End' || (e.key !== 'Home' && document.activeElement.id === 'view-patients');
-    const button = document.querySelector(office ? '#view-office' : '#view-patients');
+    const tabs = Array.from(e.currentTarget.querySelectorAll('[role="tab"]'));
+    const index = tabs.indexOf(e.target);
+    if(index < 0) return;
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (index + (e.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length;
+    const button = tabs[next];
     button.click(); button.focus();
   });
   document.querySelector('#clearShiftBtn').addEventListener('click', () => {
