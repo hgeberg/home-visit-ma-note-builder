@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.0.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.1.
+
+The main Visit, Patients Seen, and Office navigation stays visible while scrolling. Each patient has Visit and Checklist tabs; Office is available from the main navigation. Patient tabs and the desktop message preview stay below the navigation bar, including when a saved-draft warning is shown.
 
 Patients Seen is a separate workspace section for every entered visit in the current shift, including visits with no tests and messages that have not been copied. Search by name or DOB and open the complete visit. Clearing one patient or choosing Start fresh keeps their answers in Patients Seen; Clear shift removes them. Entries persist on this browser/device and are not automatically removed at midnight. Previously discarded visits without an existing saved form or Office snapshot cannot be reconstructed.
 

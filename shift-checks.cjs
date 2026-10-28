@@ -79,7 +79,7 @@ test('Office navigation hides patient forms and preserves patient inputs and che
   await fillTwoSaved(page);
   await local(patient(page), 'tab-check').click();
   await local(patient(page), 'f_k_confirm').check();
-  await local(patient(page), 'tab-office').click();
+  await showOffice(page);
   assert.equal(await page.locator('#officeSection').isVisible(), true);
   assert.equal(await page.locator('#patients').isVisible(), false);
   assert.equal(await page.locator('#officeHeading').isVisible(), true);

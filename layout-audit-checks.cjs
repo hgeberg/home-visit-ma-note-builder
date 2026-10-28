@@ -67,8 +67,8 @@ async function main(){
   });
   await run('Office remains a navigation action and saved-entry editing remains available',async p=>{
    await seed(p);await fid(p,'f_overnights').fill('4plex');await fid(p,'copyBtn').click();await fid(p,'sentBanner').waitFor({state:'visible'});
-   await fid(p,'tab-visit').focus();await p.keyboard.press('End');assert.equal(await p.evaluate(()=>document.activeElement.dataset.localId),'tab-check');assert.equal(await fid(p,'tab-office').getAttribute('aria-controls'),'officeSection');
-   await fid(p,'tab-office').click();await p.getByRole('button',{name:'Edit saved entry',exact:true}).click();await p.getByRole('dialog').getByLabel('Name',{exact:true}).fill('SYNTHETIC SAVED CHANGE');await p.getByRole('button',{name:'Save changes',exact:true}).click();assert.match(await p.locator('.office-patient').innerText(),/SYNTHETIC SAVED CHANGE/);await noEditor(p);
+   await fid(p,'tab-visit').focus();await p.keyboard.press('End');assert.equal(await p.evaluate(()=>document.activeElement.dataset.localId),'tab-check');assert.equal(await fid(p,'tab-office').count(),0);assert.equal(await p.locator('#view-office').getAttribute('aria-controls'),'officeSection');
+   await p.locator('#view-office').click();await p.getByRole('button',{name:'Edit saved entry',exact:true}).click();await p.getByRole('dialog').getByLabel('Name',{exact:true}).fill('SYNTHETIC SAVED CHANGE');await p.getByRole('button',{name:'Save changes',exact:true}).click();assert.match(await p.locator('.office-patient').innerText(),/SYNTHETIC SAVED CHANGE/);await noEditor(p);
   });
  }finally{await browser.close();await new Promise(r=>server.close(r));}
  console.log(results.length+'/'+results.length+' fixed-form and compatibility checks passed.');

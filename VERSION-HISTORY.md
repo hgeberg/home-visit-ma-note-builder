@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v9.2.1 — sticky Visit navigation (October 28, 2026)
+
+Renamed the main Patients tab to Visit and kept Visit, Patients Seen, and Office visible while scrolling. Removed the duplicate Office shortcut inside each patient, leaving Visit and Checklist. The navigation height adjusts for narrow screens and saved-draft warnings, keeping patient tabs, the desktop message preview, and scrolled-to fields below it. Dialogs preserve a field selected immediately after opening instead of letting delayed autofocus move typing to another field. Advanced the app version and offline cache together.
+
 ## v9.2.0 — Patients Seen and height in vitals (October 27, 2026)
 
 Added Patients Seen as its own workspace section, separate from the current house's forms and Office overnight tests. All entered visits appear automatically, including patients without tests and messages not yet copied. Search by name or DOB and open the full visit. Clearing a patient or choosing Start fresh keeps their entered answers and checklist in this shift's history. Visit identities prevent unrelated patients with the same name and DOB from being combined. Clear shift removes this history along with forms, recovery copies, and Office entries; visits are not automatically discarded at midnight.

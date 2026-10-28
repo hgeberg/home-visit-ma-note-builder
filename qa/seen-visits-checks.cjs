@@ -169,7 +169,12 @@ test('Clear shift removes active and archived visits from this section and both 
   await page.reload();await showSeen(page);assert.equal(await history(page).count(), 0);
 });
 
-test('Workspace keyboard navigation and phone layouts keep three tabs and both height inputs usable', async page => {
+test('Visit, Patients Seen and Office keyboard navigation keeps one Office action and both height inputs usable', async page => {
+  assert.deepEqual(await page.locator('.workspace-tabs [role="tab"]').allTextContents(), ['Visit', 'Patients Seen', 'Office']);
+  assert.equal(await page.locator('.patient [data-local-id="tab-office"], .patient [data-local-id="badge-office"]').count(), 0);
+  assert.equal(await patient(page).locator('.tabs [role="tab"]').count(), 2);
+  assert.equal(await field(page, 'tab-visit').innerText(), 'Visit');
+  assert.match(await field(page, 'tab-check').innerText(), /^Checklist\b/);
   await page.locator('#view-patients').focus();await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('#view-seen').getAttribute('aria-selected'), 'true');
   await page.keyboard.press('ArrowRight');assert.equal(await page.locator('#view-office').getAttribute('aria-selected'), 'true');
@@ -181,6 +186,57 @@ test('Workspace keyboard navigation and phone layouts keep three tabs and both h
     assert(bounds.every(b => b.width >= 70 && b.left >= 0 && b.right <= width));
     assert(bounds[0].right < bounds[1].left, 'Feet and inches stay side by side');
   }
+});
+
+test('Workspace navigation stays reachable while scrolling and keeps checklist state through Office and saved visits', async page => {
+  await seed(page, 'SYNTHETIC STICKY NAVIGATION');
+  await field(page, 'tab-check').click();await field(page, 'f_k_confirm').check();await field(page, 'tab-visit').click();
+  for(const width of [320,390,810,1280]){
+    await page.setViewportSize({width,height:700});
+    await field(page, 'f_notes').evaluate(el => el.scrollIntoView({block:'start'}));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const bar = await page.locator('.workspace-tools').evaluate(el => {
+      const box = el.getBoundingClientRect(), style = getComputedStyle(el);
+      return {top:box.top,bottom:box.bottom,left:box.left,right:box.right,height:box.height,position:style.position,expectedTop:parseFloat(style.top),scrollY,viewportHeight:innerHeight};
+    });
+    assert(bar.scrollY > 100, 'The visit is scrolled at '+width);
+    assert.equal(bar.position, 'sticky');
+    assert(Math.abs(bar.top - bar.expectedTop) <= 2, 'Workspace navigation stays pinned at '+width+': '+JSON.stringify(bar));
+    assert(bar.top >= -1 && bar.bottom <= bar.viewportHeight, 'The complete navigation stays visible at '+width);
+    assert(bar.left >= -1 && bar.right <= width+1, 'The navigation fits at '+width);
+    const patientTabs = await patient(page).locator('.tabs').boundingBox();
+    assert(patientTabs.y >= bar.bottom-1, 'Visit and Checklist stay below workspace navigation at '+width);
+    for(const id of ['view-patients','view-seen','view-office']){
+      const unobstructed = await page.locator('#'+id).evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(box.left+box.width/2, box.top+box.height/2));
+      });
+      assert(unobstructed, id+' is reachable above the scrolled form at '+width);
+    }
+    if(width === 390 || width === 1280) await page.screenshot({path:path.join(root,'qa','workspace-sticky-'+width+'.png')});
+    await page.locator('#draftWarning').evaluate(el => {el.textContent='Synthetic save warning: keep this page open and retry saving this visit.';el.hidden=false;});
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const warningBar = await page.locator('.workspace-tools').boundingBox();
+    const warningTabs = await patient(page).locator('.tabs').boundingBox();
+    assert(warningBar.height >= bar.height, 'The navigation includes the visible save warning at '+width);
+    assert(warningTabs.y >= warningBar.y+warningBar.height-1, 'The save warning does not cover Visit and Checklist at '+width);
+    for(const id of ['view-patients','view-seen','view-office']){
+      assert.equal(await page.locator('#'+id).evaluate(el => {const box=el.getBoundingClientRect();return el.contains(document.elementFromPoint(box.left+box.width/2,box.top+box.height/2));}), true, id+' stays reachable with a save warning at '+width);
+    }
+    await page.locator('#draftWarning').evaluate(el => {el.hidden=true;});
+    await page.locator('#view-office').click();
+    assert.equal(await page.locator('#officeSection').isVisible(), true);
+    await page.locator('#view-patients').click();
+    await field(page, 'tab-check').click();
+    assert.equal(await field(page, 'f_k_confirm').isChecked(), true);
+    await field(page, 'tab-visit').click();
+  }
+  await clear(page);await showSeen(page);
+  await entry(page, 'SYNTHETIC STICKY NAVIGATION').getByRole('button').click();
+  const visit = linked(page, 'SYNTHETIC STICKY NAVIGATION');
+  await visit.locator('[data-local-id="tab-check"]').click();
+  assert.equal(await visit.locator('[data-local-id="f_k_confirm"]').isChecked(), true);
+  assert.equal(await page.locator('#view-patients').getAttribute('aria-selected'), 'true');
 });
 
 (async () => {

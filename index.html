@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.2.0">
+<meta name="note-builder-version" content="v9.2.1">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -79,6 +79,7 @@ try {
   --tab-on:#374b5d; --tab-shadow:inset 0 -2px 0 var(--accent); --bar:rgba(27,37,49,.96); --scrim:rgba(6,12,20,.72); --shadow:0 18px 44px rgba(0,0,0,.38);
 }
 *{box-sizing:border-box}
+html{scroll-padding-top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px) + 12px)}
 [hidden]{display:none!important}
 body{
   margin:0;background:var(--bg);color:var(--ink);
@@ -97,7 +98,7 @@ a{color:var(--accent-text)}
 .add-patient{width:100%;min-height:48px;border:1px dashed var(--accent);color:var(--accent-text);background:var(--accent-soft)}
 .patient-caption{margin:0;color:var(--muted);font-size:13px}
 .office-section{margin-top:20px;scroll-margin-top:16px}
-.workspace-tools{display:flex;align-items:center;gap:10px;margin-top:16px}
+.workspace-tools{position:sticky;top:calc(var(--message-viewport-top,0px) + env(safe-area-inset-top,0px));z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px;padding-block:8px;background:var(--bg)}
 .workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;flex:1;min-width:0;background:var(--chip);border:1px solid var(--chip-line);border-radius:12px;padding:4px}
 .workspace-tools>.btn{flex:none}
 @media(max-width:540px){.workspace-tools{flex-wrap:wrap}.workspace-tabs{flex-basis:100%}.workspace-tools>.btn{margin-left:auto}}
@@ -130,7 +131,7 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .patient-status{min-height:18px;text-align:center;font-size:12.5px;font-weight:720;color:var(--ok)}
 .patient-status.bad{color:var(--danger)}
 .patient-status.warn{color:var(--warn)}
-.draft-warning{position:sticky;top:0;z-index:50}
+.workspace-tools>.draft-warning{flex:1 0 100%;margin:0}
 .patient .top>div:first-child{flex:1;min-width:0}
 .patient-heading-actions{display:flex;flex:none;flex-wrap:wrap;justify-content:flex-end;gap:6px}
 .patient.is-collapsed .top .sub{display:none}
@@ -197,8 +198,8 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .btn.small{min-height:36px;padding:7px 11px;font-size:14px}
 .btn:active{transform:translateY(1px)}
 
-.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:10px 8px;margin-top:6px}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:12px;background:var(--chip);border:1px solid var(--chip-line)}
+.tabs{position:sticky;top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px));z-index:20;background:var(--bg);padding-block:10px 8px;margin-top:6px}
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;border-radius:12px;background:var(--chip);border:1px solid var(--chip-line)}
 .tab{
   appearance:none;border:0;background:transparent;color:var(--muted);font-weight:720;font-size:15px;
   padding:8px 4px;border-radius:9px;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;gap:6px
@@ -292,8 +293,8 @@ textarea.inp{min-height:84px;resize:vertical}
   .app{max-width:1200px}
   .visit-workspace{display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,30vw,350px);align-items:start;gap:24px}
   .message-rail{
-    position:sticky;top:calc(var(--message-viewport-top,0px) + 12px + env(safe-area-inset-top,0px));
-    max-height:min(var(--message-room,100dvh),calc(var(--message-viewport-height,100dvh) - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+    position:sticky;top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + 12px + env(safe-area-inset-top,0px));
+    max-height:min(var(--message-room,100dvh),calc(var(--message-viewport-height,100dvh) - var(--workspace-sticky-height,0px) - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
     display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:thin;
   }
   .message-card{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;margin:0;overflow:hidden}
@@ -313,6 +314,7 @@ textarea.inp{min-height:84px;resize:vertical}
 }
 @media(min-width:760px) and (max-width:1040px){.visit-main .grid{grid-template-columns:minmax(0,1fr)}.visit-main .full{grid-column:1}}
 @media print{.visit-workspace{display:block}.message-rail{position:static;max-height:none;overflow:visible}.message-card{display:block}.message-rail .out-wrap{display:block}.message-rail .output{max-height:none}}
+@media print{.workspace-tools,.tabs{position:static}}
 
 .scrim{
   position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
@@ -343,12 +345,11 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.2.0</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
+    <p class="sub"><b>v9.2.1</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
   <div id="storageSetupWarning" class="banner warn" role="alert" hidden><p>Saved information could not be moved to this version’s separate storage. Your previous data is unchanged. Retry to open the app.</p><button type="button" class="btn" id="retryStorageSetup">Retry storage setup</button></div>
-  <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
   <div id="draftReadWarning" class="banner warn" role="alert" hidden>
     <p>Saved drafts could not be read. They have not been changed. Retry before entering patients.</p>
     <button type="button" class="btn" id="retryDraftRead">Retry reading saved drafts</button>
@@ -359,11 +360,12 @@ dialog.scrim::backdrop{background:transparent}
   </div>
   <div class="workspace-tools">
     <nav class="workspace-tabs" role="tablist" aria-label="Workspace">
-      <button type="button" class="tab" role="tab" id="view-patients" aria-controls="patients" aria-selected="true">Patients</button>
+      <button type="button" class="tab" role="tab" id="view-patients" aria-controls="patients" aria-selected="true">Visit</button>
       <button type="button" class="tab" role="tab" id="view-seen" aria-controls="seenSection" aria-selected="false" tabindex="-1">Patients Seen</button>
       <button type="button" class="tab" role="tab" id="view-office" aria-controls="officeSection" aria-selected="false" tabindex="-1">Office</button>
     </nav>
     <button type="button" class="btn danger" id="clearShiftBtn">Clear shift</button>
+    <div id="draftWarning" class="banner warn draft-warning" role="alert" hidden></div>
   </div>
   <p id="shiftStatus" class="small" role="status" aria-live="polite"></p>
   <div id="officeSaveWarning" class="banner warn" role="alert" hidden>
@@ -453,7 +455,6 @@ dialog.scrim::backdrop{background:transparent}
       <div class="seg" role="tablist">
         <button type="button" class="tab" role="tab" id="tab-visit" aria-controls="panel-visit" aria-selected="true">Visit</button>
         <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist <span class="badge" id="badge-check"></span></button>
-        <button type="button" class="tab" id="tab-office" aria-controls="officeSection">Office <span class="badge" id="badge-office"></span></button>
       </div>
     </nav>
     <div id="panel-visit" role="tabpanel" aria-labelledby="tab-visit"></div>
@@ -526,6 +527,8 @@ function updateMessageViewport(){
   const style = document.documentElement.style;
   style.setProperty('--message-viewport-top', top + 'px');
   style.setProperty('--message-viewport-height', height + 'px');
+  const workspaceHeight = document.querySelector('.workspace-tools').getBoundingClientRect().height;
+  style.setProperty('--workspace-sticky-height', workspaceHeight + 'px');
   document.documentElement.toggleAttribute('data-message-compact', height < 430);
   // Near the final field, the grid's bottom can otherwise push a tall sticky
   // panel above its top boundary. Shrink the preview to the remaining form area.
@@ -543,6 +546,7 @@ messageViewport?.addEventListener('scroll', scheduleMessageViewport);
 window.addEventListener('resize', scheduleMessageViewport);
 window.addEventListener('scroll', scheduleMessageViewport, {passive:true});
 window.addEventListener('pageshow', scheduleMessageViewport);
+if(window.ResizeObserver) new ResizeObserver(scheduleMessageViewport).observe(document.querySelector('.workspace-tools'));
 updateMessageViewport();
 
 // Migrate once, then never read keys used by older versions again. Existing
@@ -1389,8 +1393,9 @@ function openSheet(opts){
   sheetDialog = scrim;
   host.append(scrim);
   scrim.showModal();
+  const initialFocus = document.activeElement;
   setTimeout(() => {
-    if(lifecycle.signal.aborted || sheetDialog !== scrim) return;
+    if(lifecycle.signal.aborted || sheetDialog !== scrim || document.activeElement !== initialFocus) return;
     const target = opts.focus ? card.querySelector(localSelector(opts.focus)) : null;
     try{ (target || card.querySelector('.btn')).focus({preventScroll:true}); }catch(e){}
   }, 30);
@@ -1434,7 +1439,7 @@ function renderAll(){
     $('#panel-' + t).hidden = t !== tab;
     $('#tab-' + t).setAttribute('aria-selected', t === tab ? 'true' : 'false');
   }
-  configureOfficeLink();
+  configurePatientTabs();
   renderOfficePanel();
   refresh();
 }
@@ -1836,15 +1841,12 @@ function updateBadges(ctx){
   const bc = $('#badge-check');
   bc.textContent = total ? done + '/' + total : '';
   bc.classList.toggle('complete', total > 0 && done === total);
-  const waiting = office.filter(o => typeof o.overnights !== 'string' || overnightText(o)).length;
-  $('#badge-office').textContent = waiting ? String(waiting) : '';
 }
 
 /* ---------- tabs ---------- */
 
-function configureOfficeLink(){
+function configurePatientTabs(){
   PATIENT_TABS.forEach(t => { $('#tab-' + t).tabIndex = t === tab ? 0 : -1; });
-  $('#tab-office').setAttribute('aria-controls', 'officeSection');
 }
 function setTab(t){
   if(t === 'office'){ page.showOffice(); return; }
@@ -1855,7 +1857,7 @@ function setTab(t){
     $('#panel-' + x).hidden = x !== t;
     $('#tab-' + x).setAttribute('aria-selected', x === t ? 'true' : 'false');
   }
-  configureOfficeLink();
+  configurePatientTabs();
   if(t === 'visit') autoSize($('#output'));
   root.scrollIntoView({block:'start'});
   saveDraftSoon();
@@ -2173,7 +2175,7 @@ function updateSheet(){
 /* ---------- wiring ---------- */
 
 function bind(){
-  for(const t of TABS) $('#tab-' + t).addEventListener('click', () => setTab(t));
+  for(const t of PATIENT_TABS) $('#tab-' + t).addEventListener('click', () => setTab(t));
   $('.seg').addEventListener('keydown', e => {
     if(!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) || e.target.getAttribute('role') !== 'tab') return;
     const buttons = Array.from(e.currentTarget.querySelectorAll('[role="tab"]'));
@@ -2471,7 +2473,7 @@ function createPatientPage(){
       const list = document.querySelector('#seenList');
       const focusedId = document.activeElement?.dataset?.seenVisit;
       list.replaceChildren();
-      if(!all.length) list.append(progressNode('p', 'No patients entered yet. Start a visit in Patients; it will appear here automatically.', 'banner info'));
+      if(!all.length) list.append(progressNode('p', 'No patients entered yet. Open Visit to start one; it will appear here automatically.', 'banner info'));
       for(const {visit} of matches){
         const card = document.createElement('article'); card.className = 'card seen-visit';
         const name = String(visit.vals.name || '').trim() || 'Unnamed patient';
