@@ -15,7 +15,7 @@ const draft = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_
 const office = page => page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
 const showSeen = page => page.locator('#view-seen').click();
 const restore = page => page.getByRole('button', {name:/^Restore (this visit|all)/}).click();
-const linked = (page, name) => page.locator('#patients .patient').filter({hasText:name});
+const linked = (page, name) => page.locator('#patients .patient').filter({has:page.locator('[data-local-id="patientTitle"]').filter({hasText:name})});
 async function seed(page, name, n = 0) {
   await field(page, 'f_name', n).fill(name);
   await field(page, 'f_dob', n).fill('01022000');
