@@ -25,7 +25,7 @@ function app(local,session,clock,installed=true){
  env.mountPatient=(root,seed,page)=>{
    env.page=page;const vals=cloned(seed.vals||{}),layout=cloned(seed.layout||{v:4,sections:[]});
    let office={values:[],writable:true,baseline:[],readFailed:false};
-   const p={root,vals,serialize:()=>({vals:cloned(vals),meta:seed.meta||{},preservedAnswers:[]}),getOffice:()=>office,hasPendingOffice:()=>false,hasContent:()=>Object.values(vals).some(Boolean),name:()=>vals.name||'',title(){},renderSaveState(){},getLayout:()=>layout,acceptsLayout:value=>!!value&&Array.isArray(value.sections),offerRestore:(d,alternative)=>{env.offered=cloned(d);env.alternative=alternative ? cloned(alternative) : null;},destroy(){},collapse(){},resize(){},focus(){},applyOffice:(values,writable,baseline,readFailed)=>{office={values,writable,baseline,readFailed};},keepPendingOffice(){},renderOffice(){},flushLayout(){}};
+   const p={root,vals,serialize:()=>({vals:cloned(vals),meta:seed.meta||{},preservedAnswers:[]}),getOffice:()=>office,hasPendingOffice:()=>false,hasContent:()=>Object.values(vals).some(Boolean),name:()=>vals.name||'',visitId:()=>seed.meta?.visitId || (seed.meta?.officeId ? 'visit-office-' + seed.meta.officeId : 'visit-form-' + root.id),officeId:()=>seed.meta?.officeId || null,title(){},renderSaveState(){},getLayout:()=>layout,acceptsLayout:value=>!!value&&Array.isArray(value.sections),offerRestore:(d,alternative)=>{env.offered=cloned(d);env.alternative=alternative ? cloned(alternative) : null;},destroy(){},collapse(){},resize(){},focus(){},applyOffice:(values,writable,baseline,readFailed)=>{office={values,writable,baseline,readFailed};},keepPendingOffice(){},renderOffice(){},flushLayout(){}};
    p.progress=()=>({dob:vals.dob||'',messageStatus:vals.name||vals.notes?'not-copied':'blank',pendingCurrentOffice:false,officePending:false,officeSaved:false,pendingCopies:[]});
    env.lastPatient=p;return p;
  };
@@ -34,8 +34,8 @@ function app(local,session,clock,installed=true){
 function abxEnv(){
  const env={DEFAULT_BASE:12,PHARMACY_PRESETS:['Madison','Westgate','Maple','Refuah'],norm:s=>String(s??'').trim().toLowerCase(),TABS:['visit','check','office'],console};
  vm.createContext(env);
- const code=section('function defaultLayout(){','\nconst WHEN_TEXT =')+section('function reconcileValues(','\nfunction pruneValues(')+section('function context(vals){','\nfunction officeSteps(')+section('function normalizeLayout(){','\nfunction saveLayout(');
- vm.runInContext('let L; let V={}; let M={}; let preservedAnswers=[];'+section('function chips(str){','\nfunction listItems(')+'\n'+code+"\nfunction secsOf(t){return L.sections.filter(s=>s.tab===t)}; function fieldById(id){return L.sections.flatMap(s=>s.fields).find(f=>f.id===id)}; function validDob(){return true}; L=defaultLayout(); normalizeLayout(); globalThis.probe={layout:L,buildOutput,reconcileValues,context,normalizeLayout,migrateRecentAntibioticValues,getPreserved:()=>preservedAnswers};",env);
+ const code=section('function defaultLayout(){','\nconst WHEN_TEXT =')+section('function reconcileValues(','\nfunction pruneValues(')+section('function context(','\nfunction officeSteps(')+section('function normalizeLayout(){','\nfunction saveLayout(');
+ vm.runInContext('let L; let V={}; let M={}; let preservedAnswers=[];'+section('function chips(str){','\nfunction listItems(')+'\n'+code+"\nfunction secsOf(t,layout=L){return layout.sections.filter(s=>s.tab===t)}; function fieldById(id,layout=L){return layout.sections.flatMap(s=>s.fields).find(f=>f.id===id)}; function validDob(){return true}; L=defaultLayout(); normalizeLayout(); globalThis.probe={layout:L,buildOutput,reconcileValues,context,normalizeLayout,migrateRecentAntibioticValues,getPreserved:()=>preservedAnswers};",env);
  return env.probe;
 }
 function worker(fetchImpl){
@@ -46,7 +46,7 @@ function worker(fetchImpl){
  return {listeners,buckets,caches:cacheAPI,events,get skipped(){return skipped;},async install(){let p;listeners.install({waitUntil:x=>p=x});return p;},async navigate(){let p;listeners.fetch({request:{url:'https://example.test/app/',method:'GET',mode:'navigate'},respondWith:x=>p=x});return p;}};
 }
 
-const release='v9.2.1';
+const release=html.match(/<meta name="note-builder-version" content="([^"]+)">/)[1];
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{

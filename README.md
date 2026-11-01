@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.1.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.3.
+
+Office shows Incomplete and Completed patients in two visible sections on the same page, with counts and shortcuts to jump between them. Check Completed on a patient to move their card to Completed, or uncheck it to return them to Incomplete. This changes only the completion status; saved test details, visit answers, and checklists stay intact. Completion saves on this browser/device and stays as chosen when editing or copying the patient again. Existing entries start incomplete. The shared Office reference checklist remains available below both lists.
 
 The main Visit, Patients Seen, and Office navigation stays visible while scrolling. Each patient has Visit and Checklist tabs; Office is available from the main navigation. Patient tabs and the desktop message preview stay below the navigation bar, including when a saved-draft warning is shown.
 
@@ -10,9 +12,9 @@ Vitals includes Height with separate Feet and Inches inputs. Entering one digit 
 
 Complete shifts now save persistently on this device in ordinary browser tabs as well as the installed app. Reopening offers all patient answers, checklists, copied-message history, and houses without an eight-hour cutoff. Storage failures and conflicting windows remain visible; an older window cannot overwrite a newer saved shift.
 
-Copying a message with overnight tests saves a complete visit snapshot with its Office entry. Open visit page uses the current form when available, or reopens the saved copy after starting fresh or clearing a patient. The saved copy contains the answers from the last copied message; edits made only in Office stay in Office. Older test-only entries cannot recover answers they never saved. Start fresh and Clear this patient retain Office entries and their saved visit copies; Clear shift removes the shift's forms, recovery copies, and Office entries. Browser/device data clearing still removes local data; there is no patient-data cloud backup.
+Copying a message with overnight tests saves a complete visit snapshot with its Office entry. Open visit page uses the current form when available, then the latest visit preserved in Patients Seen, and finally the last copied Office snapshot. Newer archived answers and checklist items take priority over an older copied message; edits made only in Office stay in Office. Older test-only entries cannot recover answers they never saved. Start fresh and Clear this patient retain Office entries and their saved visit copies; Clear shift removes the shift's forms, recovery copies, and Office entries. Browser/device data clearing still removes local data; there is no patient-data cloud backup.
 
-Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
+Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. The review also includes uncopied messages and changes in Patients Seen after clearing a patient or starting fresh; opening one restores its visit. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
 
 Exposure Yes shows Strep, Flu, and COVID shortcuts that can be selected together or combined with typed details. Medication allergies offers NKDA as its default shortcut. Saved forms receive these shortcut updates without changing entered answers.
 
@@ -40,7 +42,7 @@ npm test
 
 `node qa/printing-checks.cjs` runs focused printing-gate browser checks using mocked API responses and synthetic credentials.
 
-`npm run test:source` runs deterministic recovery, antibiotic, and service-worker checks without a browser. `node qa/run-checks.cjs storage` runs one browser group; the other groups are `layout`, `features`, and `installed`.
+`npm run test:source` runs deterministic recovery, visit integrity, antibiotic, printing-controller, and service-worker checks without a browser. `node qa/run-checks.cjs storage` runs one browser group; the other groups are `layout`, `features`, and `installed`.
 
 All browser suites use disposable contexts and synthetic patients. The shared browser helper blocks live analytics. `PLAYWRIGHT_MODULE` and `PLAYWRIGHT_CHROME` can override the Playwright module and browser executable. Explicit legacy-migration cases still use old storage keys; current-state assertions and failure injection use `hvnb_current_*`.
 

@@ -145,7 +145,7 @@ test('Clearing a copied patient preserves the complete saved Office visit', asyn
   assert.match(await linked.locator('[data-local-id="saveState"]').innerText(), /copied/i);
 });
 
-test('A copied Office retry retains the exact copied answers and checklist after edits and reopening', async (page, context, url) => {
+test('Office retry retains the copied snapshot while reopening uses newer archived answers and checklist', async (page, context, url) => {
   await seed(page);
   await field(page, 'tab-check').click();
   await field(page, 'f_k_confirm').check();
@@ -172,14 +172,18 @@ test('A copied Office retry retains the exact copied answers and checklist after
   await restore(reopened);
   await reopened.locator('#retryOfficeSave').click();
   await reopened.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
+  const savedCopy = (await office(reopened))[0].visit;
+  assert.equal(savedCopy.meta.sentText, copiedMessage.replace(/^\u200B/, ''));
+  assert.equal(savedCopy.vals.symptoms, 'SYNTHETIC sore throat and cough');
+  assert.equal(savedCopy.vals.k_confirm, true);
   await field(reopened, 'tab-visit').click();
   await field(reopened, 'newBtn').click();
   await reopened.getByRole('button', {name:'Clear this patient', exact:true}).click();
   const linked = await openSavedVisit(reopened, 'SYNTHETIC PERSISTED VISIT');
-  assert.equal(await linked.locator('[data-local-id="f_symptoms"]').inputValue(), 'SYNTHETIC sore throat and cough');
-  assert.equal(await linked.locator('[data-local-id="output"]').inputValue(), copiedMessage);
+  assert.equal(await linked.locator('[data-local-id="f_symptoms"]').inputValue(), 'SYNTHETIC EDIT AFTER COPYING');
+  assert.notEqual(await linked.locator('[data-local-id="output"]').inputValue(), copiedMessage);
   await linked.locator('[data-local-id="tab-check"]').click();
-  assert.equal(await linked.locator('[data-local-id="f_k_confirm"]').isChecked(), true);
+  assert.equal(await linked.locator('[data-local-id="f_k_confirm"]').isChecked(), false);
 });
 
 test('Undo after typing a new patient retains the pending copied visit snapshot for Office retry', async page => {
@@ -205,11 +209,13 @@ test('Undo after typing a new patient retains the pending copied visit snapshot 
   await page.evaluate(() => window.syntheticFailOfficeRead = false);
   await page.locator('#retryOfficeSave').click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
+  assert.equal((await office(page))[0].visit.meta.sentText, copiedMessage.replace(/^\u200B/, ''));
+  assert.equal((await office(page))[0].visit.vals.notes, 'SYNTHETIC complete visit notes\nSecond line retained');
   await field(page, 'newBtn', 1).click();
   await page.getByRole('button', {name:'Clear this patient', exact:true}).click();
   const linked = await openSavedVisit(page, 'SYNTHETIC PERSISTED VISIT');
-  assert.equal(await linked.locator('[data-local-id="output"]').inputValue(), copiedMessage);
-  assert.equal(await linked.locator('[data-local-id="f_notes"]').inputValue(), 'SYNTHETIC complete visit notes\nSecond line retained');
+  assert.notEqual(await linked.locator('[data-local-id="output"]').inputValue(), copiedMessage);
+  assert.equal(await linked.locator('[data-local-id="f_notes"]').inputValue(), 'SYNTHETIC UNCOPIED CHANGE');
 });
 
 test('An archived visit with a different saved layout retains edited legacy answers through another reopening', async (page, context, url) => {
@@ -228,8 +234,12 @@ test('An archived visit with a different saved layout retains edited legacy answ
   await page.close();
 
   const reopened = await context.newPage();
+  // Model an older Office-only visit with no editable form or Patients Seen archive.
+  await reopened.addInitScript(() => {
+    localStorage.removeItem('hvnb_current_app_draft');
+    sessionStorage.removeItem('hvnb_current_draft');
+  });
   await reopened.goto(url);
-  await reopened.getByRole('button', {name:'Start fresh', exact:true}).click();
   const linked = await openSavedVisit(reopened, name);
   const extra = linked.locator('[data-local-id="f_synthetic_extra"]');
   assert.equal(await extra.inputValue(), 'SYNTHETIC LEGACY VALUE');

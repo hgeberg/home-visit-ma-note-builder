@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.2.1">
+<meta name="note-builder-version" content="v9.2.3">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -115,6 +115,12 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .office-section h2{margin:0;font-size:21px}
 .office-patient .visit-head{grid-template-columns:minmax(0,1fr)}
 .office-patient .visit-name,.office-patient .visit-meta{min-width:0;overflow-wrap:anywhere}
+.office-patient-name{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.office-patient.is-complete{border-color:var(--ok-line)}
+.office-group{margin-top:24px}
+.office-group-title{margin:0 0 10px;font-size:18px}
+.office-list-links{margin-top:12px}
+.office-completion{margin-top:12px}
 .overnight-tests{margin:4px 0 12px;font-weight:720;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}
 .office-reference-list{margin:0;padding:0 16px 16px 38px;display:grid;gap:10px}
 .office-reference-list .small{margin-top:2px}
@@ -345,7 +351,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.2.1</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
+    <p class="sub"><b>v9.2.3</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -399,7 +405,8 @@ dialog.scrim::backdrop{background:transparent}
   </section>
   <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
     <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
-    <p class="office-summary">Saved when you press Copy message. Use each patient’s tests below when filling out requisitions. Edit the visit and copy it again to update the saved entry.</p>
+    <p class="office-summary">Saved when you press Copy message. Check Completed when the patient’s office work is finished. Their saved information stays below in Completed; uncheck it to move them back to Incomplete.</p>
+    <p id="officeCompletionStatus" class="small" role="status" aria-live="polite"></p>
     <div id="officeContent"></div>
     <details id="officePrintingTools" class="card office-printing">
       <summary class="sec-title">Office tools</summary>
@@ -907,8 +914,8 @@ function restorePendingOffice(list, linkCurrent = true){
       ...(p.visit && typeof p.visit === 'object' && !Array.isArray(p.visit) ? {visit:p.visit} : {})}));
 }
 
-function secsOf(t){ return L.sections.filter(s => s.tab === t); }
-function fieldById(id){ for(const s of L.sections) for(const f of s.fields) if(f.id === id) return f; return null; }
+function secsOf(t, layout = L){ return layout.sections.filter(s => s.tab === t); }
+function fieldById(id, layout = L){ for(const s of layout.sections) for(const f of s.fields) if(f.id === id) return f; return null; }
 
 function loadLayout(){
   const saved = seed.layout || readJSON('local', LAYOUT_KEY);
@@ -1031,6 +1038,7 @@ function normalizeOffice(list){
     ...o,
     name:typeof o.name === 'string' ? o.name : '',
     dob:typeof o.dob === 'string' ? o.dob : '',
+    completed:o.completed === true,
     steps:(Array.isArray(o.steps) ? o.steps : []).filter(s => s && typeof s.id === 'string' && typeof s.label === 'string').map(s => ({id:s.id, label:s.label, done:s.done === true}))
   }));
 }
@@ -1187,9 +1195,9 @@ function preserveLayoutAnswers(layout, migrations){
 
 /* ---------- what applies ---------- */
 
-function context(vals){
+function context(vals, layout = L){
   const ticked = [], positive = [];
-  for(const sec of secsOf('visit')) for(const f of sec.fields){
+  for(const sec of secsOf('visit', layout)) for(const f of sec.fields){
     if(f.type !== 'tests') continue;
     const tv = vals[f.id] || {};
     for(const it of f.items || []){
@@ -1203,9 +1211,9 @@ function context(vals){
   if(/^(none|no|n\/?a|nothing|-+)\.?$/.test(lab)) lab = '';
   const did = (id, re) => ticked.some(it => it.id === id || re.test(it.n));
   const anyPositive = positive.length > 0;
-  const awareness = fieldById('aware');
+  const awareness = fieldById('aware', layout);
   return {
-    recentAntibiotics: !!fieldById('abx')?.yesValue && vals.abx === fieldById('abx').yesValue,
+    recentAntibiotics: !!fieldById('abx', layout)?.yesValue && vals.abx === fieldById('abx', layout).yesValue,
     added: !!vals.added,
     correction: !!String(vals.correction || '').trim(),
     anyPositive,
@@ -1223,20 +1231,20 @@ function whenOK(w, ctx){
   return (Array.isArray(w) ? w : [w]).every(k => (k in ctx) ? !!ctx[k] : true);
 }
 
-function buildOutput(vals){
+function buildOutput(vals, layout = L){
   // The message only ever holds what was entered. Anything missing goes into `issues`,
   // which the "Before you copy" sheet shows. Nothing like NOT MARKED is ever printed.
-  const ctx = context(vals);
+  const ctx = context(vals, layout);
   const lines = [], issues = [];
-  const visitFields = secsOf('visit').flatMap(sec => sec.fields);
+  const visitFields = secsOf('visit', layout).flatMap(sec => sec.fields);
   const antibioticChoice = visitFields.find(f => f.id === 'abx');
   const antibioticFields = ['abx_name', 'abx_when'].map(id => visitFields.find(f => f.id === id));
   const combineAntibiotics = antibioticChoice?.type === 'choice' && antibioticFields.every(f => f && ['text', 'textarea'].includes(f.type));
   const height = ['height_ft', 'height_in'].map(id => visitFields.find(f => f.id === id));
   const combineHeight = height.every(f => f?.type === 'text');
   let aware = '';   // printed in capitals under each positive test
-  for(const sec of secsOf('visit')) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
-  for(const sec of secsOf('visit')) for(const f of sec.fields){
+  for(const sec of secsOf('visit', layout)) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
+  for(const sec of secsOf('visit', layout)) for(const f of sec.fields){
     if(!whenOK(f.when, ctx)) continue;
     const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
     if(combineHeight && f === height[1]) continue;
@@ -1471,11 +1479,24 @@ function renderOfficePanel(){
   if(!office.length){
     p.append(h('div', {class:'banner info', text:officeWritable ? 'No overnight tests saved yet. Enter a patient’s overnight tests in the Visit form, then press Copy message.' : 'Saved entries could not be loaded. Retry saving to recover the Office list.'}));
   }
-  ordered.sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
-  if(legacy.length){
-    p.append(h('h3', {text:'Earlier saved patients'}), h('p', {class:'office-summary', text:'The previous version saved these patients without the test names. Edit each entry to add its tests, or copy its completed visit again.'}));
-    legacy.sort((a, b) => a.t - b.t).forEach(o => p.append(officeCard(o)));
+  const links = h('nav', {class:'row office-list-links', 'aria-label':'Office patient lists'});
+  const groups = [];
+  for(const completed of [false, true]){
+    const status = completed ? 'completed' : 'incomplete', title = completed ? 'Completed' : 'Incomplete';
+    const current = ordered.filter(o => (o.completed === true) === completed).sort((a, b) => a.t - b.t);
+    const earlier = legacy.filter(o => (o.completed === true) === completed).sort((a, b) => a.t - b.t);
+    const heading = h('h3', {id:'office_' + status, class:'office-group-title', tabindex:'-1', text:title + ' (' + (current.length + earlier.length) + ')'});
+    const group = h('section', {class:'office-group', data:{officeStatus:status}, 'aria-labelledby':'office_' + status}, heading);
+    links.append(h('button', {type:'button', class:'btn small', text:heading.textContent, onclick:() => { heading.focus({preventScroll:true}); heading.scrollIntoView({block:'start'}); }}));
+    current.forEach(o => group.append(officeCard(o)));
+    if(earlier.length){
+      group.append(h('h4', {text:'Earlier saved patients'}), h('p', {class:'office-summary', text:'The previous version saved these patients without the test names. Edit each entry to add its tests, or copy its completed visit again.'}));
+      earlier.forEach(o => group.append(officeCard(o)));
+    }
+    if(!current.length && !earlier.length) group.append(h('p', {class:'office-summary', text:completed ? 'No completed patients yet.' : 'No incomplete patients.'}));
+    groups.push(group);
   }
+  p.append(links, ...groups);
   const reference = h('section', {class:'card', data:{officeReference:'true'}},
     h('h3', {class:'sec-title', text:'Office checklist — reference'}),
     h('p', {class:'small pad-x', text:'Use these reminders for the patients they apply to. This checklist is shared across the full list.'}));
@@ -1491,20 +1512,37 @@ function renderOfficePanel(){
 }
 
 function officeCard(o){
-  const card = h('section', {class:'card office-patient', data:{officeId:o.id}});
+  const card = h('section', {class:'card office-patient' + (o.completed ? ' is-complete' : ''), data:{officeId:o.id}, 'aria-label':o.name || 'Name not entered'});
   card.append(h('div', {class:'visit-head'},
-    h('div', {class:'visit-name', text:o.name || 'Name not entered'}),
+    h('div', {class:'office-patient-name'}, h('div', {class:'visit-name', text:o.name || 'Name not entered'}),
+      h('span', {class:'progress-label ' + (o.completed ? 'ok' : 'warn'), text:o.completed ? 'Completed' : 'Incomplete'})),
     h('div', {class:'visit-meta', text:(o.dob ? 'DOB ' + o.dob : 'DOB not entered') + ' · ' + fmtDayTime(o.t)})));
   const details = h('div', {class:'pad'});
   if(typeof o.overnights === 'string'){
     details.append(h('p', {class:'small', text:'Overnight tests'}), h('p', {class:'overnight-tests', text:o.overnights}));
     if(o.bloodreason) details.append(h('p', {class:'small', text:'Reason for blood work'}), h('p', {class:'overnight-tests', text:o.bloodreason}));
   }else details.append(h('p', {class:'banner warn', text:'Overnight test details were not saved in this older entry.'}));
+  const completed = h('input', {type:'checkbox', checked:o.completed, data:{officeCompleted:o.id}, onchange:() => setOfficeCompleted(o.id, completed.checked)});
+  details.append(h('label', {class:'checkrow office-completion' + (o.completed ? ' done' : '')}, completed, h('span', {text:'Completed'})));
   card.append(details);
   card.append(h('div', {class:'row pad'},
     h('button', {type:'button', class:'btn small', text:'Edit saved entry', onclick:() => editOfficeVisit(o)}),
     h('button', {type:'button', class:'btn small danger', text:'Remove', onclick:() => removeOfficeVisit(o)})));
   return card;
+}
+
+function setOfficeCompleted(id, completed){
+  let entry;
+  mutateOffice(() => {
+    entry = office.find(o => o.id === id);
+    if(entry) entry.completed = completed;
+  });
+  const status = document.querySelector('#officeCompletionStatus');
+  status.textContent = !entry ? 'This entry is no longer available.'
+    : (entry.name || 'Patient') + (completed ? ' moved to Completed.' : ' moved to Incomplete.');
+  const checkbox = Array.from(page.officeContent.querySelectorAll('[data-office-completed]')).find(el => el.dataset.officeCompleted === id);
+  if(checkbox){ checkbox.focus({preventScroll:true}); checkbox.closest('.office-completion').scrollIntoView({block:'nearest'}); }
+  else document.querySelector('#officeHeading').focus({preventScroll:true});
 }
 
 function renderSection(sec){
@@ -1804,14 +1842,16 @@ function renderSaveState(text = buildOutput(V).text){
   page.updateTitles();
 }
 
+function messageStatus(vals, meta, layout = L){
+  const result = buildOutput(vals, layout);
+  return meta.sentAt ? (result.text === meta.sentText ? 'copied' : 'changed') : (result.text || result.ctx.anyTest ? 'not-copied' : 'blank');
+}
 function visitProgress(){
-  const text = buildOutput(V).text;
-  const messageStatus = M.sentAt ? (text === M.sentText ? 'copied' : 'changed') : (text || context(V).anyTest ? 'not-copied' : 'blank');
   const ownOffice = M.officeId && office.find(o => o.id === M.officeId);
   const savedOffice = M.officeId && officeBaseline.find(o => o.id === M.officeId);
   const pendingCurrentOffice = pendingOfficeSync.some(p => p.meta === M) || !!(M.officeId && !officeWritable && JSON.stringify(ownOffice) !== JSON.stringify(savedOffice));
   return {
-    dob:String(V.dob || '').trim(), messageStatus, pendingCurrentOffice,
+    dob:String(V.dob || '').trim(), messageStatus:messageStatus(V, M), pendingCurrentOffice,
     officePending:pendingCurrentOffice || pendingOfficeSync.length > 0,
     officeId:M.officeId,
     officeSaved:!!(ownOffice && !officeReadFailed && JSON.stringify(ownOffice) === JSON.stringify(savedOffice)),
@@ -2013,7 +2053,7 @@ function syncVisitSteps(ov, steps){
 /* ---------- office list ---------- */
 
 function addToOffice(name, dob, vals = V, meta = M, savedVisit = copiedVisitSnapshot(vals, meta)){
-  const visit = { id: uid('v'), name, dob, t: Date.now(), shift:page.generation(), ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
+  const visit = { id: uid('v'), name, dob, t: Date.now(), shift:page.generation(), completed:false, ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
   visit.visit = {...clone(savedVisit), meta:{...clone(savedVisit.meta), officeId:visit.id}};
   mutateOffice(() => { office.push(visit); });
   meta.officeId = visit.id;
@@ -2045,7 +2085,7 @@ function editOfficeVisit(o, pending){
     h('label', {class:'flabel', for:'sheet_overnights', text:'Overnight tests'}), tests,
     h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason,
     !visitAvailable ? h('p', {class:'small', text:'A complete visit form was not saved with this older Office entry. You can still edit its saved test details.'})
-      : !page.patientForOffice(o.id) ? h('p', {class:'small', text:'Open visit page restores the answers from the last copied message. Changes made only to this Office entry stay here.'}) : null, err],
+      : !page.patientForOffice(o.id) ? h('p', {class:'small', text:'Open visit page restores the latest saved visit, or the last copied message if no newer visit is available. Changes made only to this Office entry stay here.'}) : null, err],
     buttons:[ {label:'Save changes', kind:'primary', validate:() => {
                   if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
                   if(f.dobIn.value.trim() && !validDob(f.dobIn.value)){ err.textContent = 'DOB: enter a valid date (MM/DD/YYYY).'; return false; }
@@ -2122,6 +2162,8 @@ function clearVisit(msg){
   setTab('visit');
   if(msg !== false) flash(msg || 'This patient was cleared');
   if(canUndo) page.offerUndo('Cleared ' + (savedValues.name || 'this patient'), () => {
+    const reopened = page.patientForVisit(savedMeta.visitId);
+    if(reopened){ page.openPatient(reopened); reopened.showVisit(); return; }
     if(hasContent(V) || M.sentAt || preservedAnswers.length){
       const pending = pendingOfficeSync.filter(p => p.meta === savedMeta);
       pendingOfficeSync = pendingOfficeSync.filter(p => p.meta !== savedMeta);
@@ -2138,7 +2180,7 @@ function sentGuard(beforeEdit){
   sheet({ title:'You already copied this visit', dismissable:false,
     body:['You copied it at ' + fmtTime(M.sentAt) + '. Is this still the same patient?'],
     buttons:[ {label:'Same patient, keep editing', kind:'primary', on:() => { M.sentAck = true; saveDraft(); }},
-              {label:'No, undo this edit and add a patient', on:() => {
+              {label:'No, undo this edit and add a patient', restoreFocus:false, on:() => {
                 V = clone(beforeEdit);
                 renderAll();
                 page.addPatient(root);
@@ -2236,6 +2278,7 @@ return {
   visitId:() => M.visitId,
   snapshot:() => ({...copiedVisitSnapshot(V, M), id:root.id}),
   progress:visitProgress,
+  snapshotMessageStatus:visit => messageStatus(visit.vals, visit.meta || {}, visit.layout),
   officeId:() => M.officeId,
   showVisit:() => setTab('visit'),
   layoutImpact:(layout, migrations) => affectedAnswers(layout, migrations).map(a => a.label),
@@ -2428,7 +2471,7 @@ function createPatientPage(){
     keepOfficeVisits:() => {
       for(const entry of patients[0]?.getOffice().values || []){
         const visit = entry.visit, id = visitIdentity(visit);
-        if(!id || archivedVisits.some(v => visitIdentity(v) === id) || patients.some(p => visitIdentity(patientSnapshot(p)) === id)) continue;
+        if(!id || archivedVisits.some(v => visitIdentity(v) === id) || page.patientForVisit(id)) continue;
         page.archiveVisit(visit, null, entry.t);
       }
     },
@@ -2450,7 +2493,7 @@ function createPatientPage(){
       if(!page.isCurrentShift()) return;
       const entry = page.seenVisits().find(({visit}) => visitIdentity(visit) === id);
       if(!entry) return;
-      let patient = entry.patient;
+      let patient = entry.patient || page.patientForVisit(id);
       if(!patient){
         const seed = clone(entry.visit);
         const office = patients[0].getOffice().values.find(o => o.visit?.meta?.visitId === id);
@@ -2458,6 +2501,7 @@ function createPatientPage(){
         patient = page.addPatient(null, seed, false, true);
       }
       if(patient){ page.openPatient(patient); patient.showVisit(); }
+      return patient;
     },
     renderSeenVisits:() => {
       if(seenSection.hidden) return;
@@ -2503,20 +2547,35 @@ function createPatientPage(){
       document.querySelector('#patientNavigator').open = false;
       patient.focus();
     },
-    patientForOffice:id => typeof id === 'string' && id ? patients.find(p => p.officeId() === id) : null,
+    patientForVisit:id => typeof id === 'string' && id ? patients.find(p => p.visitId() === id) : null,
+    patientForOffice:id => {
+      if(typeof id !== 'string' || !id) return null;
+      const entry = patients[0]?.getOffice().values.find(o => o.id === id);
+      return patients.find(p => p.officeId() === id) || page.patientForVisit(visitIdentity(entry?.visit));
+    },
     savedOfficeVisit:id => {
       const entry = patients[0]?.getOffice().values.find(o => o.id === id && page.matchesShift(o));
       const visit = entry?.visit;
       if(!object(visit) || !object(visit.vals) || !object(visit.meta) || visit.meta.officeId !== id || !patients[0].acceptsLayout(visit.layout)) return null;
       return clone(visit);
     },
-    canOpenOfficeVisit:id => !!page.patientForOffice(id) || !!page.savedOfficeVisit(id),
+    officeVisit:id => {
+      const saved = page.savedOfficeVisit(id), identity = visitIdentity(saved);
+      // A cleared form may contain edits made after the last Office copy.
+      // Its complete archive remains authoritative when reopening the visit.
+      const archived = archivedVisits.find(v => v.meta?.officeId === id || (identity && visitIdentity(v) === identity));
+      return archived ? clone(archived) : saved;
+    },
+    canOpenOfficeVisit:id => !!page.patientForOffice(id) || !!page.officeVisit(id),
     openOfficeVisit:id => {
       if(!page.isCurrentShift()) return false;
       let patient = page.patientForOffice(id);
       if(!patient){
-        const saved = page.savedOfficeVisit(id);
-        if(saved) patient = page.addPatient(null, saved, false, true);
+        const saved = page.officeVisit(id);
+        if(saved){
+          saved.meta.officeId = id;
+          patient = page.patientForVisit(visitIdentity(saved)) || page.addPatient(null, saved, false, true);
+        }
       }
       if(!patient) return false;
       page.openPatient(patient);
@@ -2611,6 +2670,13 @@ function createPatientPage(){
         if(reasons.length) items.push({id:patient.root.id, patient, officeId:state.officeId, name:patient.name() || 'Unnamed patient', dob:state.dob, house, number:index + 1, reasons});
         state.pendingCopies.forEach((copy, i) => items.push({id:patient.root.id + '-pending-' + i, patient, officeId:copy.officeId, name:copy.name || 'Unnamed earlier patient', dob:copy.dob, house, earlier:true, reasons:['Office save pending', 'Earlier copied visit; original form unavailable']}));
       }
+      for(const visit of archivedVisits){
+        const id = visitIdentity(visit);
+        if(page.patientForVisit(id)) continue;
+        const message = patients[0].snapshotMessageStatus(visit);
+        const reason = message === 'not-copied' ? 'Not copied' : message === 'changed' ? 'Changes not copied' : null;
+        if(reason) items.push({id:'archived-' + id, visitId:id, archived:true, name:String(visit.vals.name || '').trim() || 'Unnamed patient', dob:String(visit.vals.dob || '').trim(), reasons:[reason]});
+      }
       if(patients.length){
         const state = patients[0].getOffice();
         if(!state.writable){
@@ -2651,7 +2717,8 @@ function createPatientPage(){
         button.addEventListener('click', () => {
           clearDialog.close();
           if(!page.isCurrentShift()) return;
-          if(item.earlier || item.officeOnly){ page.showOffice(); document.querySelector('#retryOfficeSave').focus({preventScroll:true}); }
+          if(item.archived) page.openSeenVisit(item.visitId);
+          else if(item.earlier || item.officeOnly){ page.showOffice(); document.querySelector('#retryOfficeSave').focus({preventScroll:true}); }
           else if(patients.includes(item.patient)){ page.openPatient(item.patient); item.patient.showVisit(); item.patient.focus(); }
         });
         li.append(button); list.append(li);
@@ -2671,7 +2738,7 @@ function createPatientPage(){
       const state = patients[0].getOffice();
       const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
       const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
-      const liveIds = new Set(patients.map(p => visitIdentity(patientSnapshot(p))));
+      const liveIds = new Set(patients.map(p => p.visitId()));
       const history = archivedVisits.filter(visit => !liveIds.has(visitIdentity(visit)));
       const empty = patients.length === 1 && !patients[0].hasContent() && !pending && !history.length;
       const layout = patients[0].getLayout(), serializedLayout = JSON.stringify(layout);
