@@ -85,7 +85,8 @@ test('Office navigation hides patient forms and preserves patient inputs and che
   assert.equal(await page.locator('#officeHeading').isVisible(), true);
   assert.equal(await cards(page).count(), 2);
   assert.equal(await page.locator('[data-office-reference]').count(), 1);
-  assert.equal(await cards(page).locator('input[type="checkbox"]').count(), 0);
+  assert.equal(await cards(page).getByRole('checkbox', {name:'Completed', exact:true}).count(), 2, 'Each saved patient has one completion checkbox');
+  assert.equal(await cards(page).locator('input[type="checkbox"]').count(), 2, 'Saved patient cards have no per-task checklists');
   await showPatients(page);
   assert.equal(await page.locator('#officeSection').isVisible(), false);
   assert.equal(await local(patient(page), 'panel-check').isVisible(), true);
