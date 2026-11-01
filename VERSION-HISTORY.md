@@ -1,5 +1,19 @@
 # Home Visit MA Note Builder versions
 
+## v9.2.3 — Office completion lists (November 1, 2026)
+
+Each saved Office patient has a Completed checkbox. Checking it moves the full card into Completed; unchecking returns it to Incomplete. Both sections stay visible on the Office page with counts, jump shortcuts, and explicit status labels. Empty sections explain that there are no patients in that list. The shared Office reference remains below both lists.
+
+Completion is saved with the existing Office record and preserved when editing or copying the visit again. Toggling it changes only that status, retaining all saved test details, complete visit snapshots, and checklist answers. Existing records start incomplete. Moving a card preserves focus on its checkbox and announces the change. The existing storage recovery, retry, and cross-tab merge behavior also covers completion updates. Release metadata and offline cache advance together.
+
+## v9.2.2 — preserve visit answers across Office, Undo, and shift review (October 28, 2026)
+
+Opening a visit from Office now uses its latest saved answers from Patients Seen before falling back to the last copied snapshot. Undoing a cleared patient reuses a visit that has already been reopened, preserving newer edits and preventing duplicate visit identities. Choosing to undo an edit and add a patient keeps keyboard focus on the new patient.
+
+Clear shift reviews archived visits for uncopied messages and changes after copying, using each visit's saved form definition. Checklist-only activity remains optional and does not create unfinished-message warnings. Archived review items reopen the complete visit. Saving uses patient IDs directly instead of cloning complete snapshots just to identify active visits.
+
+Added deterministic and local-browser regressions for these interactions. The standard test runner now includes the existing printing browser suite. Release metadata, package version, and offline cache advance together.
+
 ## v9.2.1 — sticky Visit navigation (October 28, 2026)
 
 Renamed the main Patients tab to Visit and kept Visit, Patients Seen, and Office visible while scrolling. Removed the duplicate Office shortcut inside each patient, leaving Visit and Checklist. The navigation height adjusts for narrow screens and saved-draft warnings, keeping patient tabs, the desktop message preview, and scrolled-to fields below it. Dialogs preserve a field selected immediately after opening instead of letting delayed autofocus move typing to another field. Advanced the app version and offline cache together.

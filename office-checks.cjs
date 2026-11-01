@@ -256,7 +256,9 @@ test('only Copy saves, with separate exact overnight orders and blood reason for
   assert.ok(!(await firstCard.innerText()).includes(betaTests));
   assert.ok((await secondCard.innerText()).includes(betaTests));
   assert.ok(!(await secondCard.innerText()).includes(bloodReason));
-  assert.equal(await cards(page).locator('input[type="checkbox"]').count(), 0, 'Saved patient cards have no task checklists');
+  await showOffice(page);
+  assert.equal(await cards(page).getByRole('checkbox', {name:'Completed', exact:true}).count(), 2, 'Each saved patient has one completion checkbox');
+  assert.equal(await cards(page).locator('input[type="checkbox"]').count(), 2, 'Saved patient cards have no per-task checklists');
 });
 
 test('rapid-only visits and empty or negative overnight placeholders never add Office cards', async ({ page }) => {
@@ -364,7 +366,8 @@ test('legacy Office entries retain identity and steps, disclose missing orders, 
   assert.equal(await cards(page).count(), 1);
   const card = cards(page);
   assert.match(await card.innerText(), /missing|not (?:saved|recorded)|unavailable/i);
-  assert.equal(await card.locator('input[type="checkbox"]').count(), 0);
+  assert.equal(await card.getByRole('checkbox', {name:'Completed', exact:true}).count(), 1, 'Older entries have a completion checkbox too');
+  assert.equal(await card.locator('input[type="checkbox"]').count(), 1, 'Older checklist steps remain reference data rather than task checkboxes');
   assert.doesNotMatch(await card.innerText(), /Overnights sent:\s*4plex/i, 'Legacy checklist steps cannot infer the actual ordered tests');
   assert.deepEqual((await records(page))[0].steps, legacy.steps);
   await card.getByRole('button', { name: /Edit saved entry/i }).click();
