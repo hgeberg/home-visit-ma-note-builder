@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.2.3">
+<meta name="note-builder-version" content="v9.2.4">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -351,7 +351,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.2.3</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
+    <p class="sub"><b>v9.2.4</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -1154,7 +1154,7 @@ function reconcileValues(values, layout, migrations){
         const old = value && value[item.id];
         if(!old || old.on !== true) continue;
         const state = {on:true};
-        if(item.kind !== 'done' && ['Positive','Negative'].includes(old.r)){
+        if(item.kind !== 'done' && ['Positive','Negative','running'].includes(old.r)){
           state.r = old.r;
           const subtype = migrate('subtypes', f.id, old.s, item.id);
           if(old.r === 'Positive' && item.sub && item.sub.includes(subtype)) state.s = subtype;
@@ -1305,7 +1305,7 @@ function buildOutput(vals, layout = L){
         if(it.kind === 'done'){ lines.push(it.n + ': Done'); continue; }
         if(!s.r){ issues.push(it.n + ': result not marked'); continue; }
         const needsType = s.r === 'Positive' && it.sub && it.sub.length;
-        lines.push(it.n + ': ' + s.r.toUpperCase() + (needsType && s.s ? ' (' + s.s + ')' : ''));
+        lines.push(it.n + ': ' + (s.r === 'running' ? 'running' : s.r.toUpperCase()) + (needsType && s.s ? ' (' + s.s + ')' : ''));
         if(s.r === 'Positive' && aware) lines.push('PATIENT ' + String(aware).toUpperCase());
         if(needsType && !s.s) issues.push(it.n + ': ' + it.sub.join(' or ') + ' not marked');
       }
@@ -1685,8 +1685,8 @@ function testsField(f){
     if(it.hint) row.append(h('div', {class:'hint', text:it.hint}));
     if(it.kind !== 'done'){
       const res = h('div', {class:'chips res', role:'radiogroup', 'aria-label':it.n + ' result'});
-      for(const r of ['Positive', 'Negative']){
-        res.append(h('button', {type:'button', class:'chip ' + (r === 'Positive' ? 'pos' : 'neg'), role:'radio', 'aria-checked':'false', data:{r}, text:r, onclick:() => {
+      for(const r of ['Positive', 'Negative', 'running']){
+        res.append(h('button', {type:'button', class:'chip' + (r === 'Positive' ? ' pos' : r === 'Negative' ? ' neg' : ''), role:'radio', 'aria-checked':'false', data:{r}, text:r, onclick:() => {
           const tv = V[f.id] = Object.assign({}, V[f.id]);
           const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
           if(s.r === r){ delete s.r; delete s.s; }
@@ -3238,3 +3238,4 @@ openCurrentApp();
 </script>
 </body>
 </html>
+
