@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v9.2.4 — running rapid tests (November 3, 2026)
+
+Each rapid-test result has a `running` option for copying a visit while the test is still in progress. The message uses `running`, and saved visits retain the selection when reopened. Switching from a positive flu result clears its type; running tests do not trigger positive-result awareness or provider-tagging prompts. Positive and Negative remain available for entering the final result. Release metadata and offline cache advance together.
+
 ## v9.2.3 — Office completion lists (November 1, 2026)
 
 Each saved Office patient has a Completed checkbox. Checking it moves the full card into Completed; unchecking returns it to Incomplete. Both sections stay visible on the Office page with counts, jump shortcuts, and explicit status labels. Empty sections explain that there are no patients in that list. The shared Office reference remains below both lists.
@@ -267,3 +271,4 @@ Run `node office-checks.cjs` for the overnight list, copy-only saving, legacy re
 Run `node shift-checks.cjs` for separate-view navigation, confirmation/cancellation, clearing, cross-tab synchronization, stale drafts, pending copies and failed storage deletion.
 
 `WEBSITE-AUDIT.md` and `audit-checks.cjs` document the original v8.7 audit. That older script deliberately reproduces original defects and reads the preserved v8.7 snapshot; its passing defect checks are not claims that those defects are fixed.
+

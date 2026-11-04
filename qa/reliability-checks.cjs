@@ -50,6 +50,38 @@ const release=html.match(/<meta name="note-builder-version" content="([^"]+)">/)
 const cacheKey='hvnb-shell-/app/-'+release;
 const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="note-builder-version" content="'+version+'">';
 (async()=>{
+ await check('Running rapid tests copy without positive prompts and survive saved-visit reconciliation',()=>{
+  const p=abxEnv(),tests={};
+  for(const id of ['strep','flu','covid']) tests[id]={on:true,r:'running',s:'B'};
+  const values=p.reconcileValues({tests},p.layout);
+  for(const id of Object.keys(tests)) assert.deepEqual(cloned(values.tests[id]),{on:true,r:'running'});
+  const result=p.buildOutput(values);
+  for(const label of ['Rapid strep','Rapid flu','Rapid COVID']){
+   assert(result.text.includes(label+': running'));
+   assert(!result.issues.some(issue=>issue.startsWith(label+':')));
+  }
+  assert.equal(result.ctx.anyPositive,false);
+  assert(!result.issues.some(issue=>/aware|type|A or B/i.test(issue)));
+ });
+ await check('Each rapid result offers a neutral running button that clears flu type and toggles off',()=>{
+  const p=abxEnv(),layout=p.layout;
+  const h=(tag,attrs,...children)=>({tag,...attrs,children,append(...items){this.children.push(...items);},addEventListener(){}});
+  const env={h,V:{tests:{flu:{on:true,r:'Positive',s:'B'}}},refresh(){}};
+  vm.createContext(env);vm.runInContext(section('function testsField(f){','\n/* ---------- refresh:')+'\nglobalThis.render=testsField;',env);
+  const f=layout.sections.flatMap(sec=>sec.fields).find(f=>f.id==='tests');
+  const rows=env.render(f)[1].children;
+  for(const row of rows){
+   const res=row.children.find(child=>child.class==='chips res');
+   if(['strep','flu','covid'].includes(row.data.item)){
+    const button=res.children.find(child=>child.text==='running');
+    assert(button);assert.equal(button.class,'chip');assert.equal(button.role,'radio');
+    button.onclick();assert.deepEqual(cloned(env.V.tests[row.data.item]),{on:true,r:'running'});
+    button.onclick();assert.deepEqual(cloned(env.V.tests[row.data.item]),{on:true});
+    res.children.find(child=>child.text==='Negative').onclick();
+    assert.equal(env.V.tests[row.data.item].r,'Negative');
+   }else assert.equal(res,undefined);
+  }
+ });
  await check('Undoing a copied-patient edit preserves all answers from immediately before that edit',()=>{
   const copied={name:'SYNTHETIC ORIGINAL',inspic:true,tests:{flu:{on:true,r:'Positive',s:'B'}}};
   const before={...cloned(copied),k_confirm:true,k_pa:true,k_posted:true,hidden_answer:'RETAINED'};
@@ -227,3 +259,4 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
  });
  console.log(results.filter(r=>r.status==='PASS').length+'/'+results.length+' reliability checks passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+

@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.3.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.4.
+
+Rapid strep, flu, and COVID each offer a `running` result alongside Positive and Negative. Select it when copying the visit before the test finishes; the message includes, for example, `Rapid flu: running`. It saves with the visit and can be replaced by the final result later. Running tests do not require a flu type or positive-result awareness.
 
 Office shows Incomplete and Completed patients in two visible sections on the same page, with counts and shortcuts to jump between them. Check Completed on a patient to move their card to Completed, or uncheck it to return them to Incomplete. This changes only the completion status; saved test details, visit answers, and checklists stay intact. Completion saves on this browser/device and stays as chosen when editing or copying the patient again. Existing entries start incomplete. The shared Office reference checklist remains available below both lists.
 
@@ -49,3 +51,4 @@ All browser suites use disposable contexts and synthetic patients. The shared br
 GitHub Actions runs the source checks and all browser groups on pull requests and main, using the Ubuntu 24.04 runner's preinstalled Google Chrome. Physical iPhone/iPad installation and on-screen keyboards require device testing.
 
 See `VERSION-HISTORY.md` for behavior changes and historical versions.
+
