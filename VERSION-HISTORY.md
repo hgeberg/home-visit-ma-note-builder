@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.1 — copy-time vital review (November 5, 2026)
+
+Unavailable/refused reason controls move out of the Visit form and into a popup shown when Copy is pressed with missing or incomplete temperature, height, or weight. Each missing vital offers Unable to obtain with an optional explanation or Pt refused. Copy message records the selected reasons; Copy anyways allows copying without reasons for the remaining missing vitals. Canceling does not change saved answers, and previous reasons remain editable in the popup.
+
+Flu-treatment preference is shown and included in the message only when Rapid flu is checked. Tamiflu capsule/liquid preference also requires Tamiflu to be selected. Hidden selections remain saved. Existing visits retain their previous reason text. Release metadata and offline cache advance together.
+
 ## v9.3.0 — NJ visit guidelines (November 5, 2026)
 
 Temperature, height, and weight now have missing-measurement reminders for every patient, with a place to record why a measurement was unavailable or refused. Copying remains available after review. Height supports measured or patient-reported values, and BP wording allows collection when requested or warranted. Flu-treatment preference joins Pharmacy, with capsule/liquid preference shown only for Tamiflu and included in the message when relevant.

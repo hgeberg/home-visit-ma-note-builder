@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.3.0">
+<meta name="note-builder-version" content="v9.3.1">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -338,6 +338,9 @@ dialog.scrim::backdrop{background:transparent}
 .sheet .btn:disabled{opacity:.5;cursor:default}
 .steplist{margin:4px 0 8px;padding-left:20px;display:grid;gap:4px}
 .preview{margin:0 0 6px;padding:10px 12px;border-radius:10px;background:var(--out-bg);color:var(--out-ink);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.vital-copy-review{min-width:0;margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:10px}
+.vital-copy-review legend{font-weight:720;padding:0 4px}
+.vital-copy-review .inp{margin-top:10px}
 .err{color:var(--danger);font-size:13px;font-weight:650;min-height:18px;margin-top:6px}
 @media (prefers-reduced-motion:no-preference){
   .sheet{animation:rise .16s ease-out}
@@ -351,7 +354,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.3.0</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.3.1</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -728,7 +731,7 @@ function defaultLayout(){
         sub:{ id:'pregtype', on:'Yes', label:'Which?', opts:['Nursing','Pregnant','Both'], out:{ Both:'Nursing and pregnant' } } }
     ]},
     { id:'s_vitals', tab:'visit', title:'Vitals', fields:[
-      { id:'vitals_note', type:'note', label:'Collect temperature, height and weight for every patient. If unavailable or refused, record why. Patient-reported approximate height is acceptable.' },
+      { id:'vitals_note', type:'note', label:'Collect temperature, height and weight for every patient. Patient-reported approximate height is acceptable.' },
       { id:'temp', type:'text', label:'Temp', ph:'98.7 °F', im:'decimal' },
       { id:'o2', type:'text', label:'O2', ph:'98%', im:'numeric' },
       { id:'hr', type:'text', label:'HR', ph:'72 bpm', im:'numeric' },
@@ -826,7 +829,7 @@ function vitalGuidelineFields(){
 
 function fluPreferenceFields(){
   return [
-    {id:'flu_pref', type:'choice', label:'Flu treatment preference', opts:['Tamiflu','Xofluza','Discuss with clinician','Declined']},
+    {id:'flu_pref', type:'choice', label:'Flu treatment preference', opts:['Tamiflu','Xofluza','Discuss with clinician','Declined'], when:'rapidFlu'},
     {id:'tamiflu_form', type:'choice', label:'Tamiflu form', opts:['Capsules','Liquid'], when:'tamiflu', req:true}
   ];
 }
@@ -869,7 +872,8 @@ const WHEN_TEXT = {
   missingWeight:'weight has not been obtained',
   missingHeight:'height has not been obtained',
   hasHeight:'a complete height is entered',
-  tamiflu:'Tamiflu is the recorded preference',
+  rapidFlu:'Rapid flu is checked',
+  tamiflu:'Rapid flu is checked and Tamiflu is the recorded preference',
   strepLabConflict:'rapid strep is positive and a strep lab is selected',
   viralLabConflict:'rapid flu or COVID is positive and 4plex / RPP is selected',
   urineCollection:'a urine dip or urine lab is selected',
@@ -1075,6 +1079,12 @@ function normalizeLayout(){
     }
     L.pharmacyPresetsVersion = 1;
   }
+  const fluPreference = fieldById('flu_pref');
+  if(fluPreference?.type === 'choice') fluPreference.when = 'rapidFlu';
+  const tamifluForm = fieldById('tamiflu_form');
+  if(tamifluForm?.type === 'choice') tamifluForm.when = 'tamiflu';
+  const vitalNote = fieldById('vitals_note');
+  if(vitalNote?.label === 'Collect temperature, height and weight for every patient. If unavailable or refused, record why. Patient-reported approximate height is acceptable.') vitalNote.label = 'Collect temperature, height and weight for every patient. Patient-reported approximate height is acceptable.';
   const aware = fieldById('aware');
   if(aware && aware.type === 'choice' && aware.unawareValue === undefined && aware.opts.includes('Unaware')) aware.unawareValue = 'Unaware';
   const antibiotic = fieldById('abx');
@@ -1316,9 +1326,10 @@ function context(vals, layout = L){
   return {
     missingTemp: !obtained(vals.temp),
     missingWeight: !obtained(vals.weight),
-    missingHeight: !obtained(feet) && !obtained(inches),
+    missingHeight: !hasHeight,
     hasHeight,
-    tamiflu: vals.flu_pref === 'Tamiflu',
+    rapidFlu: did('flu', /flu/i),
+    tamiflu: did('flu', /flu/i) && vals.flu_pref === 'Tamiflu',
     strepLabConflict: isPositive('strep', /strep/i) && /strep/.test(lab),
     viralLabConflict: (isPositive('flu', /flu/i) || isPositive('covid', /covid/i)) && /4\s*-?\s*plex|\brpp\b|(flu|covid|viral)[^,]*pcr/.test(lab),
     urineCollection,
@@ -1677,6 +1688,7 @@ function renderSection(sec){
   const feet = sec.fields.find(f => f.id === 'height_ft' && f.type === 'text');
   const inches = sec.fields.find(f => f.id === 'height_in' && f.type === 'text');
   for(const f of sec.fields){
+    if(['temp_reason', 'weight_reason', 'height_reason'].includes(f.id)) continue;
     if(feet && inches && f === inches) continue;
     if(feet && inches && f === feet){
       grid.append(h('div', {class:'field', data:{field:'height'}},
@@ -2033,14 +2045,88 @@ function setTab(t){
 function onCopy(){
   const res = buildOutput(V);
   if(!res.text){ flash('Nothing to copy yet', 'bad'); return; }
-  const warn = res.issues.slice();
+  const missing = L.njGuidelinesVersion === 1 ? [
+    {id:'temp', label:'Temperature', field:'temp', missing:res.ctx.missingTemp},
+    {id:'height', label:'Height', field:'height_ft', missing:res.ctx.missingHeight},
+    {id:'weight', label:'Weight', field:'weight', missing:res.ctx.missingWeight}
+  ].filter(vital => vital.missing && fieldById(vital.field)) : [];
+  const warn = res.issues.filter(issue => !missing.some(vital => issue.startsWith(vital.label + ':') && /enter a measurement|enter feet and inches/.test(issue)));
   if(fieldById('inspic') && !V.inspic) warn.unshift('Insurance pic box isn’t ticked');
+  if(missing.length){ vitalCopyReview(missing, warn); return; }
   if(warn.length){
     sheet({ title:'Before you copy', body:['Check these first:', h('ul', {class:'steplist'}, warn.map(w => h('li', {text:w})))],
       buttons:[ {label:'Go back', kind:'primary'}, {label:'Copy anyway', on:() => doCopy(buildOutput(V).text)} ] });
     return;
   }
   doCopy(res.text);
+}
+
+function vitalCopyReview(missing, warnings){
+  const error = h('p', {class:'err', role:'alert'});
+  const rows = missing.map(vital => {
+    const original = String(V[vital.id + '_reason'] || '').trim();
+    const refused = /^(pt\.?\s+refused|patient\s+refused|refused)\b/i.test(original);
+    let selected = original ? (refused ? 'refused' : 'unable') : '', changed = false;
+    const explanation = h('input', {type:'text', class:'inp', value:refused ? '' : original.replace(/^Unable to obtain\s*:?\s*/i, ''),
+      placeholder:'Optional explanation', 'aria-label':vital.label + ' explanation', autocomplete:'off'});
+    explanation.addEventListener('input', () => { changed = true; });
+    const group = h('div', {class:'chips', role:'radiogroup', 'aria-label':vital.label + ' missing reason'});
+    const buttons = [];
+    const update = () => {
+      const active = selected || 'unable';
+      buttons.forEach(button => {
+        button.setAttribute('aria-checked', button.dataset.reason === selected ? 'true' : 'false');
+        button.tabIndex = button.dataset.reason === active ? 0 : -1;
+      });
+      explanation.hidden = selected !== 'unable';
+      error.textContent = '';
+    };
+    for(const [reason, label] of [['unable', 'Unable to obtain'], ['refused', 'Pt refused']]){
+      const button = h('button', {type:'button', class:'chip', role:'radio', text:label, data:{reason}, onclick:() => {
+        selected = selected === reason ? '' : reason; changed = true; update();
+      }});
+      buttons.push(button); group.append(button);
+    }
+    group.addEventListener('keydown', event => {
+      if(!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+      const at = buttons.indexOf(event.target);
+      if(at < 0) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (at + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + buttons.length) % buttons.length;
+      selected = buttons[next].dataset.reason; changed = true; update(); buttons[next].focus();
+    });
+    const node = h('fieldset', {class:'vital-copy-review', data:{vitalReview:vital.id}},
+      h('legend', {text:vital.label + ' is missing'}), group, explanation);
+    update();
+    return {node, selected:() => selected, save:() => {
+      const key = vital.id + '_reason';
+      if(!changed && original){ V[key] = original; return; }
+      const detail = explanation.value.trim().replace(/\s*\n+\s*/g, '; ');
+      if(selected === 'unable') V[key] = 'Unable to obtain' + (detail ? ': ' + detail : '');
+      else if(selected === 'refused') V[key] = 'Pt refused';
+      else delete V[key];
+    }};
+  });
+  const copy = () => {
+    if(lifecycle.signal.aborted || !page.isCurrentShift()) return;
+    rows.forEach(row => row.save());
+    refresh();
+    doCopy(buildOutput(V).text);
+  };
+  sheet({title:'Missing vitals', body:[
+    'Choose a reason for each missing vital. Copy anyways skips any missing vital without a reason.',
+    ...rows.map(row => row.node),
+    warnings.length ? h('div', {}, h('p', {text:'Also check:'}), h('ul', {class:'steplist'}, warnings.map(text => h('li', {text})))) : null,
+    error
+  ], buttons:[
+    {label:'Go back'},
+    {label:'Copy anyways', on:copy},
+    {label:'Copy message', kind:'primary', validate:() => {
+      if(rows.every(row => row.selected())) return true;
+      error.textContent = 'Choose a reason for each missing vital, or select Copy anyways.';
+      return false;
+    }, on:copy}
+  ]});
 }
 
 function doCopy(text){

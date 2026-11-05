@@ -1,10 +1,10 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.0.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.1.
 
-The NJ visit workflow asks for temperature, height, and weight for every patient. Before copying, missing measurements produce reminders; an unavailable/refused reason can be entered instead. Heights can be marked Measured or Patient-reported. BP remains available when requested or warranted. These reminders do not block copying.
+The NJ visit workflow asks for temperature, height, and weight for every patient. Unavailable/refused options appear only after pressing Copy with missing or incomplete vitals. The popup offers Unable to obtain with an optional explanation, Pt refused, or Copy anyways to omit the remaining measurements. Copy message saves the selected reasons; canceling leaves the visit unchanged. Previously saved reasons appear in the popup for review. Heights can be marked Measured or Patient-reported. BP remains available when requested or warranted.
 
-Pharmacy includes flu-treatment preference and a separate capsule/liquid preference when Tamiflu is selected. Only the relevant preferences appear in the copied message; treatment decisions remain with the clinician.
+Pharmacy shows flu-treatment preference only while Rapid flu is checked, with capsule/liquid preference when Tamiflu is selected. Unchecking Rapid flu hides these controls and excludes them from the copied message while retaining the selections for reuse. Treatment decisions remain with the clinician.
 
 Labs collected/sent replaces the public "Overnights" wording, with UA, stool culture, and GPP shortcuts alongside the existing choices. Lab-selection reference explains strep PCR versus culture and 4plex versus RPP. A positive rapid strep paired with a strep lab, or positive rapid flu/COVID paired with 4plex/RPP, prompts a reminder unless the clinician specifically requested the lab. Entered orders are never automatically removed.
 

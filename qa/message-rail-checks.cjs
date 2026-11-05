@@ -55,7 +55,7 @@ test('Live output and copy payload stay exact after moving the preview', async p
   const expected = await local(page, 'output').inputValue();
   assert.match(expected, /Synthetic note for the side preview\./);
   await local(page, 'copyBtn').click();
-  const warning = page.getByRole('button', { name:'Copy anyway', exact:true });
+  const warning = page.getByRole('button', { name:/^Copy anyways?$/ });
   if (await warning.isVisible()) await warning.click();
   await page.waitForFunction(() => window.__copies.length > 0);
   assert.equal(await page.evaluate(() => window.__copies.at(-1)), expected);
