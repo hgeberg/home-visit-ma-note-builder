@@ -16,7 +16,8 @@ const testRow = (page, id, n = 0) => patient(page, n).locator('.testrow[data-ite
 const restore = page => page.getByRole('button', {name:/^Restore (this visit|all)/}).click();
 const vitalReview = (page, id) => dialog(page).locator('[data-vital-review="' + id + '"]');
 const vitalOption = (page, id, name) => vitalReview(page, id).getByRole('radio', {name, exact:true});
-const vitalExplanation = (page, id) => vitalReview(page, id).locator('input');
+const vitalExplanation = (page, id) => vitalReview(page, id).locator('input[aria-label$=" explanation"]');
+const vitalInput = (page, id, field = id) => vitalReview(page, id).locator('[data-vital-value="' + field + '"]');
 const utiIds = ['k_uti_dip', 'k_uti_photo', 'k_uti_ua', 'k_uti_uc', 'k_uti_cup', 'k_uti_tube'];
 async function seed(page, name = 'SYNTHETIC NJ GUIDELINES', n = 0, vitals = true) {
   await field(page, 'f_name', n).fill(name);
@@ -112,6 +113,65 @@ test('Copy anyways bypasses missing vitals without inventing unavailable or refu
   assert.doesNotMatch(copied,/not obtained|Unable to obtain|refused|NOT MARKED|: missing/i);
   const saved=await checkpoint(page);
   for(const id of ['temp_reason','weight_reason','height_reason']) assert(!saved.patients[0].vals[id]);
+});
+
+test('Popup measurements update the visit and copied message and survive reopening', async page => {
+  await seed(page, 'SYNTHETIC POPUP MEASUREMENTS', 0, false);
+  await inspectCopy(page);
+  for(const id of ['temp', 'weight', 'height']) await vitalOption(page, id, 'Enter measurement').click();
+  await vitalInput(page, 'temp').fill('98.6');
+  await vitalInput(page, 'weight').fill('145.5');
+  await vitalInput(page, 'height', 'height_in').pressSequentially('70.1');
+  assert.equal(await vitalInput(page, 'height', 'height_in').inputValue(), '70.1', 'Typing total inches does not rewrite the active input');
+  await dialog(page).getByRole('button', {name:'Copy message', exact:true}).click();
+  await field(page, 'sentBanner').waitFor({state:'visible'});
+  const copied = await page.evaluate(() => window.syntheticCopied);
+  assert.match(copied, /Temp: 98.6/);assert.match(copied, /Weight: 145.5/);assert.match(copied, /Height: 5 ft 10.1 in/);
+  assert.doesNotMatch(copied, /not obtained|refused/i);
+  for(const [id, value] of [['temp','98.6'], ['weight','145.5'], ['height_ft','5'], ['height_in','10.1']]) assert.equal(await field(page, 'f_' + id).inputValue(), value);
+  const saved = await checkpoint(page);
+  assert.equal(saved.patients[0].vals.height_ft, '5');assert.equal(saved.patients[0].vals.height_in, '10.1');
+  await page.reload();await page.getByRole('button', {name:'Restore this visit', exact:true}).click();
+  assert.equal(await field(page, 'f_temp').inputValue(), '98.6');assert.equal(await field(page, 'f_weight').inputValue(), '145.5');
+  assert.equal(await field(page, 'f_height_in').inputValue(), '10.1');
+  assert.equal(await copy(page), copied);
+});
+
+test('Canceling popup measurements preserves partial vitals and saved answers', async page => {
+  await seed(page, 'SYNTHETIC CANCELED POPUP MEASUREMENTS');
+  await field(page, 'f_temp').fill('');await field(page, 'f_height_in').fill('');
+  await inspectCopy(page);
+  await vitalOption(page, 'temp', 'Enter measurement').click();await vitalInput(page, 'temp').fill('99.1');
+  await vitalOption(page, 'height', 'Enter measurement').click();
+  assert.equal(await vitalInput(page, 'height', 'height_ft').inputValue(), '5');
+  await vitalInput(page, 'height', 'height_in').fill('11.25');
+  await goBack(page);
+  assert.equal(await field(page, 'f_temp').inputValue(), '');assert.equal(await field(page, 'f_height_ft').inputValue(), '5');assert.equal(await field(page, 'f_height_in').inputValue(), '');
+  const saved = await checkpoint(page);
+  assert.equal(saved.patients[0].vals.temp, '');assert.equal(saved.patients[0].vals.height_in, '');
+  await inspectCopy(page);await vitalOption(page, 'temp', 'Enter measurement').click();
+  assert.equal(await vitalInput(page, 'temp').inputValue(), '');
+});
+
+test('Popup measurements validate before either copy action and mix with missing-vital reasons', async page => {
+  await seed(page, 'SYNTHETIC MIXED POPUP VITALS', 0, false);
+  await inspectCopy(page);
+  await vitalOption(page, 'temp', 'Enter measurement').click();
+  await vitalOption(page, 'weight', 'Pt refused').click();
+  await vitalOption(page, 'height', 'Enter measurement').click();
+  await vitalInput(page, 'height', 'height_ft').fill('5');await vitalInput(page, 'height', 'height_in').fill('12');
+  await dialog(page).getByRole('button', {name:'Copy message', exact:true}).click();
+  assert.match(await dialog(page).getByRole('alert').innerText(), /Temperature: enter a measurement/);
+  await vitalInput(page, 'temp').fill('99.2');
+  await dialog(page).getByRole('button', {name:'Copy anyways', exact:true}).click();
+  assert.match(await dialog(page).getByRole('alert').innerText(), /Height: enter feet and inches/);
+  assert.equal(await page.evaluate(() => window.syntheticCopied), undefined);
+  await vitalInput(page, 'height', 'height_in').fill('11');
+  await dialog(page).getByRole('button', {name:'Copy anyways', exact:true}).click();
+  await field(page, 'sentBanner').waitFor({state:'visible'});
+  const copied = await page.evaluate(() => window.syntheticCopied);
+  assert.match(copied, /Temp: 99.2/);assert.match(copied, /Weight not obtained: Pt refused/);assert.match(copied, /Height: 5 ft 11 in/);
+  assert.doesNotMatch(copied, /Height not obtained|Temperature not obtained/);
 });
 
 test('Recorded missing-vital choices are prefilled at the next copy and only missing vitals appear', async page => {

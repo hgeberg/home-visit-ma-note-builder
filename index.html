@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.3.1">
+<meta name="note-builder-version" content="v9.3.2">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -354,7 +354,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.3.1</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.3.2</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -1318,8 +1318,7 @@ function context(vals, layout = L){
     const text = String(value || '').trim();
     return !!text && !/^(n\/?a|unknown|not obtained|not measured|refused|unable to obtain)$/i.test(text);
   };
-  const feet = String(vals.height_ft || '').trim(), inches = String(vals.height_in || '').trim();
-  const hasHeight = /^\d$/.test(feet) && /^\d{1,2}(?:\.\d+)?$/.test(inches) && Number(inches) < 12;
+  const hasHeight = heightParts(vals) !== null;
   const urineCollection = did('urine', /urine|dip/i) || /urine|\b(?:ua|uc|urinalysis)\b/.test(lab);
   const anyPositive = positive.length > 0;
   const awareness = fieldById('aware', layout);
@@ -1348,6 +1347,15 @@ function context(vals, layout = L){
     anyTest: ticked.length > 0 || lab !== ''
   };
 }
+function heightParts(vals){
+  let feet = String(vals.height_ft ?? '').trim(), inches = String(vals.height_in ?? '').trim();
+  if(!feet && /^\d{1,3}(?:\.\d+)?$/.test(inches) && Number(inches) < 120){
+    const [whole, fraction] = inches.split('.');
+    feet = String(Math.floor(Number(whole) / 12));
+    inches = String(Number(whole) % 12) + (fraction ? '.' + fraction : '');
+  }
+  return /^\d$/.test(feet) && /^\d{1,2}(?:\.\d+)?$/.test(inches) && Number(inches) < 12 ? {feet, inches} : null;
+}
 function whenOK(w, ctx){
   if(!w) return true;
   return (Array.isArray(w) ? w : [w]).every(k => (k in ctx) ? !!ctx[k] : true);
@@ -1373,8 +1381,8 @@ function buildOutput(vals, layout = L){
     if(combineHeight && f === height[0]){
       const feet = String(vals.height_ft || '').trim(), inches = String(vals.height_in || '').trim();
       if(feet || inches){
-        const valid = /^\d$/.test(feet) && /^\d{1,2}(?:\.\d+)?$/.test(inches) && Number(inches) < 12;
-        if(valid) lines.push('Height: ' + feet + ' ft ' + inches + ' in');
+        const height = heightParts(vals);
+        if(height) lines.push('Height: ' + height.feet + ' ft ' + height.inches + ' in');
         else issues.push('Height: enter feet and inches (0 to less than 12 inches)');
       }
       continue;
@@ -1694,7 +1702,8 @@ function renderSection(sec){
       grid.append(h('div', {class:'field', data:{field:'height'}},
         h('div', {class:'flabel', id:'heightLabel', text:'Height'}),
         h('div', {class:'height-inputs', role:'group', 'aria-labelledby':'heightLabel'},
-          h('div', {}, ...textField({...feet, label:'Feet'})), h('div', {}, ...textField({...inches, label:'Inches'})))));
+          h('div', {}, ...textField({...feet, label:'Feet'})), h('div', {}, ...textField({...inches, label:'Inches'}))),
+        h('p', {class:'small', text:'Or leave Feet blank and enter total inches.'})));
     }else grid.append(renderField(sec, f));
   }
   card.append(grid);
@@ -1754,6 +1763,13 @@ function textField(f){
       const inches = $('#f_height_in');
       if(inches){ inches.focus(); inches.select(); }
     }
+  });
+  if(f.id === 'height_in') inp.addEventListener('blur', () => {
+    const feet = $('#f_height_ft'), height = heightParts(V);
+    if(!feet || String(V.height_ft || '').trim() || !height) return;
+    V.height_ft = feet.value = height.feet;
+    V.height_in = inp.value = height.inches;
+    refresh({user:true});
   });
   const parts = [h('label', {class:'flabel', for:id, text:f.label, data:{labelOf:f.id}}), inp];
   if(f.chips && f.chips.length) parts.push(shortcutRow(f, inp));
@@ -2070,18 +2086,54 @@ function vitalCopyReview(missing, warnings){
     const explanation = h('input', {type:'text', class:'inp', value:refused ? '' : original.replace(/^Unable to obtain\s*:?\s*/i, ''),
       placeholder:'Optional explanation', 'aria-label':vital.label + ' explanation', autocomplete:'off'});
     explanation.addEventListener('input', () => { changed = true; });
-    const group = h('div', {class:'chips', role:'radiogroup', 'aria-label':vital.label + ' missing reason'});
+    const inputs = {};
+    const measurementFields = vital.id === 'height' ? ['height_ft', 'height_in'] : [vital.id];
+    const measurementInputs = measurementFields.map(id => {
+      const field = fieldById(id), inputId = 'copy_vital_' + id;
+      const label = id === 'height_ft' ? 'Feet' : id === 'height_in' ? 'Inches' : vital.id === 'temp' ? 'Temperature (°F)' : 'Weight (lb)';
+      const input = inputs[id] = h('input', {type:'text', class:'inp', id:inputId, value:V[id] || '',
+        placeholder:field?.ph || '', inputmode:field?.im || 'decimal', autocomplete:'off', data:{vitalValue:id}});
+      if(id === 'height_ft') input.maxLength = 1;
+      input.addEventListener('input', event => {
+        error.textContent = '';
+        if(id !== 'height_ft') return;
+        input.value = input.value.replace(/\D/g, '').slice(0, 1);
+        if(/^\d$/.test(input.value) && !event.isComposing && !String(event.inputType || '').startsWith('delete')){
+          inputs.height_in.focus(); inputs.height_in.select();
+        }
+      });
+      return h('div', {}, h('label', {class:'flabel', for:inputId, text:label}), input);
+    });
+    const measurementBox = h('div', {},
+      h('div', {class:vital.id === 'height' ? 'height-inputs' : ''}, ...measurementInputs),
+      vital.id === 'height' ? h('p', {class:'small', text:'Or leave Feet blank and enter total inches.'}) : null);
+    const enteredValues = () => Object.fromEntries(measurementFields.map(id => [id, inputs[id].value.trim()]));
+    const measurement = () => {
+      const values = enteredValues();
+      if(vital.id === 'height'){
+        const height = heightParts(values);
+        return height ? {height_ft:height.feet, height_in:height.inches} : null;
+      }
+      return context({...V, ...values})[vital.id === 'temp' ? 'missingTemp' : 'missingWeight'] ? null : values;
+    };
+    if(vital.id === 'height') inputs.height_in.addEventListener('blur', () => {
+      const height = heightParts(enteredValues());
+      if(inputs.height_ft.value.trim() || !height) return;
+      inputs.height_ft.value = height.feet; inputs.height_in.value = height.inches;
+    });
+    const group = h('div', {class:'chips', role:'radiogroup', 'aria-label':vital.label + ' options'});
     const buttons = [];
     const update = () => {
-      const active = selected || 'unable';
+      const active = selected || 'measurement';
       buttons.forEach(button => {
         button.setAttribute('aria-checked', button.dataset.reason === selected ? 'true' : 'false');
         button.tabIndex = button.dataset.reason === active ? 0 : -1;
       });
       explanation.hidden = selected !== 'unable';
+      measurementBox.hidden = selected !== 'measurement';
       error.textContent = '';
     };
-    for(const [reason, label] of [['unable', 'Unable to obtain'], ['refused', 'Pt refused']]){
+    for(const [reason, label] of [['measurement', 'Enter measurement'], ['unable', 'Unable to obtain'], ['refused', 'Pt refused']]){
       const button = h('button', {type:'button', class:'chip', role:'radio', text:label, data:{reason}, onclick:() => {
         selected = selected === reason ? '' : reason; changed = true; update();
       }});
@@ -2096,10 +2148,21 @@ function vitalCopyReview(missing, warnings){
       selected = buttons[next].dataset.reason; changed = true; update(); buttons[next].focus();
     });
     const node = h('fieldset', {class:'vital-copy-review', data:{vitalReview:vital.id}},
-      h('legend', {text:vital.label + ' is missing'}), group, explanation);
+      h('legend', {text:vital.label + ' is missing'}), group, measurementBox, explanation);
     update();
-    return {node, selected:() => selected, save:() => {
+    return {node, selected:() => selected, invalidMeasurement:() => selected === 'measurement' && !measurement(),
+      invalidLabel:vital.label, save:() => {
       const key = vital.id + '_reason';
+      if(selected === 'measurement'){
+        const values = measurement();
+        if(!values) return;
+        for(const [id, value] of Object.entries(values)){
+          V[id] = value;
+          const input = $('#f_' + id); if(input) input.value = value;
+        }
+        delete V[key];
+        return;
+      }
       if(!changed && original){ V[key] = original; return; }
       const detail = explanation.value.trim().replace(/\s*\n+\s*/g, '; ');
       if(selected === 'unable') V[key] = 'Unable to obtain' + (detail ? ': ' + detail : '');
@@ -2113,19 +2176,25 @@ function vitalCopyReview(missing, warnings){
     refresh();
     doCopy(buildOutput(V).text);
   };
+  const validate = skipMissing => {
+    const invalid = rows.find(row => row.invalidMeasurement());
+    if(invalid){
+      error.textContent = invalid.invalidLabel + ': enter ' + (invalid.invalidLabel === 'Height' ? 'feet and inches (inches must be less than 12), or total inches with Feet blank.' : 'a measurement, or choose a reason instead.');
+      return false;
+    }
+    if(skipMissing || rows.every(row => row.selected())) return true;
+    error.textContent = 'Enter a measurement or choose a reason for each missing vital, or select Copy anyways.';
+    return false;
+  };
   sheet({title:'Missing vitals', body:[
-    'Choose a reason for each missing vital. Copy anyways skips any missing vital without a reason.',
+    'Enter each missing measurement or choose why it was not recorded. Copy anyways skips vitals left without a measurement or reason.',
     ...rows.map(row => row.node),
     warnings.length ? h('div', {}, h('p', {text:'Also check:'}), h('ul', {class:'steplist'}, warnings.map(text => h('li', {text})))) : null,
     error
   ], buttons:[
     {label:'Go back'},
-    {label:'Copy anyways', on:copy},
-    {label:'Copy message', kind:'primary', validate:() => {
-      if(rows.every(row => row.selected())) return true;
-      error.textContent = 'Choose a reason for each missing vital, or select Copy anyways.';
-      return false;
-    }, on:copy}
+    {label:'Copy anyways', validate:() => validate(true), on:copy},
+    {label:'Copy message', kind:'primary', validate:() => validate(false), on:copy}
   ]});
 }
 
