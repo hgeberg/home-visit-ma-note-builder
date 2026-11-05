@@ -5,7 +5,7 @@ const http = require('node:http');
 const path = require('node:path');
 
 const {chromium, launchOptions} = require('./qa/browser.cjs');
-const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
+const {defaultLayout, installSavedLayout, acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const htmlPath = path.join(__dirname, 'index.html');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -133,8 +133,10 @@ test('copy buttons copy their own output and create separate shared office recor
   const alphaOutput = await output(patient(page, 0));
   const betaOutput = await output(patient(page, 1));
   await local(patient(page, 0), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   await local(patient(page, 1), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 2);
   assert.deepEqual(await page.evaluate(() => window.__copies), [alphaOutput, betaOutput]);
   const records = await office(page);
@@ -162,6 +164,7 @@ test('pending clipboard completion retains the original patient and value snapsh
   await page.evaluate(() => { window.__deferCopy = true; });
   const copiedOutput = await output(patient(page, 0));
   await local(patient(page, 0), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => typeof window.__resolveCopy === 'function');
   await local(patient(page, 0), 'f_symptoms').fill('changed while clipboard was pending');
   await local(patient(page, 1), 'f_symptoms').fill('beta still separate');
@@ -180,6 +183,7 @@ test('the copied-patient guard can undo the edit and append a blank patient', as
   await fillPatient(first, 'TEST UNDO ORIGINAL', 'copied original symptoms');
   const originalOutput = await output(first);
   await local(first, 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await local(first, 'sentBanner').waitFor({ state: 'visible' });
   await local(first, 'f_symptoms').fill('accidental next patient symptoms');
   const guard = dialog(first);
@@ -209,6 +213,7 @@ for (const change of ['name', 'choice', 'test result']) {
     await local(first, 'f_overnights').fill('RPP');
     const before = await output(first);
     await local(first, 'copyBtn').click();
+    await acknowledgeCopyWarning(page);
     await local(first, 'sentBanner').waitFor({state:'visible'});
     await local(first, 'tab-check').click();
     for (const id of ['k_confirm', 'k_pa', 'k_posted']) await local(first, 'f_' + id).check();
@@ -238,6 +243,7 @@ test('clearing warns about uncopied changes and never saves an uncopied patient 
   const first = patient(page, 0);
   await fillPatient(first, 'TEST CLEAR WARNING', 'already copied symptoms');
   await local(first, 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await local(first, 'sentBanner').waitFor({ state: 'visible' });
   assert.deepEqual(await office(page), []);
   await markTest(first, 'ears');

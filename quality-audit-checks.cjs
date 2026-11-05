@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const tests = [];
 const test = (name, run) => tests.push({name, run});
 const local = (page, id, i = 0) => page.locator('.patient').nth(i).locator(`[data-local-id="${id}"]`);
@@ -51,6 +52,7 @@ test('HTML-looking patient input remains literal in titles, output, clipboard an
   await local(page, 'f_inspic').check();
   await local(page, 'f_overnights').fill(tests);
   await local(page, 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   assert.equal(await local(page, 'patientTitle').textContent(), 'Patient 1 · ' + name);
   assert.equal(await page.evaluate(() => window.__injected), undefined);
@@ -95,6 +97,7 @@ test('the application works without making patient-data network requests', async
   await local(page, 'f_inspic').check();
   await local(page, 'f_overnights').fill('Urine culture');
   await local(page, 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === 1);
   await page.locator('#view-office').click();
   assert.equal(await page.locator('.visit-name').textContent(), 'SYNTHETIC OFFLINE');

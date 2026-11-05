@@ -148,7 +148,7 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
   const p=abxEnv(),f=p.layout.sections.flatMap(s=>s.fields).find(f=>f.id==='abx');f.opts=['No','Taken'];f.yesValue='Taken';
   const v=p.reconcileValues({name:'SYNTHETIC',dob:'01/01/2000',abx:'Yes',abx_name:'SYNTHETIC HISTORY',abx_when:'Last week'},p.layout,{choices:[{id:'abx',from:'Yes',to:'Taken'}]});
   assert.equal(p.context(v).recentAntibiotics,true);assert(p.buildOutput(v).text.includes('SYNTHETIC HISTORY, Last week'));
-  assert.equal(p.buildOutput({...v,abx_name:'',abx_when:''}).issues.length,2);
+  assert.equal(p.buildOutput({...v,abx_name:'',abx_when:''}).issues.filter(issue=>/^(Recent antibiotic|When taken):/.test(issue)).length,2);
   assert(!p.buildOutput({...v,abx:'No'}).text.includes('SYNTHETIC HISTORY'));
  });
  await check('Old binary antibiotic imports gain a semantic affirmative value',()=>{
@@ -206,7 +206,7 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
   for(const values of [{},{height_ft:'5'},{height_in:'10'},{height_ft:'5',height_in:'12'},{height_ft:'5',height_in:'-1'}]){
    const result=p.buildOutput({name:'SYNTHETIC',...values});
    assert(!result.text.includes('Height:'));
-   assert.equal(result.issues.some(issue=>issue.startsWith('Height:')),Object.keys(values).length>0);
+   assert(result.issues.some(issue=>issue.startsWith('Height:')), 'Missing and incomplete heights prompt before copying');
   }
  });
  await check('Older saved vital layouts gain height once without replacing entered values or custom fields',()=>{

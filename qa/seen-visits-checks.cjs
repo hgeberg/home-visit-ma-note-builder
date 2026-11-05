@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./browser.cjs');
+const {acknowledgeCopyWarning} = require('./form-fixtures.cjs');
 const root = path.resolve(__dirname, '..');
 const tests = [], test = (name, run, installed = false) => tests.push({name, run, installed});
 const patient = (page, n = 0) => page.locator('#patients .patient').nth(n);
@@ -26,6 +27,7 @@ async function seed(page, name, n = 0) {
 }
 async function copy(page, n = 0) {
   await field(page, 'copyBtn', n).click();
+  await acknowledgeCopyWarning(page);
   await field(page, 'sentBanner', n).waitFor({state:'visible'});
 }
 async function clear(page, n = 0) {

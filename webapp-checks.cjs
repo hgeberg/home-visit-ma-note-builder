@@ -1,6 +1,7 @@
 /* Installed-app recovery uses synthetic data in disposable Chrome profiles. */
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const backupKey='hvnb_current_app_draft',tests=[],test=(name,run,offline=false)=>tests.push({name,run,offline});
 const patient=(p,n=0)=>p.locator('.patient').nth(n);
 const field=(p,id,n=0)=>patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -12,7 +13,7 @@ async function installed(c){await c.addInitScript(()=>{
  Object.defineProperty(navigator,'standalone',{configurable:true,value:true});
  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.resolve()}});
 });}
-async function copy(p,n=0){await field(p,'copyBtn',n).click();await field(p,'sentBanner',n).waitFor({state:'visible'});}
+async function copy(p,n=0){await field(p,'copyBtn',n).click();await acknowledgeCopyWarning(p);await field(p,'sentBanner',n).waitFor({state:'visible'});}
 
 test('Manifest and opaque icons use the GitHub project scope and launch in standalone mode',async(p,c,url)=>{
  const manifest=await p.evaluate(async()=>{const link=document.querySelector('link[rel="manifest"]');const response=await fetch(link.href);return {url:link.href,data:await response.json()};});
@@ -60,7 +61,7 @@ test('Start fresh clears active forms while retaining Patients Seen and copied O
 test('Clear shift removes durable recovery across app windows and blocks a pending old copy',async(p,c,url)=>{
  await seed(p);await field(p,'f_overnights').fill('RPP');await flush(p);
  const q=await c.newPage();await q.goto(url);await restore(q);
- await p.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>new Promise(resolve=>window.finishCopy=resolve)}}));await field(p,'copyBtn').click();await p.waitForFunction(()=>typeof finishCopy==='function');
+ await p.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>new Promise(resolve=>window.finishCopy=resolve)}}));await field(p,'copyBtn').click();await acknowledgeCopyWarning(p);await p.waitForFunction(()=>typeof finishCopy==='function');
  await q.locator('#clearShiftBtn').click();await q.locator('#confirmClearShift').click();await p.waitForFunction(()=>document.querySelector('[data-local-id="f_name"]').value==='');await p.evaluate(()=>window.finishCopy());
  assert.equal(await backup(q),null);assert.equal(await backup(p),null);await p.close();await q.close();
  const r=await c.newPage();await r.goto(url);assert.equal(await r.getByRole('button',{name:/^Restore/}).count(),0);assert.equal(await field(r,'f_name').inputValue(),'');assert.deepEqual(await r.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_office')||'[]')),[]);

@@ -1,6 +1,14 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.2.4.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.0.
+
+The NJ visit workflow asks for temperature, height, and weight for every patient. Before copying, missing measurements produce reminders; an unavailable/refused reason can be entered instead. Heights can be marked Measured or Patient-reported. BP remains available when requested or warranted. These reminders do not block copying.
+
+Pharmacy includes flu-treatment preference and a separate capsule/liquid preference when Tamiflu is selected. Only the relevant preferences appear in the copied message; treatment decisions remain with the clinician.
+
+Labs collected/sent replaces the public "Overnights" wording, with UA, stool culture, and GPP shortcuts alongside the existing choices. Lab-selection reference explains strep PCR versus culture and 4plex versus RPP. A positive rapid strep paired with a strep lab, or positive rapid flu/COVID paired with 4plex/RPP, prompts a reminder unless the clinician specifically requested the lab. Entered orders are never automatically removed.
+
+Urine collection distinguishes suspected UTI from urine accompanying bloodwork. Suspected UTI shows an optional patient checklist for the dipstick, posted photo, UA, UC, labeled cup, and culture tube. Existing saved forms gain these fields and updated labels while retaining entered answers, custom fields, checked items, stored lab orders, and running rapid-test results.
 
 Rapid strep, flu, and COVID each offer a `running` result alongside Positive and Negative. Select it when copying the visit before the test finishes; the message includes, for example, `Rapid flu: running`. It saves with the visit and can be replaced by the final result later. Running tests do not require a flu type or positive-result awareness.
 
@@ -14,7 +22,7 @@ Vitals includes Height with separate Feet and Inches inputs. Entering one digit 
 
 Complete shifts now save persistently on this device in ordinary browser tabs as well as the installed app. Reopening offers all patient answers, checklists, copied-message history, and houses without an eight-hour cutoff. Storage failures and conflicting windows remain visible; an older window cannot overwrite a newer saved shift.
 
-Copying a message with overnight tests saves a complete visit snapshot with its Office entry. Open visit page uses the current form when available, then the latest visit preserved in Patients Seen, and finally the last copied Office snapshot. Newer archived answers and checklist items take priority over an older copied message; edits made only in Office stay in Office. Older test-only entries cannot recover answers they never saved. Start fresh and Clear this patient retain Office entries and their saved visit copies; Clear shift removes the shift's forms, recovery copies, and Office entries. Browser/device data clearing still removes local data; there is no patient-data cloud backup.
+Copying a message with labs collected/sent saves a complete visit snapshot with its Office entry. Open visit page uses the current form when available, then the latest visit preserved in Patients Seen, and finally the last copied Office snapshot. Newer archived answers and checklist items take priority over an older copied message; edits made only in Office stay in Office. Older test-only entries cannot recover answers they never saved. Start fresh and Clear this patient retain Office entries and their saved visit copies; Clear shift removes the shift's forms, recovery copies, and Office entries. Browser/device data clearing still removes local data; there is no patient-data cloud backup.
 
 Patients today supports search by name or DOB across all houses and shows message-copy and Office-save status. Clear shift opens a review of uncopied messages, changes since copying, and pending Office saves with links to the relevant visit or Office retry. Blank forms and checklist activity do not count as unfinished messages; the checklist remains an optional reference. The review also includes uncopied messages and changes in Patients Seen after clearing a patient or starting fresh; opening one restores its visit. Review and Cancel leave the shift intact, and Clear everything retains its explicit destructive confirmation.
 
@@ -43,6 +51,8 @@ npm test
 ```
 
 `node qa/printing-checks.cjs` runs focused printing-gate browser checks using mocked API responses and synthetic credentials.
+
+`node qa/guideline-checks.cjs` runs focused NJ-guideline browser checks for vital reminders, flu preferences, lab reminders, the UTI checklist, saved-form migration, and narrow-screen layout using synthetic patients.
 
 `npm run test:source` runs deterministic recovery, visit integrity, antibiotic, printing-controller, and service-worker checks without a browser. `node qa/run-checks.cjs storage` runs one browser group; the other groups are `layout`, `features`, and `installed`.
 

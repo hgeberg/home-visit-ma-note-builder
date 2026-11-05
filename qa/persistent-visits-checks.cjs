@@ -6,6 +6,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./browser.cjs');
+const {acknowledgeCopyWarning} = require('./form-fixtures.cjs');
 
 const root = path.resolve(__dirname, '..');
 const draftKey = 'hvnb_current_app_draft';
@@ -41,6 +42,7 @@ async function seed(page, name = 'SYNTHETIC PERSISTED VISIT', n = 0) {
 }
 async function copy(page, n = 0) {
   await field(page, 'copyBtn', n).click();
+  await acknowledgeCopyWarning(page);
   await field(page, 'sentBanner', n).waitFor({state:'visible'});
 }
 async function openSavedVisit(page, name, capture = false) {
@@ -127,6 +129,7 @@ for (const installed of [false, true]) {
     assert.equal(await linked.locator('[data-local-id="output"]').inputValue(), copiedMessage);
     assert.match(await linked.locator('[data-local-id="saveState"]').innerText(), /copied/i);
     await linked.locator('[data-local-id="copyBtn"]').click();
+    await acknowledgeCopyWarning(reopened);
     assert.equal((await office(reopened)).length, 1, 'Opening and copying a saved visit keeps its existing Office record');
   }, installed);
 }

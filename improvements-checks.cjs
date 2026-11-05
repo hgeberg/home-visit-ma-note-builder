@@ -1,11 +1,12 @@
 /* Integration checks for v8.13; disposable browser contexts, dummy records. */
 const fs = require('node:fs'), http = require('node:http'), assert = require('node:assert/strict');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const tests = [], test = (name, run, offline = false) => tests.push({name, run, offline});
 const f = (p,id,n=0) => p.locator('.patient').nth(n).locator('[data-local-id="'+id+'"]');
 const stored = p => p.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
 async function seed(p,name='SYNTHETIC ALPHA',n=0){await f(p,'f_name',n).fill(name);await f(p,'f_dob',n).fill('01/01/2000');await f(p,'f_inspic',n).check();await f(p,'f_overnights',n).fill('RPP');}
-async function copy(p,n=0){await f(p,'copyBtn',n).click();await f(p,'sentBanner',n).waitFor({state:'visible'});}
+async function copy(p,n=0){await f(p,'copyBtn',n).click();await acknowledgeCopyWarning(p);await f(p,'sentBanner',n).waitFor({state:'visible'});}
 async function restore(p){await p.getByRole('button',{name:/^Restore (this visit|all)/}).click();}
 async function clear(p,n=0){await f(p,'newBtn',n).click();const b=p.getByRole('button',{name:'Clear this patient',exact:true});if(await b.count())await b.click();}
 async function failure(p,mode='write'){await p.evaluate(mode=>{window.failOffice=true;const method=mode==='read'?'getItem':'setItem',old=Storage.prototype[method];Storage.prototype[method]=function(k,...v){if(this===localStorage&&k==='hvnb_current_office'&&window.failOffice)throw Error('Synthetic failure');return old.call(this,k,...v)};},mode);}

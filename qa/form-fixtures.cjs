@@ -27,4 +27,11 @@ async function installSavedLayout(page, layout){
   await page.reload();
 }
 
-module.exports = {defaultLayout, installSavedLayout};
+// Flow regressions may intentionally leave clinical fields blank. Acknowledge
+// the real reminder so their clipboard/storage assertions still exercise Copy.
+async function acknowledgeCopyWarning(page){
+  const warning = page.getByRole('button', {name:'Copy anyway', exact:true});
+  if(await warning.count()) await warning.click();
+}
+
+module.exports = {defaultLayout, installSavedLayout, acknowledgeCopyWarning};

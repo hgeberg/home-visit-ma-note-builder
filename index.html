@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.2.4">
+<meta name="note-builder-version" content="v9.3.0">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -351,7 +351,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.2.4</b> · All visits save on this device in Patients Seen. Copy a message with overnight tests to also save it to Office.</p>
+    <p class="sub"><b>v9.3.0</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -404,7 +404,7 @@ dialog.scrim::backdrop{background:transparent}
     <div id="seenList" class="seen-list"></div>
   </section>
   <section id="officeSection" class="office-section" role="tabpanel" aria-labelledby="view-office" hidden>
-    <h2 id="officeHeading" tabindex="-1">Office — overnight tests</h2>
+    <h2 id="officeHeading" tabindex="-1">Office — labs collected/sent</h2>
     <p class="office-summary">Saved when you press Copy message. Check Completed when the patient’s office work is finished. Their saved information stays below in Completed; uncheck it to move them back to Incomplete.</p>
     <p id="officeCompletionStatus" class="small" role="status" aria-live="polite"></p>
     <div id="officeContent"></div>
@@ -707,7 +707,7 @@ function validDob(v){
 /* ---------- default layout ---------- */
 
 function defaultLayout(){
-  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, exposurePresetsVersion:1, allergyPresetsVersion:1, heightFieldsVersion:1, sections: [
+  return { v: 4, base: DEFAULT_BASE, pharmacyPresetsVersion:1, recentAntibioticsVersion:1, symptomPresetsVersion:1, exposurePresetsVersion:1, allergyPresetsVersion:1, heightFieldsVersion:1, njGuidelinesVersion:1, sections: [
     { id:'s_door', tab:'visit', title:'At the door', fields:[
       { id:'name', type:'text', label:'Patient', outAlt:{ when:'added', out:'Added patient' }, ph:'Full name, spelled right', cap:'words', req:true },
       { id:'dob', type:'dob', label:'DOB', req:true },
@@ -728,16 +728,19 @@ function defaultLayout(){
         sub:{ id:'pregtype', on:'Yes', label:'Which?', opts:['Nursing','Pregnant','Both'], out:{ Both:'Nursing and pregnant' } } }
     ]},
     { id:'s_vitals', tab:'visit', title:'Vitals', fields:[
+      { id:'vitals_note', type:'note', label:'Collect temperature, height and weight for every patient. If unavailable or refused, record why. Patient-reported approximate height is acceptable.' },
       { id:'temp', type:'text', label:'Temp', ph:'98.7 °F', im:'decimal' },
       { id:'o2', type:'text', label:'O2', ph:'98%', im:'numeric' },
       { id:'hr', type:'text', label:'HR', ph:'72 bpm', im:'numeric' },
-      { id:'bp', type:'text', label:'BP', ph:'Only if the provider asks', chips: chips('N/A') },
-      { id:'weight', type:'text', label:'Weight', ph:'Peds or under 100 lb', im:'decimal', chips: chips('N/A') },
-      ...heightFields()
+      { id:'bp', type:'text', label:'BP', ph:'When requested or as needed', chips: chips('N/A') },
+      { id:'weight', type:'text', label:'Weight', ph:'Weight in lb for every patient', im:'decimal' },
+      ...heightFields(),
+      ...vitalGuidelineFields()
     ]},
     { id:'s_rx', tab:'visit', title:'Pharmacy', fields:[
       { id:'pharmacy', type:'text', label:'Pharmacy', ph:'Pharmacy name', chips: chips(PHARMACY_PRESETS.join(', ')) },
-      { id:'formpref', type:'choice', label:'Pills or liquid', opts:['Pill','Liquid','Either','N/A'] }
+      { id:'formpref', type:'choice', label:'Pills or liquid', opts:['Pill','Liquid','Either','N/A'] },
+      ...fluPreferenceFields()
     ]},
     { id:'s_tests', tab:'visit', title:'Tests', fields:[
       { id:'tests', type:'tests', label:'Tap each test you did', items:[
@@ -748,8 +751,9 @@ function defaultLayout(){
         { id:'urine', n:'Urine dip', kind:'done' }
       ]},
       { id:'aware', type:'choice', label:'Patient aware of positive', opts:['Aware','Unaware'], unawareValue:'Unaware', when:'anyPositive', req:true, underPositive:true },
-      { id:'overnights', type:'text', label:'Overnights sent', ph:'Overnights and samples that went out',
-        chips: chips('None, +4plex, +Strep throat PCR, +RPP, +Strep culture, +Urine culture, +Blood') },
+      { id:'overnights', type:'text', label:'Labs collected/sent', ph:'Tests and samples collected or sent to the lab',
+        chips: chips('None, +4plex, +Strep throat PCR, +RPP, +Strep culture, +UA, +Urine culture, +Stool culture, +GPP, +Blood') },
+      ...labGuidelineFields(),
       { id:'bloodreason', type:'text', label:'Reason for blood work', ph:'Why the blood work was ordered', when:'blood', req:true }
     ]},
     { id:'s_ins', tab:'visit', title:'Insurance', fields:[
@@ -773,6 +777,7 @@ function defaultLayout(){
       { id:'k_label', type:'check', label:'LABEL EVERYTHING' },
       { id:'k_script', type:'check', label:'Took a pic of the blood work script', when:'blood' }
     ]},
+    { id:'k_uti', tab:'check', title:'UTI collection', fields:utiChecklistFields() },
     { id:'k_post', tab:'check', title:'When you post', fields:[
       { id:'k_posted', type:'check', label:'Posted the message with the insurance pic' },
       { id:'k_scriptpost', type:'check', label:'Posted the script pic', when:'blood' },
@@ -788,7 +793,7 @@ function defaultLayout(){
 
     { id:'o_steps', tab:'office', title:'Requisition and follow-up reminders', fields:[
       { id:'o_reqtests', type:'check', label:'Req: all tests done are checked off, and the provider', when:'anyTest' },
-      { id:'o_4plex', type:'check', label:'Req: overnight viral / flu / COVID PCR has 4plex checked, unless the provider ordered RPP', when:'viralPcr' },
+      { id:'o_4plex', type:'check', label:'Req: viral / flu / COVID lab testing has 4plex checked, unless the provider ordered RPP', when:'viralPcr' },
       { id:'o_strep', type:'check', label:'Req: strep throat PCR checked, unless the provider ordered a culture', when:'strep' },
       { id:'o_match', type:'check', label:'Req: name, spelling and DOB match', when:'anyTest' },
       { id:'o_corr', type:'check', label:'Req: the correction is fixed on the req too. If not, cross out and write it out', when:['correction', 'anyTest'] },
@@ -810,6 +815,46 @@ function heightFields(){
   ];
 }
 
+function vitalGuidelineFields(){
+  return [
+    {id:'height_source', type:'choice', label:'Height source', opts:['Measured','Patient-reported'], when:'hasHeight'},
+    {id:'temp_reason', type:'text', label:'Temperature unavailable / refused', out:'Temperature not obtained', ph:'Why could temperature not be obtained?', chips:chips('Refused, Unable to obtain'), when:'missingTemp'},
+    {id:'weight_reason', type:'text', label:'Weight unavailable / refused', out:'Weight not obtained', ph:'Why could weight not be obtained?', chips:chips('Refused, Unable to obtain'), when:'missingWeight'},
+    {id:'height_reason', type:'text', label:'Height unavailable / refused', out:'Height not obtained', ph:'Why could height not be obtained?', chips:chips('Refused, Unable to obtain'), when:'missingHeight'}
+  ];
+}
+
+function fluPreferenceFields(){
+  return [
+    {id:'flu_pref', type:'choice', label:'Flu treatment preference', opts:['Tamiflu','Xofluza','Discuss with clinician','Declined']},
+    {id:'tamiflu_form', type:'choice', label:'Tamiflu form', opts:['Capsules','Liquid'], when:'tamiflu', req:true}
+  ];
+}
+
+function labGuidelineFields(){
+  return [
+    {id:'lab_selection_note', type:'note', label:'Strep: PCR unless the clinician requests a culture. 4plex tests for flu, COVID and RSV; select RPP when the clinician requests a full viral panel. Record all rapid results and labs collected/sent on Teams.'},
+    {id:'strep_lab_note', type:'note', label:'Positive rapid strep: do not send a strep lab unless specifically requested by the clinician.', when:'strepLabConflict'},
+    {id:'strep_lab_requested', type:'check', label:'Strep lab specifically requested by clinician', when:'strepLabConflict'},
+    {id:'viral_lab_note', type:'note', label:'Positive rapid flu or COVID: do not send 4plex / RPP unless specifically requested by the clinician.', when:'viralLabConflict'},
+    {id:'viral_lab_requested', type:'check', label:'4plex / RPP specifically requested by clinician', when:'viralLabConflict'},
+    {id:'urine_reason', type:'choice', label:'Urine collection reason', opts:['Suspected UTI','With bloodwork','Other'], when:'urineCollection', req:true},
+    {id:'uti_note', type:'note', label:'Suspected UTI: run a dipstick, post its photo, and send both the labeled cup and culture tube for UA and urine culture. Use the UTI collection checks in Checklist.', when:'uti'},
+    {id:'stool_note', type:'note', label:'Stool culture / GPP: collect a fecal swab or a stool sample in the orange-cap, pink-liquid cup.', when:'stoolLab'}
+  ];
+}
+
+function utiChecklistFields(){
+  return [
+    {id:'k_uti_dip', type:'check', label:'UTI: dipstick performed', when:'uti'},
+    {id:'k_uti_photo', type:'check', label:'UTI: dipstick photo posted to Teams', when:'uti'},
+    {id:'k_uti_ua', type:'check', label:'UTI: UA requested on the requisition', when:'uti'},
+    {id:'k_uti_uc', type:'check', label:'UTI: urine culture requested on the requisition', when:'uti'},
+    {id:'k_uti_cup', type:'check', label:'UTI: labeled urine cup sent to the lab', when:'uti'},
+    {id:'k_uti_tube', type:'check', label:'UTI: labeled culture tube sent to the lab', when:'uti'}
+  ];
+}
+
 function recentAntibioticFields(){
   return [
     {id:'abx', type:'choice', label:'Recent antibiotics', opts:['No','Yes'], yesValue:'Yes'},
@@ -820,13 +865,23 @@ function recentAntibioticFields(){
 }
 
 const WHEN_TEXT = {
+  missingTemp:'temperature has not been obtained',
+  missingWeight:'weight has not been obtained',
+  missingHeight:'height has not been obtained',
+  hasHeight:'a complete height is entered',
+  tamiflu:'Tamiflu is the recorded preference',
+  strepLabConflict:'rapid strep is positive and a strep lab is selected',
+  viralLabConflict:'rapid flu or COVID is positive and 4plex / RPP is selected',
+  urineCollection:'a urine dip or urine lab is selected',
+  uti:'urine is collected for suspected UTI',
+  stoolLab:'stool culture or GPP is selected',
   recentAntibiotics:'Recent antibiotics indicates antibiotics were taken',
   added:'“Patient added at the house” is ticked',
   correction:'a correction is typed',
   anyPositive:'a test is marked Positive',
   positiveUnaware:'a test is positive and the patient is unaware',
-  blood:'Blood is in overnights sent',
-  viralPcr:'4plex or RPP is in overnights sent',
+  blood:'Blood is in labs collected/sent',
+  viralPcr:'4plex or RPP is in labs collected/sent',
   strep:'a strep test was done or sent',
   ears:'Ears is ticked',
   urine:'Urine dip is ticked',
@@ -934,6 +989,44 @@ function normalizeLayout(){
     const vitals = L.sections.find(s => s.id === 's_vitals' && s.tab === 'visit');
     if(vitals) vitals.fields.push(...heightFields().filter(f => !fieldById(f.id)));
     L.heightFieldsVersion = 1;
+  }
+  if(L.njGuidelinesVersion !== 1){
+    const defaults = defaultLayout();
+    const additions = new Set(['vitals_note', ...vitalGuidelineFields().map(f => f.id), ...fluPreferenceFields().map(f => f.id), ...labGuidelineFields().map(f => f.id)]);
+    for(const source of defaults.sections.filter(s => ['s_vitals', 's_rx', 's_tests'].includes(s.id))){
+      const target = L.sections.find(s => s.id === source.id && s.tab === source.tab);
+      if(!target) continue;
+      source.fields.forEach((field, index) => {
+        if(!additions.has(field.id) || fieldById(field.id)) return;
+        const previous = source.fields.slice(0, index).reverse().find(f => target.fields.some(old => old.id === f.id));
+        const at = previous ? target.fields.findIndex(f => f.id === previous.id) + 1 : 0;
+        target.fields.splice(at, 0, field);
+      });
+    }
+    if(fieldById('urine_reason')){
+      let section = L.sections.find(s => s.id === 'k_uti' && s.tab === 'check');
+      if(!section){
+        section = {id:'k_uti', tab:'check', title:'UTI collection', fields:[]};
+        const at = L.sections.findIndex(s => s.id === 'k_post');
+        L.sections.splice(at < 0 ? L.sections.length : at, 0, section);
+      }
+      section.fields.push(...utiChecklistFields().filter(f => !fieldById(f.id)));
+    }
+    const weight = fieldById('weight'), bp = fieldById('bp'), labs = fieldById('overnights');
+    if(weight){
+      if(weight.ph === 'Peds or under 100 lb') weight.ph = 'Weight in lb for every patient';
+      if(weight.chips) weight.chips = weight.chips.filter(c => norm(c.v) !== 'n/a');
+    }
+    if(bp?.ph === 'Only if the provider asks') bp.ph = 'When requested or as needed';
+    if(labs && ['text', 'textarea'].includes(labs.type)){
+      if(labs.label === 'Overnights sent') labs.label = 'Labs collected/sent';
+      if(labs.ph === 'Overnights and samples that went out') labs.ph = 'Tests and samples collected or sent to the lab';
+      labs.chips = labs.chips || [];
+      for(const name of ['UA', 'Urine culture', 'Stool culture', 'GPP']) if(!labs.chips.some(c => norm(c.v) === norm(name))) labs.chips.push({v:name, m:'add'});
+    }
+    const viral = fieldById('o_4plex');
+    if(viral?.label === 'Req: overnight viral / flu / COVID PCR has 4plex checked, unless the provider ordered RPP') viral.label = 'Req: viral / flu / COVID lab testing has 4plex checked, unless the provider ordered RPP';
+    L.njGuidelinesVersion = 1;
   }
   if(L.exposurePresetsVersion !== 1){
     const exposure = fieldById('exposure');
@@ -1210,9 +1303,27 @@ function context(vals, layout = L){
   let lab = norm(vals.overnights);
   if(/^(none|no|n\/?a|nothing|-+)\.?$/.test(lab)) lab = '';
   const did = (id, re) => ticked.some(it => it.id === id || re.test(it.n));
+  const isPositive = (id, re) => positive.some(it => it.id === id || re.test(it.n));
+  const obtained = value => {
+    const text = String(value || '').trim();
+    return !!text && !/^(n\/?a|unknown|not obtained|not measured|refused|unable to obtain)$/i.test(text);
+  };
+  const feet = String(vals.height_ft || '').trim(), inches = String(vals.height_in || '').trim();
+  const hasHeight = /^\d$/.test(feet) && /^\d{1,2}(?:\.\d+)?$/.test(inches) && Number(inches) < 12;
+  const urineCollection = did('urine', /urine|dip/i) || /urine|\b(?:ua|uc|urinalysis)\b/.test(lab);
   const anyPositive = positive.length > 0;
   const awareness = fieldById('aware', layout);
   return {
+    missingTemp: !obtained(vals.temp),
+    missingWeight: !obtained(vals.weight),
+    missingHeight: !obtained(feet) && !obtained(inches),
+    hasHeight,
+    tamiflu: vals.flu_pref === 'Tamiflu',
+    strepLabConflict: isPositive('strep', /strep/i) && /strep/.test(lab),
+    viralLabConflict: (isPositive('flu', /flu/i) || isPositive('covid', /covid/i)) && /4\s*-?\s*plex|\brpp\b|(flu|covid|viral)[^,]*pcr/.test(lab),
+    urineCollection,
+    uti: urineCollection && vals.urine_reason === 'Suspected UTI',
+    stoolLab: /stool|\bgpp\b/.test(lab),
     recentAntibiotics: !!fieldById('abx', layout)?.yesValue && vals.abx === fieldById('abx', layout).yesValue,
     added: !!vals.added,
     correction: !!String(vals.correction || '').trim(),
@@ -1312,6 +1423,20 @@ function buildOutput(vals, layout = L){
     }
   }
   if(!lines.length) return { text: '', issues: [], ctx };
+  if(layout.njGuidelinesVersion === 1){
+    for(const [id, label, missing] of [['temp', 'Temperature', ctx.missingTemp], ['weight', 'Weight', ctx.missingWeight], ['height', 'Height', ctx.missingHeight]]){
+      const field = id === 'height' ? 'height_ft' : id;
+      if(visitFields.some(f => f.id === field) && missing && !String(vals[id + '_reason'] || '').trim()) issues.push(label + ': enter a measurement or explain why it was unavailable / refused');
+    }
+    if(ctx.strepLabConflict && !vals.strep_lab_requested) issues.push('Positive rapid strep: confirm the strep lab was specifically requested by the clinician');
+    if(ctx.viralLabConflict && !vals.viral_lab_requested) issues.push('Positive rapid flu / COVID: confirm 4plex / RPP was specifically requested by the clinician');
+    if(ctx.uti){
+      if(!ctx.urine) issues.push('Suspected UTI: run a urine dip and post its photo');
+      const labs = String(vals.overnights || '').toLowerCase();
+      if(!/\bua\b|urinalysis/.test(labs)) issues.push('Suspected UTI: include UA in labs collected/sent');
+      if(!/\buc\b|urine\s+culture/.test(labs)) issues.push('Suspected UTI: include urine culture in labs collected/sent');
+    }
+  }
   return { text: lines.join('\n'), issues, ctx };
 }
 
@@ -1475,9 +1600,9 @@ function renderOfficePanel(){
   page.updateOfficeStatus();
   const ordered = office.filter(o => typeof o.overnights === 'string' && overnightText(o));
   const legacy = office.filter(o => typeof o.overnights !== 'string');
-  p.append(h('p', {class:'office-summary', text:ordered.length + (ordered.length === 1 ? ' patient with overnight tests.' : ' patients with overnight tests.') + ' Saved in this browser only.'}));
+  p.append(h('p', {class:'office-summary', text:ordered.length + (ordered.length === 1 ? ' patient with labs collected/sent.' : ' patients with labs collected/sent.') + ' Saved in this browser only.'}));
   if(!office.length){
-    p.append(h('div', {class:'banner info', text:officeWritable ? 'No overnight tests saved yet. Enter a patient’s overnight tests in the Visit form, then press Copy message.' : 'Saved entries could not be loaded. Retry saving to recover the Office list.'}));
+    p.append(h('div', {class:'banner info', text:officeWritable ? 'No labs saved yet. Enter a patient’s labs collected/sent in the Visit form, then press Copy message.' : 'Saved entries could not be loaded. Retry saving to recover the Office list.'}));
   }
   const links = h('nav', {class:'row office-list-links', 'aria-label':'Office patient lists'});
   const groups = [];
@@ -1519,9 +1644,9 @@ function officeCard(o){
     h('div', {class:'visit-meta', text:(o.dob ? 'DOB ' + o.dob : 'DOB not entered') + ' · ' + fmtDayTime(o.t)})));
   const details = h('div', {class:'pad'});
   if(typeof o.overnights === 'string'){
-    details.append(h('p', {class:'small', text:'Overnight tests'}), h('p', {class:'overnight-tests', text:o.overnights}));
+    details.append(h('p', {class:'small', text:'Labs collected/sent'}), h('p', {class:'overnight-tests', text:o.overnights}));
     if(o.bloodreason) details.append(h('p', {class:'small', text:'Reason for blood work'}), h('p', {class:'overnight-tests', text:o.bloodreason}));
-  }else details.append(h('p', {class:'banner warn', text:'Overnight test details were not saved in this older entry.'}));
+  }else details.append(h('p', {class:'banner warn', text:'Lab details were not saved in this older entry.'}));
   const completed = h('input', {type:'checkbox', checked:o.completed, data:{officeCompleted:o.id}, onchange:() => setOfficeCompleted(o.id, completed.checked)});
   details.append(h('label', {class:'checkrow office-completion' + (o.completed ? ' done' : '')}, completed, h('span', {text:'Completed'})));
   card.append(details);
@@ -1835,7 +1960,7 @@ function renderSaveState(text = buildOutput(V).text){
     if(pending) saved = 'Office save pending — retry save';
     else if(M.officeId && office.some(o => o.id === M.officeId)) saved = 'Office saved';
     else if(overnightText(M.sentVals || {})) saved = 'Office entry removed';
-    else saved = 'No overnight tests to save';
+    else saved = 'No labs to save';
   }
   el.textContent = copied + ' · ' + saved;
   el.classList.toggle('warn', pending || !!(M.sentAt && text !== M.sentText));
@@ -2005,15 +2130,15 @@ function saveCopiedOffice(copiedValues, copiedMeta, savedVisit = copiedVisitSnap
       const removedId = copiedMeta.officeId;
       mutateOffice(() => { office = office.filter(o => o.id !== removedId); });
       copiedMeta.officeId = null;
-      msg = 'Copied. No overnight tests — removed from Office';
+      msg = 'Copied. No labs — removed from Office';
     }
   }else if(copiedMeta.officeId){
     syncOfficeCard(steps, copiedValues, copiedMeta, savedVisit);
-    msg = 'Copied. Overnight tests updated in Office';
+    msg = 'Copied. Labs updated in Office';
   }else{
     const nm = String(copiedValues.name || '').trim(), db = String(copiedValues.dob || '').trim();
     addToOffice(nm, db, copiedValues, copiedMeta, savedVisit);
-    msg = 'Copied. Overnight tests saved to Office';
+    msg = 'Copied. Labs saved to Office';
   }
   return msg;
 }
@@ -2082,14 +2207,14 @@ function editOfficeVisit(o, pending){
   const openVisit = () => page.openOfficeVisit(o.id);
   sheet({ title:'Edit saved entry', focus:'#sheet_name', body:[
     'Changes apply to this saved entry. Copying the patient again replaces it with the current visit details.', ...f.nodes,
-    h('label', {class:'flabel', for:'sheet_overnights', text:'Overnight tests'}), tests,
+    h('label', {class:'flabel', for:'sheet_overnights', text:'Labs collected/sent'}), tests,
     h('label', {class:'flabel', for:'sheet_bloodreason', text:'Reason for blood work'}), reason,
     !visitAvailable ? h('p', {class:'small', text:'A complete visit form was not saved with this older Office entry. You can still edit its saved test details.'})
       : !page.patientForOffice(o.id) ? h('p', {class:'small', text:'Open visit page restores the latest saved visit, or the last copied message if no newer visit is available. Changes made only to this Office entry stay here.'}) : null, err],
     buttons:[ {label:'Save changes', kind:'primary', validate:() => {
                   if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
                   if(f.dobIn.value.trim() && !validDob(f.dobIn.value)){ err.textContent = 'DOB: enter a valid date (MM/DD/YYYY).'; return false; }
-                  if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the overnight tests, or cancel and remove this entry if no tests were sent.'; return false; }
+                  if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the labs collected/sent, or cancel and remove this entry if no samples were collected or sent.'; return false; }
                   return true; },
                 on:() => {
                   const edited = Object.fromEntries(Object.entries(currentValues()).map(([key, value]) => [key, value.trim()]));
@@ -2123,7 +2248,7 @@ function removeOfficeVisit(o){
     });
     flash(officeWritable ? 'Removed ' + (o.name || 'the entry') : 'Removal could not be saved. Keep this page open', officeWritable ? '' : 'bad');
   };
-  sheet({ title:'Remove ' + (o.name || 'this saved entry') + '?', body:['This removes the saved Office entry. Patient forms stay on the page. Copying that patient again will add their overnight tests back.'],
+  sheet({ title:'Remove ' + (o.name || 'this saved entry') + '?', body:['This removes the saved Office entry. Patient forms stay on the page. Copying that patient again will add their labs back.'],
     buttons:[ {label:'Remove', kind:'solid danger', on:doit}, {label:'Cancel'} ] });
 }
 
@@ -3078,7 +3203,7 @@ openCurrentApp();
     Promise.resolve(context.registerTool({
       name: 'open_note_builder_tab',
       title: 'Open note builder tab',
-      description: 'Open the current house’s first patient Visit or Checklist tab, or the separate Office overnight-test view.',
+      description: 'Open the current house’s first patient Visit or Checklist tab, or the separate Office lab view.',
       inputSchema: {type: 'object', properties: {tab: {type: 'string', enum: ['visit', 'check', 'office']}}, required: ['tab'], additionalProperties: false},
       annotations: {readOnlyHint: false, untrustedContentHint: false},
       execute(input) {

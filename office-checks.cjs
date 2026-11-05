@@ -5,6 +5,7 @@ const http = require('node:http');
 const path = require('node:path');
 
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 const local = (root, id) => root.locator(`[data-local-id="${id}"]`);
@@ -21,7 +22,13 @@ async function fillPatient(root, name, overnights = '') {
   await local(root, 'f_name').fill(name);
   await local(root, 'f_dob').fill('01012000');
   await local(root, 'f_inspic').check();
+  await local(root, 'f_temp').fill('98.6');
+  await local(root, 'f_weight').fill('120');
+  await local(root, 'f_height_ft').fill('5');
+  await local(root, 'f_height_in').fill('10');
   if (overnights) await local(root, 'f_overnights').fill(overnights);
+  const urineReason = root.locator('[data-choice="urine_reason"][data-v="Other"]');
+  if(await urineReason.isVisible()) await urineReason.click();
 }
 
 async function addAfter(page, index) {
@@ -32,6 +39,7 @@ async function addAfter(page, index) {
 
 async function copyPatient(page, root, expectedCount) {
   await local(root, 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await local(root, 'sentBanner').waitFor({ state: 'visible' });
   if (expectedCount !== undefined) {
     await page.waitForFunction(count => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === count, expectedCount);
@@ -120,7 +128,7 @@ test('A saved cleared visit reopens without confusing another form having the sa
   await showOffice(page);
   await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
   assert.equal(await page.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), true);
-  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Urine culture');
+  await page.getByRole('dialog').getByLabel('Labs collected/sent', {exact:true}).fill('Urine culture');
   await page.getByRole('button', {name:'Save changes', exact:true}).click();
   assert.equal((await records(page))[0].id, id);
   assert.equal((await records(page))[0].overnights, 'Urine culture');
@@ -142,7 +150,7 @@ test('Keep editing and Escape preserve unsaved Office values before opening a vi
   await showOffice(page);
   await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
   await page.getByRole('dialog').getByLabel('Name', {exact:true}).fill('TEST UNSAVED ENTRY');
-  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Strep culture');
+  await page.getByRole('dialog').getByLabel('Labs collected/sent', {exact:true}).fill('Strep culture');
   await page.getByRole('button', {name:'Open visit page', exact:true}).click();
   assert.match(await page.getByRole('dialog').innerText(), /Unsaved Office changes/);
   await page.getByRole('button', {name:'Keep editing', exact:true}).click();
@@ -150,7 +158,7 @@ test('Keep editing and Escape preserve unsaved Office values before opening a vi
   await page.getByRole('button', {name:'Open visit page', exact:true}).click();
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('dialog').getByLabel('Name', {exact:true}).inputValue(), 'TEST UNSAVED ENTRY');
-  assert.equal(await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).inputValue(), 'Strep culture');
+  assert.equal(await page.getByRole('dialog').getByLabel('Labs collected/sent', {exact:true}).inputValue(), 'Strep culture');
   assert.deepEqual(await records(page), before);
   await page.getByRole('button', {name:'Save changes', exact:true}).click();
   assert.equal((await records(page))[0].name, 'TEST UNSAVED ENTRY');
@@ -165,7 +173,7 @@ test('Confirmed navigation discards only unsaved Office edits and opens the curr
   const before = await records(page);
   await showOffice(page);
   await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
-  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('Unsaved Office order');
+  await page.getByRole('dialog').getByLabel('Labs collected/sent', {exact:true}).fill('Unsaved Office order');
   await page.getByRole('dialog').getByLabel('DOB', {exact:true}).fill('bad');
   await page.getByRole('button', {name:'Open visit page', exact:true}).click();
   await page.getByRole('button', {name:'Open without saving', exact:true}).click();
@@ -314,6 +322,7 @@ test('pending clipboard completion stores the exact patient snapshot taken at Co
   await local(root, 'f_bloodreason').fill('Original blood reason');
   await page.evaluate(() => { window.__deferCopy = true; });
   await local(root, 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => typeof window.__resolveCopy === 'function');
   await local(root, 'f_overnights').fill('Blood: changed panel');
   await local(root, 'f_bloodreason').fill('Changed while clipboard pending');
@@ -373,7 +382,7 @@ test('legacy Office entries retain identity and steps, disclose missing orders, 
   await card.getByRole('button', { name: /Edit saved entry/i }).click();
   const dialog = page.locator('[role="dialog"]:visible');
   assert.equal(await dialog.getByRole('button', {name:'Open visit page', exact:true}).isEnabled(), false);
-  await dialog.getByLabel('Overnight tests', { exact: true }).fill('Blood: CBC; custom legacy assay');
+  await dialog.getByLabel('Labs collected/sent', { exact: true }).fill('Blood: CBC; custom legacy assay');
   await dialog.getByLabel('Reason for blood work', { exact: true }).fill('Verified from copied note');
   await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
   const updated = (await records(page))[0];

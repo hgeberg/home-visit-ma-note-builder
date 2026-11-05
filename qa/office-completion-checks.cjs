@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./browser.cjs');
+const {acknowledgeCopyWarning} = require('./form-fixtures.cjs');
 
 const root = path.resolve(__dirname, '..');
 const tests = [];
@@ -37,6 +38,7 @@ async function seed(page, name = 'SYNTHETIC OFFICE ALPHA', n = 0) {
 }
 async function copy(page, n = 0) {
   await field(page, 'copyBtn', n).click();
+  await acknowledgeCopyWarning(page);
   await field(page, 'sentBanner', n).waitFor({state:'visible'});
 }
 async function restore(page) {
@@ -134,7 +136,7 @@ test('Office edits and copying the linked visit again preserve the manually chos
   await showOffice(page);
   await checkbox(page, 'SYNTHETIC OFFICE ALPHA').check();
   await card(page, 'SYNTHETIC OFFICE ALPHA').getByRole('button', {name:'Edit saved entry', exact:true}).click();
-  await page.getByRole('dialog').getByLabel('Overnight tests', {exact:true}).fill('SYNTHETIC edited Office order');
+  await page.getByRole('dialog').getByLabel('Labs collected/sent', {exact:true}).fill('SYNTHETIC edited Office order');
   await page.getByRole('button', {name:'Save changes', exact:true}).click();
   assert.equal((await records(page))[0].completed, true);
   assert.match(await group(page, 'completed').innerText(), /SYNTHETIC edited Office order/);

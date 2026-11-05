@@ -1,6 +1,7 @@
 /* House navigation: isolated Chrome contexts with synthetic patients only. */
 const fs = require('node:fs'), http = require('node:http'), assert = require('node:assert/strict');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
+const {acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const tests = [], test = (name, run) => tests.push({name, run});
 const patient = (p, n=0) => p.locator('.patient').nth(n);
 const field = (p, id, n=0) => patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -17,7 +18,7 @@ async function openPatient(p, name){
   await p.locator('#patientJumps').getByRole('button',{name,exact:true}).click();
 }
 async function restore(p){await p.getByRole('button',{name:/^Restore (this visit|all)/}).click();}
-async function copy(p,n=0){await field(p,'copyBtn',n).click();await field(p,'sentBanner',n).waitFor({state:'visible'});}
+async function copy(p,n=0){await field(p,'copyBtn',n).click();await acknowledgeCopyWarning(p);await field(p,'sentBanner',n).waitFor({state:'visible'});}
 
 test('Patient list starts collapsed; adding patients waits for a field tap before typing',async p=>{
   assert.equal(await p.locator('#patientNavigator').evaluate(el=>el.open),false);
@@ -122,7 +123,7 @@ test('An empty new house survives reload and incomplete house metadata falls bac
 test('A pending copy stays with its original patient when moving to another house',async p=>{
   await seed(p,'SYNTHETIC ALPHA');await field(p,'f_overnights').fill('RPP');
   await p.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>new Promise(resolve=>window.finishCopy=resolve)}}));
-  await field(p,'copyBtn').click();await p.waitForFunction(()=>typeof window.finishCopy==='function');
+  await field(p,'copyBtn').click();await acknowledgeCopyWarning(p);await p.waitForFunction(()=>typeof window.finishCopy==='function');
   await p.locator('#newHouseBtn').click();await seed(p,'SYNTHETIC BETA',1);
   await p.evaluate(()=>window.finishCopy());
   await p.waitForFunction(()=>JSON.parse(localStorage.getItem('hvnb_current_office')||'[]').length===1);
