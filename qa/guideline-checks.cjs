@@ -14,6 +14,9 @@ const output = (page, n = 0) => field(page, 'output', n).inputValue();
 const dialog = page => page.locator('dialog[open]');
 const testRow = (page, id, n = 0) => patient(page, n).locator('.testrow[data-item="' + id + '"]');
 const restore = page => page.getByRole('button', {name:/^Restore (this visit|all)/}).click();
+const vitalReview = (page, id) => dialog(page).locator('[data-vital-review="' + id + '"]');
+const vitalOption = (page, id, name) => vitalReview(page, id).getByRole('radio', {name, exact:true});
+const vitalExplanation = (page, id) => vitalReview(page, id).locator('input');
 const utiIds = ['k_uti_dip', 'k_uti_photo', 'k_uti_ua', 'k_uti_uc', 'k_uti_cup', 'k_uti_tube'];
 async function seed(page, name = 'SYNTHETIC NJ GUIDELINES', n = 0, vitals = true) {
   await field(page, 'f_name', n).fill(name);
@@ -48,40 +51,127 @@ async function checkpoint(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_app_draft')));
 }
 
-test('Missing temperature, height and adult weight prompt before copying and reasons can be copied', async page => {
+test('Missing-vital options stay out of the form and appear only when Copy is pressed', async page => {
   await seed(page, 'SYNTHETIC MISSING ADULT VITALS', 0, false);
+  for(const id of ['temp_reason', 'weight_reason', 'height_reason']) assert.equal(await field(page, 'f_' + id).count(), 0);
+  assert.equal(await patient(page).getByText('Unable to obtain', {exact:true}).count(), 0);
+  assert.equal(await patient(page).getByText('Pt refused', {exact:true}).count(), 0);
+  assert.equal(await dialog(page).count(), 0);
   const warning = await inspectCopy(page);
-  assert.match(warning, /temp(?:erature)?/i);
-  assert.match(warning, /height/i);
-  assert.match(warning, /weight/i);
-  assert.equal(await dialog(page).getByRole('button', {name:'Copy anyway', exact:true}).isVisible(), true);
-  await goBack(page);
-  await field(page, 'f_temp_reason').fill('SYNTHETIC thermometer unavailable');
-  await field(page, 'f_weight_reason').fill('Patient refused weight');
-  await field(page, 'f_height_reason').fill('Patient unable to provide height');
-  const copied = await copy(page);
-  for(const reason of ['SYNTHETIC thermometer unavailable', 'Patient refused weight', 'Patient unable to provide height']) assert(copied.includes(reason));
-  assert.doesNotMatch(copied, /NOT MARKED|not entered|: missing/i);
+  assert.match(warning, /temp(?:erature)?/i);assert.match(warning, /height/i);assert.match(warning, /weight/i);
+  for(const id of ['temp','weight','height']) {
+    for(const name of ['Unable to obtain','Pt refused']) assert.equal(await vitalOption(page,id,name).isVisible(), true);
+    assert.equal(await vitalExplanation(page,id).isVisible(), false);
+  }
+  await vitalOption(page,'temp','Unable to obtain').click();
+  await vitalExplanation(page,'temp').fill('SYNTHETIC thermometer unavailable');
+  await vitalOption(page,'weight','Pt refused').click();
+  await dialog(page).getByRole('button',{name:'Copy anyways',exact:true}).click();
+  await field(page,'sentBanner').waitFor({state:'visible'});
+  const copied = await page.evaluate(() => window.syntheticCopied);
+  assert.match(copied,/Temperature not obtained:.*Unable to obtain.*SYNTHETIC thermometer unavailable/);
+  assert.match(copied,/Weight not obtained: Pt refused/);
+  assert.doesNotMatch(copied,/Height not obtained|NOT MARKED|: missing/i);
+  const saved=await checkpoint(page);
+  assert.match(saved.patients[0].vals.temp_reason,/SYNTHETIC thermometer unavailable/);
+  assert.equal(saved.patients[0].vals.weight_reason,'Pt refused');
+  assert(!saved.patients[0].vals.height_reason);
 });
 
-test('Collected vitals hide stale reasons and a patient-reported height is included in the message', async page => {
+test('Unable to obtain accepts an optional explanation and cancel leaves answers unchanged', async page => {
+  await seed(page, 'SYNTHETIC CANCEL MISSING VITALS',0,false);
+  await inspectCopy(page);
+  await dialog(page).getByRole('button',{name:'Copy message',exact:true}).click();
+  assert.equal(await dialog(page).count(),1);
+  assert.match(await dialog(page).getByRole('alert').innerText(),/choose a reason/i);
+  assert.equal(await page.evaluate(() => window.syntheticCopied),undefined);
+  await vitalOption(page,'temp','Unable to obtain').click();
+  await vitalExplanation(page,'temp').fill('SYNTHETIC discarded reason');
+  await vitalOption(page,'weight','Pt refused').click();
+  await goBack(page);
+  assert.doesNotMatch(await output(page),/discarded reason|not obtained|Pt refused/);
+  let saved=await checkpoint(page);
+  for(const id of ['temp_reason','weight_reason','height_reason']) assert(!saved.patients[0].vals[id]);
+  await inspectCopy(page);
+  for(const id of ['temp','weight','height']) await vitalOption(page,id,'Unable to obtain').click();
+  await dialog(page).getByRole('button',{name:'Copy message',exact:true}).click();
+  await field(page,'sentBanner').waitFor({state:'visible'});
+  const copied=await page.evaluate(() => window.syntheticCopied);
+  assert.match(copied,/Temperature not obtained: Unable to obtain/);
+  assert.match(copied,/Weight not obtained: Unable to obtain/);
+  assert.match(copied,/Height not obtained: Unable to obtain/);
+});
+
+test('Copy anyways bypasses missing vitals without inventing unavailable or refused reasons', async page => {
+  await seed(page,'SYNTHETIC COPY WITHOUT VITALS',0,false);
+  await inspectCopy(page);
+  await dialog(page).getByRole('button',{name:'Copy anyways',exact:true}).click();
+  await field(page,'sentBanner').waitFor({state:'visible'});
+  const copied=await page.evaluate(() => window.syntheticCopied);
+  assert.match(copied,/SYNTHETIC COPY WITHOUT VITALS/);
+  assert.doesNotMatch(copied,/not obtained|Unable to obtain|refused|NOT MARKED|: missing/i);
+  const saved=await checkpoint(page);
+  for(const id of ['temp_reason','weight_reason','height_reason']) assert(!saved.patients[0].vals[id]);
+});
+
+test('Recorded missing-vital choices are prefilled at the next copy and only missing vitals appear', async page => {
+  await seed(page,'SYNTHETIC REPEAT MISSING TEMPERATURE');
+  await field(page,'f_temp').fill('');
+  await inspectCopy(page);
+  assert.equal(await vitalReview(page,'temp').count(),1);
+  assert.equal(await vitalReview(page,'weight').count(),0);
+  assert.equal(await vitalReview(page,'height').count(),0);
+  await vitalOption(page,'temp','Unable to obtain').click();
+  await vitalExplanation(page,'temp').fill('SYNTHETIC repeated thermometer issue');
+  await dialog(page).getByRole('button',{name:'Copy message',exact:true}).click();
+  await field(page,'sentBanner').waitFor({state:'visible'});
+  await inspectCopy(page);
+  assert.equal(await vitalOption(page,'temp','Unable to obtain').getAttribute('aria-checked'),'true');
+  assert.equal(await vitalExplanation(page,'temp').inputValue(),'SYNTHETIC repeated thermometer issue');
+  await goBack(page);
+  const saved=await checkpoint(page);
+  assert.match(saved.patients[0].vals.temp_reason,/SYNTHETIC repeated thermometer issue/);
+});
+
+test('An incomplete height offers the missing-vital options and can record refusal', async page => {
+  await seed(page,'SYNTHETIC INCOMPLETE HEIGHT');
+  await field(page,'f_height_in').fill('');
+  await inspectCopy(page);
+  assert.equal(await vitalReview(page,'height').count(),1);
+  assert.equal(await vitalReview(page,'temp').count(),0);
+  assert.equal(await vitalReview(page,'weight').count(),0);
+  await vitalOption(page,'height','Pt refused').click();
+  await dialog(page).getByRole('button',{name:'Copy message',exact:true}).click();
+  await field(page,'sentBanner').waitFor({state:'visible'});
+  const copied=await page.evaluate(() => window.syntheticCopied);
+  assert.match(copied,/Height not obtained: Pt refused/);
+  assert.doesNotMatch(copied,/Height: 5 ft|Height source/);
+});
+
+test('Collected vitals hide saved popup reasons and a patient-reported height is included in the message', async page => {
   await seed(page, 'SYNTHETIC REPORTED HEIGHT', 0, false);
-  await field(page, 'f_temp_reason').fill('SYNTHETIC OLD TEMPERATURE REASON');
-  await field(page, 'f_weight_reason').fill('SYNTHETIC OLD WEIGHT REASON');
-  await field(page, 'f_height_reason').fill('SYNTHETIC OLD HEIGHT REASON');
-  await field(page, 'f_temp').fill('99.1');await field(page, 'f_weight').fill('170');
+  await inspectCopy(page);
+  for(const id of ['temp','weight','height']) await vitalOption(page,id,'Pt refused').click();
+  await dialog(page).getByRole('button',{name:'Copy message',exact:true}).click();
+  await field(page,'sentBanner').waitFor({state:'visible'});
+  await field(page, 'f_temp').fill('99.1');
+  await dialog(page).getByRole('button',{name:'Same patient, keep editing',exact:true}).click();
+  await field(page, 'f_weight').fill('170');
   await field(page, 'f_height_ft').fill('6');await field(page, 'f_height_in').fill('0');
   await choice(page, 'height_source', 'Patient-reported').click();
-  for(const id of ['temp_reason', 'weight_reason', 'height_reason']) assert.equal(await field(page, 'f_' + id).isVisible(), false);
+  for(const id of ['temp_reason', 'weight_reason', 'height_reason']) assert.equal(await field(page, 'f_' + id).count(), 0);
   assert.doesNotMatch(await field(page, 'f_weight').getAttribute('placeholder'), /Peds|under 100/i);
   assert.doesNotMatch(await field(page, 'f_bp').getAttribute('placeholder'), /Only if/i);
   const copied = await copy(page);
   assert.match(copied, /Height: 6 ft 0 in/);assert.match(copied, /Patient-reported/);
-  assert.doesNotMatch(copied, /SYNTHETIC OLD/);
+  assert.doesNotMatch(copied, /not obtained|Pt refused/);
 });
 
 test('Flu preferences require Tamiflu formulation only when relevant and preserve hidden choices', async page => {
   await seed(page);
+  assert.equal(await patient(page).locator('[data-field="flu_pref"]').isVisible(), false);
+  await selectTest(page,'flu','running');
+  assert.equal(await patient(page).locator('[data-field="flu_pref"]').isVisible(), true);
   assert.equal(await patient(page).locator('[data-field="tamiflu_form"]').isVisible(), false);
   await choice(page, 'flu_pref', 'Tamiflu').click();
   assert.equal(await patient(page).locator('[data-field="tamiflu_form"]').isVisible(), true);
@@ -97,6 +187,13 @@ test('Flu preferences require Tamiflu formulation only when relevant and preserv
   await choice(page, 'flu_pref', 'Tamiflu').click();
   assert.equal(await choice(page, 'tamiflu_form', 'Capsules').getAttribute('aria-checked'), 'true');
   await choice(page, 'tamiflu_form', 'Liquid').click();
+  await testRow(page,'flu').locator('input[type="checkbox"]').uncheck();
+  assert.equal(await patient(page).locator('[data-field="flu_pref"]').isVisible(), false);
+  assert.equal(await patient(page).locator('[data-field="tamiflu_form"]').isVisible(), false);
+  assert.doesNotMatch(await output(page),/Flu treatment preference|Tamiflu form|Tamiflu|Liquid/);
+  await selectTest(page,'flu','running');
+  assert.equal(await choice(page,'flu_pref','Tamiflu').getAttribute('aria-checked'),'true');
+  assert.equal(await choice(page,'tamiflu_form','Liquid').getAttribute('aria-checked'),'true');
   const copied = await copy(page);assert.match(copied, /Tamiflu/);assert.match(copied, /Liquid/);assert.doesNotMatch(copied, /Capsules/);
 });
 
@@ -198,6 +295,8 @@ test('Old saved forms gain the new fields while keeping custom answers, checklis
   layout.sections[0].title = 'SYNTHETIC CUSTOM SECTION';
   layout.sections[0].fields.push({id:'legacy_custom',type:'text',label:'SYNTHETIC custom field'});
   saved.patients[0].vals.legacy_custom = 'SYNTHETIC retained answer';
+  saved.patients[0].vals.temp = '';
+  saved.patients[0].vals.temp_reason = 'SYNTHETIC legacy unavailable explanation';
   // Install the old fixture after closing the live form so its pagehide save
   // cannot replace the synthetic layout with the current form snapshot.
   await page.close();page = await context.newPage();
@@ -221,14 +320,25 @@ test('Old saved forms gain the new fields while keeping custom answers, checklis
   await field(page, 'tab-visit').click();await checkpoint(page);await page.reload();await restore(page);
   assert.equal(await choice(page, 'flu_pref', 'Tamiflu').count(), 1);
   assert.equal(await field(page, 'f_legacy_custom').inputValue(), 'SYNTHETIC retained answer');
+  assert.equal(await field(page,'f_temp_reason').count(),0);
+  assert.match(await output(page),/Temperature not obtained: SYNTHETIC legacy unavailable explanation/);
+  await inspectCopy(page);
+  assert.equal(await vitalOption(page,'temp','Unable to obtain').getAttribute('aria-checked'),'true');
+  assert.equal(await vitalExplanation(page,'temp').inputValue(),'SYNTHETIC legacy unavailable explanation');
+  await goBack(page);
+  const retained=await checkpoint(page);
+  assert.equal(retained.patients[0].vals.temp_reason,'SYNTHETIC legacy unavailable explanation');
 });
 
 test('Preferences, reasons and lab overrides stay isolated across patients and reloads', async page => {
-  await seed(page, 'SYNTHETIC FIRST PREFERENCE');await choice(page, 'flu_pref', 'Tamiflu').click();await choice(page, 'tamiflu_form', 'Capsules').click();
+  await seed(page, 'SYNTHETIC FIRST PREFERENCE');await selectTest(page,'flu','running');await choice(page, 'flu_pref', 'Tamiflu').click();await choice(page, 'tamiflu_form', 'Capsules').click();
   await selectTest(page, 'strep', 'Positive');await choice(page, 'aware', 'Aware').click();await field(page, 'f_overnights').fill('Strep culture');await field(page, 'f_strep_lab_requested').check();
   await page.locator('#appendPatient').click();await seed(page, 'SYNTHETIC SECOND PREFERENCE', 1, false);
-  await choice(page, 'flu_pref', 'Xofluza', 1).click();
-  for(const id of ['temp_reason', 'weight_reason', 'height_reason']) await field(page, 'f_' + id, 1).fill('SYNTHETIC second patient unavailable');
+  await selectTest(page,'flu','running',1);await choice(page, 'flu_pref', 'Xofluza', 1).click();
+  await inspectCopy(page,1);
+  for(const id of ['temp','weight','height']) {await vitalOption(page,id,'Unable to obtain').click();await vitalExplanation(page,id).fill('SYNTHETIC second patient unavailable');}
+  await dialog(page).getByRole('button',{name:'Copy message',exact:true}).click();
+  await field(page,'sentBanner',1).waitFor({state:'visible'});
   await checkpoint(page);await page.reload();await restore(page);
   assert.equal(await choice(page, 'flu_pref', 'Tamiflu').getAttribute('aria-checked'), 'true');
   assert.equal(await field(page, 'f_strep_lab_requested').isChecked(), true);
@@ -239,11 +349,15 @@ test('Preferences, reasons and lab overrides stay isolated across patients and r
 
 test('New preferences and conditional UTI checks fit mobile and desktop widths', async page => {
   await seed(page, 'SYNTHETIC MOBILE GUIDELINES', 0, false);
-  await page.setViewportSize({width:320,height:900});await field(page, 'f_temp_reason').scrollIntoViewIfNeeded();
-  await page.screenshot({path:path.join(root,'qa','guideline-vitals-reasons-320.png')});
+  await page.setViewportSize({width:320,height:900});await inspectCopy(page);
+  await vitalOption(page,'temp','Unable to obtain').click();
+  await vitalExplanation(page,'temp').fill('SYNTHETIC device unavailable');
+  assert.equal(await dialog(page).getByRole('button',{name:'Copy anyways',exact:true}).isVisible(),true);
+  await page.screenshot({path:path.join(root,'qa','guideline-vitals-popup-320.png')});
+  await goBack(page);
   await field(page, 'f_temp').fill('98.6');await field(page, 'f_weight').fill('145');
   await field(page, 'f_height_ft').fill('5');await field(page, 'f_height_in').fill('10');
-  await choice(page, 'flu_pref', 'Tamiflu').click();await selectTest(page, 'urine');await choice(page, 'urine_reason', 'Suspected UTI').click();
+  await selectTest(page,'flu','running');await choice(page, 'flu_pref', 'Tamiflu').click();await selectTest(page, 'urine');await choice(page, 'urine_reason', 'Suspected UTI').click();
   await selectTest(page, 'flu', 'Positive');await testRow(page, 'flu').getByRole('radio', {name:'A',exact:true}).click();
   await choice(page, 'aware', 'Aware').click();await field(page, 'f_overnights').fill('RPP, UA, Urine culture');
   for(const width of [320, 390, 1280]) {

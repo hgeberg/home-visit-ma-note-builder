@@ -12,7 +12,7 @@ const patient = (p,n=0) => p.locator('.patient').nth(n);
 const field = (p,id,n=0) => patient(p,n).locator('[data-local-id="f_'+id+'"]');
 const button = (p,id,n=0) => patient(p,n).locator('[data-local-id="'+id+'"]');
 async function fill(p,id,value,n=0){ await field(p,id,n).fill(value); }
-async function copy(p,n=0){ await button(p,'copyBtn',n).click(); const b=p.getByRole('button',{name:'Copy anyway',exact:true}); if(await b.count()) await b.click(); await p.waitForTimeout(30); }
+async function copy(p,n=0){ await button(p,'copyBtn',n).click(); const b=p.getByRole('button',{name:/^Copy anyways?$/}); if(await b.count()) await b.click(); await p.waitForTimeout(30); }
 async function fresh(c,url){const p=await c.newPage();p.setDefaultTimeout(15000);await p.goto(url);return p;}
 async function stored(p){ return p.evaluate(()=>JSON.parse(localStorage.getItem('hvnb_current_office')||'[]')); }
 async function clipboard(p,mode='success'){ await p.evaluate(mode=>{window.pendingCopies=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:text=>mode==='delayed' ? new Promise((resolve,reject)=>window.pendingCopies.push({text,resolve,reject})) : mode==='blocked' ? Promise.reject(Error('Synthetic clipboard rejection')) : Promise.resolve()}});if(mode==='blocked')document.execCommand=()=>false;},mode); }
