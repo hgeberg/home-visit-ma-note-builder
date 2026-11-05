@@ -81,6 +81,24 @@ test('One digit in feet focuses inches for the same patient and complete height 
   assert.equal(await page.evaluate(() => document.activeElement.id), await field(page, 'f_height_ft', 1).getAttribute('id'));
 });
 
+test('Total inches convert after leaving the input, stay within the same patient, and survive reload', async page => {
+  await field(page, 'f_name').fill('SYNTHETIC TOTAL INCHES');
+  await field(page, 'f_height_in').pressSequentially('70.1');
+  assert.equal(await field(page, 'f_height_in').inputValue(), '70.1');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.localId), 'f_height_in');
+  assert.match(await field(page, 'output').inputValue(), /Height: 5 ft 10.1 in/);
+  await field(page, 'f_temp').focus();
+  assert.equal(await field(page, 'f_height_ft').inputValue(), '5');assert.equal(await field(page, 'f_height_in').inputValue(), '10.1');
+  await page.locator('#appendPatient').click();
+  await field(page, 'f_name', 1).fill('SYNTHETIC SMALL HEIGHT');
+  await field(page, 'f_height_in', 1).fill('8.5');await field(page, 'f_temp', 1).focus();
+  assert.equal(await field(page, 'f_height_ft', 1).inputValue(), '0');assert.equal(await field(page, 'f_height_in', 1).inputValue(), '8.5');
+  assert.equal(await field(page, 'f_height_in').inputValue(), '10.1');
+  await checkpoint(page);await page.reload();await restore(page);
+  assert.equal(await field(page, 'f_height_ft').inputValue(), '5');assert.equal(await field(page, 'f_height_in').inputValue(), '10.1');
+  assert.equal(await field(page, 'f_height_ft', 1).inputValue(), '0');assert.equal(await field(page, 'f_height_in', 1).inputValue(), '8.5');
+});
+
 for (const installed of [false, true]) {
   test((installed ? 'Installed app' : 'Regular browser') + ' preserves a no-lab visit after Clear patient, all tabs close, and Start fresh', async (page, context, url) => {
     await seed(page, 'SYNTHETIC ARCHIVED WITHOUT LABS');

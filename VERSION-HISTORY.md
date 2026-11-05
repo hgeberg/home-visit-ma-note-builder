@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.2 — inches-only height and measurements in the Copy popup (November 5, 2026)
+
+Leaving Feet blank accepts total inches and converts them to feet and inches in the message and, after leaving the Inches field, in the form. Fractional inches are preserved. The existing two-field height entry remains available.
+
+The missing-vitals Copy popup now offers Enter measurement alongside Unable to obtain and Pt refused. Enter temperature, weight, or height directly there, including total inches for height. Copying updates the visit fields and copied message; Go back discards popup edits. Measurements can be combined with reasons for other missing vitals. Incomplete measurements stay in the popup for correction. Release metadata and the offline cache advance together.
+
 ## v9.3.1 — copy-time vital review (November 5, 2026)
 
 Unavailable/refused reason controls move out of the Visit form and into a popup shown when Copy is pressed with missing or incomplete temperature, height, or weight. Each missing vital offers Unable to obtain with an optional explanation or Pt refused. Copy message records the selected reasons; Copy anyways allows copying without reasons for the remaining missing vitals. Canceling does not change saved answers, and previous reasons remain editable in the popup.

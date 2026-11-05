@@ -203,7 +203,12 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
    assert(!result.text.includes('Height feet:'));assert(!result.text.includes('Height inches:'));
    assert(!result.issues.some(issue=>issue.startsWith('Height:')));
   }
-  for(const values of [{},{height_ft:'5'},{height_in:'10'},{height_ft:'5',height_in:'12'},{height_ft:'5',height_in:'-1'}]){
+  for(const [total,expected] of [['70','5 ft 10 in'],['70.1','5 ft 10.1 in'],['72','6 ft 0 in'],['8.5','0 ft 8.5 in'],['0','0 ft 0 in'],['119.5','9 ft 11.5 in']]){
+   const result=p.buildOutput({name:'SYNTHETIC',height_in:total});
+   assert(result.text.includes('Height: '+expected));assert.equal(result.ctx.hasHeight,true);assert.equal(result.ctx.missingHeight,false);
+   assert(!result.issues.some(issue=>issue.startsWith('Height:')));
+  }
+  for(const values of [{},{height_ft:'5'},{height_in:'bad'},{height_in:'120'},{height_ft:'5',height_in:'12'},{height_ft:'5',height_in:'-1'}]){
    const result=p.buildOutput({name:'SYNTHETIC',...values});
    assert(!result.text.includes('Height:'));
    assert(result.issues.some(issue=>issue.startsWith('Height:')), 'Missing and incomplete heights prompt before copying');
