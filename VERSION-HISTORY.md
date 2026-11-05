@@ -1,5 +1,13 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.0 — NJ visit guidelines (November 5, 2026)
+
+Temperature, height, and weight now have missing-measurement reminders for every patient, with a place to record why a measurement was unavailable or refused. Copying remains available after review. Height supports measured or patient-reported values, and BP wording allows collection when requested or warranted. Flu-treatment preference joins Pharmacy, with capsule/liquid preference shown only for Tamiflu and included in the message when relevant.
+
+The app calls sent specimens "Labs collected/sent" instead of "Overnights." UA, stool culture, and GPP choices join the existing shortcuts, with nearby strep PCR/culture and 4plex/RPP reference. Positive rapid tests paired with their corresponding lab tests prompt a reminder with a clinician-requested exception; entered orders remain intact. Urine collection distinguishes suspected UTI from urine accompanying bloodwork, and suspected UTI has optional patient checks for dipstick, posted photo, UA, UC, labeled cup, and culture tube.
+
+Saved forms receive the new fields and labels while preserving entered answers, custom fields, checked items, lab orders, and running rapid-test results. Added `qa/guideline-checks.cjs` for the new visit workflow. Release metadata, package version, and offline cache advance together.
+
 ## v9.2.4 — running rapid tests (November 3, 2026)
 
 Each rapid-test result has a `running` option for copying a visit while the test is still in progress. The message uses `running`, and saved visits retain the selection when reopened. Switching from a positive flu result clears its type; running tests do not trigger positive-result awareness or provider-tagging prompts. Positive and Negative remain available for entering the final result. Release metadata and offline cache advance together.

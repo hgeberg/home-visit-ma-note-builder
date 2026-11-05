@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./browser.cjs');
+const {acknowledgeCopyWarning} = require('./form-fixtures.cjs');
 
 const root = path.resolve(__dirname, '..');
 const tests = [], test = (name, run) => tests.push({name, run});
@@ -24,6 +25,7 @@ async function history(page) {
 }
 async function copy(page, n = 0) {
   await local(page, 'copyBtn', n).click();
+  await acknowledgeCopyWarning(page);
   await local(page, 'sentBanner', n).waitFor({state:'visible'});
 }
 async function changeCopied(page, value, n = 0) {

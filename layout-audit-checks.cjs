@@ -2,7 +2,7 @@
 // Form editing is retired. Exercise visits and forms saved by earlier releases.
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium,launchOptions}=require('./qa/browser.cjs');
-const {defaultLayout,installSavedLayout}=require('./qa/form-fixtures.cjs');
+const {defaultLayout,installSavedLayout,acknowledgeCopyWarning}=require('./qa/form-fixtures.cjs');
 const source=fs.readFileSync(path.join(__dirname,'index.html'));
 const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end(source)});
 const results=[],fid=(p,id)=>p.locator('[data-local-id="'+id+'"]');
@@ -26,7 +26,7 @@ async function main(){
  }
  try{
   await run('Fixed forms retain copying, conditional history, houses and recovery without editor controls',async p=>{
-   await seed(p);await p.locator('[data-choice="abx"][data-v="Yes"]').click();await fid(p,'f_abx_name').fill('SYNTHETIC MEDICINE');await fid(p,'f_abx_when').fill('Last week');await fid(p,'f_overnights').fill('RPP');await fid(p,'copyBtn').click();await fid(p,'sentBanner').waitFor({state:'visible'});
+   await seed(p);await p.locator('[data-choice="abx"][data-v="Yes"]').click();await fid(p,'f_abx_name').fill('SYNTHETIC MEDICINE');await fid(p,'f_abx_when').fill('Last week');await fid(p,'f_overnights').fill('RPP');await fid(p,'copyBtn').click();await acknowledgeCopyWarning(p);await fid(p,'sentBanner').waitFor({state:'visible'});
    assert.match(await p.evaluate(()=>window.copied),/SYNTHETIC MEDICINE, Last week/);
    await p.locator('#appendPatient').click();await p.locator('#newHouseBtn').click();await noEditor(p);
    await p.locator('#view-office').click();assert.equal(await p.locator('.office-patient').count(),1);await noEditor(p);
@@ -66,7 +66,7 @@ async function main(){
    const text=await fid(p,'output').inputValue();assert.match(text,/Exposure: Certainly, to SYNTHETIC CONTACT/);assert.match(text,/POSITIVE \(Y\)/);assert.match(text,/PATIENT NOT YET AWARE/);assert.match(await fid(p,'tagLine').innerText(),/patient unaware/);await noEditor(p);
   });
   await run('Office remains a navigation action and saved-entry editing remains available',async p=>{
-   await seed(p);await fid(p,'f_overnights').fill('4plex');await fid(p,'copyBtn').click();await fid(p,'sentBanner').waitFor({state:'visible'});
+   await seed(p);await fid(p,'f_overnights').fill('4plex');await fid(p,'copyBtn').click();await acknowledgeCopyWarning(p);await fid(p,'sentBanner').waitFor({state:'visible'});
    await fid(p,'tab-visit').focus();await p.keyboard.press('End');assert.equal(await p.evaluate(()=>document.activeElement.dataset.localId),'tab-check');assert.equal(await fid(p,'tab-office').count(),0);assert.equal(await p.locator('#view-office').getAttribute('aria-controls'),'officeSection');
    await p.locator('#view-office').click();await p.getByRole('button',{name:'Edit saved entry',exact:true}).click();await p.getByRole('dialog').getByLabel('Name',{exact:true}).fill('SYNTHETIC SAVED CHANGE');await p.getByRole('button',{name:'Save changes',exact:true}).click();assert.match(await p.locator('.office-patient').innerText(),/SYNTHETIC SAVED CHANGE/);await noEditor(p);
   });

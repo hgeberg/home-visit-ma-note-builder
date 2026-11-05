@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..');
 const groups = {
   storage:['multi-patient-checks.cjs','office-checks.cjs','qa/office-completion-checks.cjs','shift-checks.cjs','data-audit-checks.cjs','qa/shift-review-checks.cjs','qa/persistent-visits-checks.cjs','qa/seen-visits-checks.cjs'],
   layout:['layout-audit-checks.cjs','browser-audit-checks.cjs','quality-audit-checks.cjs'],
-  features:['improvements-checks.cjs','house-checks.cjs','antibiotic-checks.cjs','qa/message-rail-checks.cjs','qa/printing-checks.cjs'],
+  features:['qa/guideline-checks.cjs','improvements-checks.cjs','house-checks.cjs','antibiotic-checks.cjs','qa/message-rail-checks.cjs','qa/printing-checks.cjs'],
   installed:['webapp-checks.cjs']
 };
 const selected = process.argv[2];

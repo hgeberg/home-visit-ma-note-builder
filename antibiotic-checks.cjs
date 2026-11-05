@@ -1,7 +1,7 @@
 /* Recent-antibiotics workflow: isolated browser profiles and synthetic history. */
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
-const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
+const {defaultLayout, installSavedLayout, acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const tests=[],test=(name,run)=>tests.push({name,run});
 const patient=(p,n=0)=>p.locator('.patient').nth(n);
 const field=(p,id,n=0)=>patient(p,n).locator('[data-local-id="'+id+'"]');
@@ -40,7 +40,7 @@ test('Custom antibiotic text and dates copy exactly; missing Yes details prompt 
   assert.match(await p.locator('dialog[open]').innerText(),/When taken: not entered/);
   await p.getByRole('button',{name:'Go back',exact:true}).click();
   await field(p,'f_abx_name').fill('Other antibiotic, patient-reported');await field(p,'f_abx_when').fill('About 3 weeks ago');
-  await field(p,'copyBtn').click();await field(p,'sentBanner').waitFor({state:'visible'});
+  await field(p,'copyBtn').click();await acknowledgeCopyWarning(p);await field(p,'sentBanner').waitFor({state:'visible'});
   const copied=await p.evaluate(()=>window.copied);
   assert.deepEqual(copied.split('\n').filter(line=>line.startsWith('Recent antibiotics:')),['Recent antibiotics: Other antibiotic, patient-reported, About 3 weeks ago']);
   assert.doesNotMatch(copied,/Recent antibiotics: Yes|\nRecent antibiotic:|\nWhen taken:/);

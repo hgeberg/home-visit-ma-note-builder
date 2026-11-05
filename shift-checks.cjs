@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const {chromium, launchOptions} = require('./qa/browser.cjs');
-const {defaultLayout, installSavedLayout} = require('./qa/form-fixtures.cjs');
+const {defaultLayout, installSavedLayout, acknowledgeCopyWarning} = require('./qa/form-fixtures.cjs');
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 const patients = page => page.locator('#patients .patient');
@@ -22,8 +22,14 @@ async function fillPatient(page, name, overnights = '4plex', index = 0) {
   await local(root, 'f_name').fill(name);
   await local(root, 'f_dob').fill('01012000');
   await local(root, 'f_inspic').check();
+  await local(root, 'f_temp').fill('98.6');
+  await local(root, 'f_weight').fill('120');
+  await local(root, 'f_height_ft').fill('5');
+  await local(root, 'f_height_in').fill('10');
   await local(root, 'f_symptoms').fill(`Unfinished symptoms for ${name}`);
   await local(root, 'f_overnights').fill(overnights);
+  const urineReason = root.locator('[data-choice="urine_reason"][data-v="Other"]');
+  if(await urineReason.isVisible()) await urineReason.click();
 }
 
 async function addPatient(page, index = 0) {
@@ -34,6 +40,7 @@ async function addPatient(page, index = 0) {
 
 async function copyPatient(page, index = 0, count = 1) {
   await local(patient(page, index), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(n => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]').length === n, count);
 }
 
@@ -104,7 +111,7 @@ test('Office edit and removal dialogs work while patient inputs are hidden', asy
   await cards(page).getByRole('button', { name: 'Edit saved entry', exact: true }).click();
   assert.equal(await sheet(page).isVisible(), true);
   assert.equal(await page.locator('#patients').isVisible(), false);
-  await sheet(page).getByLabel('Overnight tests', { exact: true }).fill('RPP, urine culture');
+  await sheet(page).getByLabel('Labs collected/sent', { exact: true }).fill('RPP, urine culture');
   await sheet(page).getByRole('button', { name: 'Save changes', exact: true }).click();
   assert.equal((await records(page))[0].overnights, 'RPP, urine culture');
   await cards(page).getByRole('button', { name: 'Remove', exact: true }).click();
@@ -167,6 +174,7 @@ test('a pending clipboard operation cannot repopulate patient drafts or Office a
   await fillPatient(page, 'TEST PENDING CLEAR', '4plex');
   await page.evaluate(() => { window.__deferCopy = true; });
   await local(patient(page), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await page.waitForFunction(() => typeof window.__resolveCopy === 'function');
   await clearShift(page);
   await page.evaluate(() => { window.__resolveCopy(); });
@@ -188,6 +196,7 @@ test('clearing resets other tabs including pending copies and unfinished patient
   await fillPatient(second, 'TEST OTHER TAB UNFINISHED', 'Urine culture', 1);
   await second.evaluate(() => { window.__deferCopy = true; });
   await local(patient(second), 'copyBtn').click();
+  await acknowledgeCopyWarning(second);
   await second.waitForFunction(() => typeof window.__resolveCopy === 'function');
   await clearShift(page);
   await assertBlank(second);
@@ -280,6 +289,7 @@ test('a pending failed Office save cannot resurrect copied records after shift c
     };
   });
   await local(patient(page), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await showOffice(page);
   await page.locator('#officeSaveWarning').waitFor({ state: 'visible' });
   assert.equal(await cards(page).count(), 1);
@@ -305,6 +315,7 @@ test('stale Office retry notices a new shift before a storage event and cannot r
     };
   });
   await local(patient(page), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
   await showOffice(page);
   await page.locator('#officeSaveWarning').waitFor({ state: 'visible' });
   assert.equal(await cards(page).count(), 1);
