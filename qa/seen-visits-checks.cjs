@@ -211,6 +211,7 @@ test('Visit, Patients Seen and Office keyboard navigation keeps one Office actio
 test('Workspace navigation stays reachable while scrolling and keeps checklist state through Office and saved visits', async page => {
   await seed(page, 'SYNTHETIC STICKY NAVIGATION');
   await field(page, 'tab-check').click();await field(page, 'f_k_confirm').check();await field(page, 'tab-visit').click();
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY), 'none', 'The root prevents native bottom-edge bounce from moving the sticky navigation');
   for(const width of [320,390,810,1280]){
     await page.setViewportSize({width,height:700});
     await field(page, 'f_notes').evaluate(el => el.scrollIntoView({block:'start'}));
@@ -244,6 +245,18 @@ test('Workspace navigation stays reachable while scrolling and keeps checklist s
       assert.equal(await page.locator('#'+id).evaluate(el => {const box=el.getBoundingClientRect();return el.contains(document.elementFromPoint(box.left+box.width/2,box.top+box.height/2));}), true, id+' stays reachable with a save warning at '+width);
     }
     await page.locator('#draftWarning').evaluate(el => {el.hidden=true;});
+    for(const view of ['patients','seen','office']){
+      await page.locator('#view-'+view).click();
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.mouse.move(1, 699);
+      await page.mouse.wheel(0, 1200);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const bottomBar = await page.locator('.workspace-tools').boundingBox();
+      assert(bottomBar.y >= -1 && bottomBar.y+bottomBar.height <= 701, view+' navigation stays visible after scrolling past the bottom at '+width+': '+JSON.stringify(bottomBar));
+      for(const id of ['view-patients','view-seen','view-office']){
+        assert.equal(await page.locator('#'+id).evaluate(el => {const box=el.getBoundingClientRect();return el.contains(document.elementFromPoint(box.left+box.width/2,box.top+box.height/2));}), true, id+' stays reachable at the bottom of '+view+' at '+width);
+      }
+    }
     await page.locator('#view-office').click();
     assert.equal(await page.locator('#officeSection').isVisible(), true);
     await page.locator('#view-patients').click();
