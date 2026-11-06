@@ -301,6 +301,7 @@ textarea.inp{min-height:84px;resize:vertical}
   .app{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
   .phone-house-action{display:block;position:fixed;z-index:30;bottom:var(--message-viewport-bottom,0px);left:0;right:0;padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--bar);border-top:1px solid var(--line)}
   .phone-house-action .btn{width:100%;min-height:48px}
+  .phone-house-action:not([hidden])~.undo-notice{bottom:calc(var(--message-viewport-bottom,0px) + 76px + env(safe-area-inset-bottom,0px))}
 }
 @media(min-width:760px){
   .app{max-width:1200px}
@@ -3262,7 +3263,7 @@ function createPatientPage(){
   }
   function setDraftReadBlocked(blocked){
     readWarning.hidden = !blocked;
-    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#patients', '#seenSection', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
+    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#patients', '#phoneHouseAction', '#seenSection', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
   }
   document.querySelector('#retryDraftRead').addEventListener('click', readSavedDrafts);
   document.querySelector('#retryOfficeSave').addEventListener('click', () => {

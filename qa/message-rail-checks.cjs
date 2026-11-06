@@ -174,6 +174,57 @@ test('Phone New house follows the visible viewport above the open keyboard', asy
   await reachable(page.locator('#phoneNewHouseBtn'), 'panned phone keyboard', {top:250, height:350});
 }, {keyboard:true});
 
+test('Phone New house and Undo remain reachable together after clearing a patient', async page => {
+  await seed(page, 'SYNTHETIC PHONE UNDO');
+  await local(page, 'tab-check').click();await local(page, 'f_k_confirm').check();await local(page, 'tab-visit').click();
+  for(const width of [320, 390]) {
+    await page.setViewportSize({width, height:844});
+    await local(page, 'newBtn').click();
+    await page.getByRole('dialog').getByRole('button', {name:'Clear this patient', exact:true}).click();
+    await page.locator('#undoNotice').waitFor({state:'visible'});
+    const undo = await page.locator('#undoNotice').boundingBox();
+    const dock = await page.locator('#phoneHouseAction').boundingBox();
+    assert.ok(undo.y + undo.height <= dock.y, width + ': Undo sits above the phone action');
+    await reachable(page.locator('#undoAction'), width + ' Undo', {top:0, height:844});
+    await reachable(page.locator('#phoneNewHouseBtn'), width + ' New house with Undo', {top:0, height:844});
+    await page.locator('#undoAction').click();
+    assert.equal(await local(page, 'f_name').inputValue(), 'SYNTHETIC PHONE UNDO');
+    assert.equal(await local(page, 'f_symptoms').inputValue(), 'SYNTHETIC PHONE UNDO symptoms');
+    await local(page, 'tab-check').click();assert.equal(await local(page, 'f_k_confirm').isChecked(), true);await local(page, 'tab-visit').click();
+  }
+  await page.locator('#phoneNewHouseBtn').click();
+  assert.equal(await page.locator('#houseHeading').innerText(), 'House 2');
+  assert.equal(await local(page, 'f_name', 1).inputValue(), '');
+});
+
+test('Phone New house cannot bypass an unread saved draft and becomes usable after recovery', async page => {
+  await page.setViewportSize({width:390, height:844});
+  await seed(page, 'SYNTHETIC UNREAD PHONE DRAFT');
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await page.addInitScript(() => {
+    window.syntheticFailDraftRead = true;
+    const original = Storage.prototype.getItem;
+    window.syntheticReadDraft = () => original.call(localStorage, 'hvnb_current_app_draft');
+    window.syntheticSavedDraft = window.syntheticReadDraft();
+    Storage.prototype.getItem = function(key) {
+      if(this === localStorage && key === 'hvnb_current_app_draft' && window.syntheticFailDraftRead) throw Error('Synthetic saved-draft read failure');
+      return original.call(this, key);
+    };
+  });
+  await page.reload();await page.locator('#draftReadWarning').waitFor({state:'visible'});
+  const button = page.locator('#phoneNewHouseBtn'), box = await button.boundingBox();
+  await button.evaluate(el => el.focus());
+  assert.equal(await button.evaluate(el => el === document.activeElement), false, 'The unread-draft block prevents keyboard focus');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  assert.equal(await page.locator('.patient').count(), 0, 'The blocked dock cannot start a house');
+  assert.equal(await page.evaluate(() => window.syntheticReadDraft() === window.syntheticSavedDraft), true, 'Unread saved answers remain unchanged');
+  await page.evaluate(() => window.syntheticFailDraftRead = false);
+  await page.locator('#retryDraftRead').click();
+  await page.getByRole('button', {name:'Restore this visit', exact:true}).click();
+  assert.equal(await local(page, 'f_name').inputValue(), 'SYNTHETIC UNREAD PHONE DRAFT');
+  await button.click();assert.equal(await page.locator('#houseHeading').innerText(), 'House 2');
+});
+
 test('Keyboard resize and visual viewport panning keep the preview and copy controls visible', async page => {
   await seed(page, 'SYNTHETIC KEYBOARD');
   await local(page, 'f_notes').fill(Array.from({ length:35 }, (_, i) => 'Synthetic note line ' + (i + 1)).join('\n'));
