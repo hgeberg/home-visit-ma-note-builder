@@ -1,8 +1,10 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.1.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.3.
 
-The NJ visit workflow asks for temperature, height, and weight for every patient. Unavailable/refused options appear only after pressing Copy with missing or incomplete vitals. The popup offers Unable to obtain with an optional explanation, Pt refused, or Copy anyways to omit the remaining measurements. Copy message saves the selected reasons; canceling leaves the visit unchanged. Previously saved reasons appear in the popup for review. Heights can be marked Measured or Patient-reported. BP remains available when requested or warranted.
+New house is available beneath the Teams message on tablets and desktops and in a fixed bottom bar on phones while Visit is open. It opens a blank house using the same action as the top New house button, preserving earlier visits and checklists. Vertical page bounce is disabled to keep the workspace navigation in view when pulling past the bottom.
+
+The NJ visit workflow asks for temperature, height, and weight for every patient. Pressing Copy with missing or incomplete vitals opens a popup with Enter measurement, Unable to obtain with an optional explanation, Pt refused, or Copy anyways to omit remaining measurements. Copy message applies entered measurements and selected reasons to the visit and message; Go back discards popup edits. Previously saved reasons appear for review. Heights can be marked Measured or Patient-reported. BP remains available when requested or warranted.
 
 Pharmacy shows flu-treatment preference only while Rapid flu is checked, with capsule/liquid preference when Tamiflu is selected. Unchecking Rapid flu hides these controls and excludes them from the copied message while retaining the selections for reuse. Treatment decisions remain with the clinician.
 
@@ -18,7 +20,7 @@ The main Visit, Patients Seen, and Office navigation stays visible while scrolli
 
 Patients Seen is a separate workspace section for every entered visit in the current shift, including visits with no tests and messages that have not been copied. Search by name or DOB and open the complete visit. Clearing one patient or choosing Start fresh keeps their answers in Patients Seen; Clear shift removes them. Entries persist on this browser/device and are not automatically removed at midnight. Previously discarded visits without an existing saved form or Office snapshot cannot be reconstructed.
 
-Vitals includes Height with separate Feet and Inches inputs. Entering one digit in Feet moves focus to Inches for that same patient. A complete height appears as `Height: 5 ft 10 in` alongside the other vitals. Empty height stays out of the message; incomplete heights and inches outside the range from 0 to less than 12 are flagged before copying. Existing saved forms gain the fields while keeping their answers.
+Vitals includes Height with separate Feet and Inches inputs. Entering one digit in Feet moves focus to Inches for that same patient. Leaving Feet blank accepts total inches, preserving fractional inches and converting to feet and inches after leaving Inches and in the message. A complete height appears as `Height: 5 ft 10 in` alongside the other vitals. Empty height stays out of the message; incomplete or invalid heights are reviewed before copying. Existing saved forms gain the fields while keeping their answers.
 
 Complete shifts now save persistently on this device in ordinary browser tabs as well as the installed app. Reopening offers all patient answers, checklists, copied-message history, and houses without an eight-hour cutoff. Storage failures and conflicting windows remain visible; an older window cannot overwrite a newer saved shift.
 

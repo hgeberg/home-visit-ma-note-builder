@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.3.2">
+<meta name="note-builder-version" content="v9.3.3">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -79,7 +79,7 @@ try {
   --tab-on:#374b5d; --tab-shadow:inset 0 -2px 0 var(--accent); --bar:rgba(27,37,49,.96); --scrim:rgba(6,12,20,.72); --shadow:0 18px 44px rgba(0,0,0,.38);
 }
 *{box-sizing:border-box}
-html{scroll-padding-top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px) + 12px)}
+html{overscroll-behavior-y:none;scroll-padding-top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px) + 12px)}
 [hidden]{display:none!important}
 body{
   margin:0;background:var(--bg);color:var(--ink);
@@ -295,6 +295,13 @@ textarea.inp{min-height:84px;resize:vertical}
 .visit-main,.message-rail{min-width:0}
 .message-card{margin-top:12px}
 .message-hint{margin-top:10px}
+.message-new-house{display:none}
+.phone-house-action{display:none}
+@media(max-width:759px){
+  .app{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
+  .phone-house-action{display:block;position:fixed;z-index:30;bottom:var(--message-viewport-bottom,0px);left:0;right:0;padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--bar);border-top:1px solid var(--line)}
+  .phone-house-action .btn{width:100%;min-height:48px}
+}
 @media(min-width:760px){
   .app{max-width:1200px}
   .visit-workspace{display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,30vw,350px);align-items:start;gap:24px}
@@ -310,6 +317,7 @@ textarea.inp{min-height:84px;resize:vertical}
   .message-rail .output{flex:1 1 auto;min-height:80px;overflow-y:auto;scrollbar-width:thin}
   .message-rail .actions-inner{grid-template-columns:1fr 1fr}
   .message-rail [data-local-id="copyBtn"]{grid-column:1/-1;grid-row:1}
+  .message-rail .message-new-house{display:block;grid-column:1/-1}
   .message-rail .actions .btn{font-size:14px}
   :root[data-message-compact] .message-hint{display:none}
   :root[data-message-compact] .message-card>.sec-title{padding-top:10px}
@@ -317,10 +325,12 @@ textarea.inp{min-height:84px;resize:vertical}
   :root[data-message-compact] .message-rail .output{min-height:64px}
   :root[data-message-compact] .message-rail .actions{margin-top:8px}
   :root[data-message-compact] .message-rail .actions .btn{min-height:40px}
+  :root[data-message-compact] .message-rail [data-local-id="copyBtn"]{grid-column:1;grid-row:1}
+  :root[data-message-compact] .message-rail .message-new-house{grid-column:2;grid-row:1}
 }
 @media(min-width:760px) and (max-width:1040px){.visit-main .grid{grid-template-columns:minmax(0,1fr)}.visit-main .full{grid-column:1}}
 @media print{.visit-workspace{display:block}.message-rail{position:static;max-height:none;overflow:visible}.message-card{display:block}.message-rail .out-wrap{display:block}.message-rail .output{max-height:none}}
-@media print{.workspace-tools,.tabs{position:static}}
+@media print{.workspace-tools,.tabs{position:static}.phone-house-action{display:none}}
 
 .scrim{
   position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
@@ -354,7 +364,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.3.2</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.3.3</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -396,6 +406,7 @@ dialog.scrim::backdrop{background:transparent}
     <div class="row"><button class="btn small" type="button" id="collapsePatients">Collapse all</button><button class="btn small" type="button" id="expandPatients">Expand all</button></div>
   </section>
   <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
+  <div id="phoneHouseAction" class="phone-house-action"><button type="button" class="btn primary" id="phoneNewHouseBtn">New house</button></div>
   <section id="seenSection" class="seen-section" role="tabpanel" aria-labelledby="view-seen" hidden>
     <h2 id="seenHeading" tabindex="-1">Patients Seen</h2>
     <p class="office-summary">All patients from this shift, with or without tests. Visits save automatically as you enter them and stay here until you clear the shift.</p>
@@ -484,6 +495,7 @@ dialog.scrim::backdrop{background:transparent}
         <button type="button" class="btn" id="newBtn">Clear this patient</button>
         <button type="button" class="btn" id="selectBtn">Select text</button>
         <button type="button" class="btn primary" id="copyBtn">Copy message</button>
+        <button type="button" class="btn primary message-new-house" id="messageNewHouseBtn">New house</button>
       </div>
       <div id="status" class="patient-status" role="status" aria-live="polite"></div>
     </div>
@@ -537,6 +549,7 @@ function updateMessageViewport(){
   const style = document.documentElement.style;
   style.setProperty('--message-viewport-top', top + 'px');
   style.setProperty('--message-viewport-height', height + 'px');
+  style.setProperty('--message-viewport-bottom', Math.max(0, window.innerHeight - top - height) + 'px');
   const workspaceHeight = document.querySelector('.workspace-tools').getBoundingClientRect().height;
   style.setProperty('--workspace-sticky-height', workspaceHeight + 'px');
   document.documentElement.toggleAttribute('data-message-compact', height < 430);
@@ -2525,6 +2538,7 @@ function bind(){
   $('#newBtn').addEventListener('click', () => newPatient());
   $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
   $('#nextHouseBtn').addEventListener('click', page.newHouse);
+  $('#messageNewHouseBtn').addEventListener('click', page.newHouse);
   $('#selectBtn').addEventListener('click', () => {
     setTab('visit');
     const o = $('#output');
@@ -2875,6 +2889,7 @@ function createPatientPage(){
       host.hidden = view !== 'patients';
       document.querySelector('#patientNavigator').hidden = view !== 'patients';
       document.querySelector('#houseToolbar').hidden = view !== 'patients';
+      document.querySelector('#phoneHouseAction').hidden = view !== 'patients';
       officeSection.hidden = view !== 'office';
       seenSection.hidden = view !== 'seen';
       for(const name of ['patients', 'seen', 'office']){
@@ -3261,6 +3276,7 @@ function createPatientPage(){
   document.querySelector('#expandPatients').addEventListener('click', () => page.housePatients().forEach(p => p.collapse(false)));
   document.querySelector('#appendPatient').addEventListener('click', () => page.addPatient(page.housePatients().at(-1)?.root));
   document.querySelector('#newHouseBtn').addEventListener('click', page.newHouse);
+  document.querySelector('#phoneNewHouseBtn').addEventListener('click', page.newHouse);
   document.querySelector('#patientSearch').addEventListener('input', page.renderPatientNavigation);
   document.querySelector('#clearPatientSearch').addEventListener('click', () => { document.querySelector('#patientSearch').value = ''; page.renderPatientNavigation(); document.querySelector('#patientSearch').focus(); });
   document.querySelector('#seenSearch').addEventListener('input', page.renderSeenVisits);

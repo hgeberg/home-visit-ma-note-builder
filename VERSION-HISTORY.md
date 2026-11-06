@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.3 — New house beside the message and bottom-edge scrolling (November 6, 2026)
+
+The Teams message controls now include New house, using the same action as the existing top button. It stays with the sticky preview on tablets and desktops. Phones have one fixed New house button at the bottom of Visit, including while scrolling or opening the keyboard; page padding keeps the last controls reachable. The phone button is hidden in Patients Seen and Office. Earlier houses, visit answers, and checklists remain available.
+
+The root page disables vertical overscroll bounce so pulling past the bottom does not push the sticky workspace navigation upward. Normal scrolling and the existing responsive navigation offsets remain. Release metadata and the offline cache advance together. Browser regressions cover the buttons, house preservation, keyboard layout, and navigation at and beyond the bottom; physical Safari bounce still requires device verification.
+
 ## v9.3.2 — inches-only height and measurements in the Copy popup (November 5, 2026)
 
 Leaving Feet blank accepts total inches and converts them to feet and inches in the message and, after leaving the Inches field, in the form. Fractional inches are preserved. The existing two-field height entry remains available.
