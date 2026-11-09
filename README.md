@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.3.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.4.
+
+Numeric weights include pounds in the message preview and copied message, such as `Weight: 100 lb` or `Weight: 145.5 lb`. Entries that already include units stay as entered.
 
 New house is available beneath the Teams message on tablets and desktops and in a fixed bottom bar on phones while Visit is open. It opens a blank house using the same action as the top New house button, preserving earlier visits and checklists. Vertical page bounce is disabled to keep the workspace navigation in view when pulling past the bottom.
 
