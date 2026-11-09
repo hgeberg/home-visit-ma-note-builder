@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.4 — Weight units in messages (November 9, 2026)
+
+Numeric weights now include `lb` in the message preview and copied message, including measurements entered from the Copy popup. Decimal weights are preserved, and entries that already include units are unchanged. Release metadata and the offline cache advance together.
+
 ## v9.3.3 — New house beside the message and bottom-edge scrolling (November 6, 2026)
 
 The Teams message controls now include New house, using the same action as the existing top button. It stays with the sticky preview on tablets and desktops. Phones have one fixed New house button at the bottom of Visit, including while scrolling or opening the keyboard; page padding keeps the last controls reachable. The phone button is hidden in Patients Seen and Office. Earlier houses, visit answers, and checklists remain available.
