@@ -209,6 +209,22 @@ check('Clear-shift review includes archived uncopied visits and opens their form
   assert.equal(a.page.reviewItems().filter(item => item.name === 'SYNTHETIC PATIENT').length, 1);
 });
 
+check('Copied rapid tests that are still running stay visible in the shift review and Patients Seen', () => {
+  const a = app(), patient = a.first;
+  seedVisit(patient, 'visit-running');
+  const values = {...patient.snapshot().vals, tests:{flu:{on:true, r:'running'}, strep:{on:true, r:'Negative'}}};
+  patient.setValues(values);
+  patient.setMeta({...patient.snapshot().meta, sentAt:1100, sentText:patient.output(), sentVals:values});
+  const reviewItem = () => a.page.reviewItems().find(item => item.name === 'SYNTHETIC PATIENT');
+  assert.deepEqual(Array.from(reviewItem().reasons), ['Rapid flu running']);
+  patient.clear(false);
+  assert.equal(reviewItem().archived, true);
+  assert.deepEqual(Array.from(reviewItem().reasons), ['Rapid flu running']);
+  a.page.showSeen();
+  const card = a.document.querySelector('#seenList').children[0];
+  assert(card.children.some(child => child.textContent === 'Rapid flu running'));
+});
+
 check('Archived review distinguishes changed messages, copied visits, and checklist-only visits', () => {
   const a = app(); seedVisit(a.first, 'visit-changed');
   a.first.setMeta({...a.first.snapshot().meta, sentAt:1100, sentText:a.first.output(), sentVals:a.first.snapshot().vals});

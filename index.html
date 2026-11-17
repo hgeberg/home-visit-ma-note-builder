@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.3.4">
+<meta name="note-builder-version" content="v9.3.5">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -267,6 +267,7 @@ textarea.inp{min-height:84px;resize:vertical}
 .thead input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
 .tkind{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted)}
 .testrow .res,.testrow .sub{margin-top:10px;align-items:center}
+.test-awareness{margin-top:10px}
 .subchoice{margin-top:10px;align-items:center}
 .sublabel{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
 .hint{font-size:12.5px;font-weight:650;color:var(--warn);margin:6px 0 0 34px}
@@ -365,7 +366,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.3.4</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.3.5</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -488,13 +489,13 @@ dialog.scrim::backdrop{background:transparent}
         <div id="tagLine" class="tagline" hidden></div>
         <div class="out-wrap">
           <textarea id="output" class="output" readonly aria-label="Teams message"></textarea>
-          <p class="small message-hint">Updates as you type. Checklist and Office items never appear here. If Copy is blocked, press and hold in this box, Select All, then Copy.</p>
+          <p class="small message-hint">Updates as you type. Use Copy message or Copy by hand to review and record the copy.</p>
         </div>
       </section>
     <div class="actions">
       <div class="actions-inner">
         <button type="button" class="btn" id="newBtn">Clear this patient</button>
-        <button type="button" class="btn" id="selectBtn">Select text</button>
+        <button type="button" class="btn" id="selectBtn">Copy by hand</button>
         <button type="button" class="btn primary" id="copyBtn">Copy message</button>
         <button type="button" class="btn primary message-new-house" id="messageNewHouseBtn">New house</button>
       </div>
@@ -711,14 +712,19 @@ function maskDob(v){
   if(d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
   return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
 }
-function validDob(v){
-  if(/^n\/?a$/i.test(v.trim())) return true;
-  const match = v.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+function validDob(v, allowNotApplicable = false){
+  const text = v.trim();
+  if(allowNotApplicable && /^n\/?a$/i.test(text)) return true;
+  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if(!match) return false;
   const month = Number(match[1]), day = Number(match[2]), year = Number(match[3]);
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
+  if(year < 1 || month < 1 || month > 12 || day < 1 || day > days[month - 1]) return false;
+  const today = new Date();
+  const calendarDate = year * 10000 + month * 100 + day;
+  const localDate = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  return calendarDate <= localDate;
 }
 
 /* ---------- default layout ---------- */
@@ -798,7 +804,7 @@ function defaultLayout(){
     { id:'k_post', tab:'check', title:'When you post', fields:[
       { id:'k_posted', type:'check', label:'Posted the message with the insurance pic' },
       { id:'k_scriptpost', type:'check', label:'Posted the script pic', when:'blood' },
-      { id:'k_tagcorr', type:'check', label:'Correction: tagged the person who posted the stop', when:'correction' },
+      { id:'k_tagcorr', type:'check', label:'Correction: tagged the office staff', when:'correction' },
       { id:'k_tagadd', type:'check', label:'Added patient: tagged the person who posted the stop', when:'added' },
       { id:'k_tagprov', type:'check', label:'Positive: tagged the provider', when:'anyPositive' },
       { id:'k_tagunaware', type:'check', label:'Patient unaware: tagged the person who posted the stop', when:'positiveUnaware' },
@@ -811,7 +817,7 @@ function defaultLayout(){
     { id:'o_steps', tab:'office', title:'Requisition and follow-up reminders', fields:[
       { id:'o_reqtests', type:'check', label:'Req: all tests done are checked off, and the provider', when:'anyTest' },
       { id:'o_4plex', type:'check', label:'Req: viral / flu / COVID lab testing has 4plex checked, unless the provider ordered RPP', when:'viralPcr' },
-      { id:'o_strep', type:'check', label:'Req: strep throat PCR checked, unless the provider ordered a culture', when:'strep' },
+      { id:'o_strep', type:'check', label:'Req: the ordered strep PCR or culture is checked', when:'strepLab' },
       { id:'o_match', type:'check', label:'Req: name, spelling and DOB match', when:'anyTest' },
       { id:'o_corr', type:'check', label:'Req: the correction is fixed on the req too. If not, cross out and write it out', when:['correction', 'anyTest'] },
       { id:'o_date', type:'check', label:'Req: collection date is correct', when:'anyTest' },
@@ -851,10 +857,10 @@ function fluPreferenceFields(){
 function labGuidelineFields(){
   return [
     {id:'lab_selection_note', type:'note', label:'Strep: PCR unless the clinician requests a culture. 4plex tests for flu, COVID and RSV; select RPP when the clinician requests a full viral panel. Record all rapid results and labs collected/sent on Teams.'},
-    {id:'strep_lab_note', type:'note', label:'Positive rapid strep: do not send a strep lab unless specifically requested by the clinician.', when:'strepLabConflict'},
+    {id:'strep_lab_note', type:'note', label:'Positive rapid strep: do not send a strep lab unless specifically requested by the clinician.', when:'strepLabNeedsReview'},
     {id:'strep_lab_requested', type:'check', label:'Strep lab specifically requested by clinician', when:'strepLabConflict'},
-    {id:'viral_lab_note', type:'note', label:'Positive rapid flu or COVID: do not send 4plex / RPP unless specifically requested by the clinician.', when:'viralLabConflict'},
-    {id:'viral_lab_requested', type:'check', label:'4plex / RPP specifically requested by clinician', when:'viralLabConflict'},
+    {id:'viral_lab_note', type:'note', label:'Positive rapid flu or COVID: do not send a matching viral lab unless specifically requested by the clinician.', when:'viralLabNeedsReview'},
+    {id:'viral_lab_requested', type:'check', label:'Viral lab specifically requested by clinician', when:'viralLabConflict'},
     {id:'urine_reason', type:'choice', label:'Urine collection reason', opts:['Suspected UTI','With bloodwork','Other'], when:'urineCollection', req:true},
     {id:'uti_note', type:'note', label:'Suspected UTI: run a dipstick, post its photo, and send both the labeled cup and culture tube for UA and urine culture. Use the UTI collection checks in Checklist.', when:'uti'},
     {id:'stool_note', type:'note', label:'Stool culture / GPP: collect a fecal swab or a stool sample in the orange-cap, pink-liquid cup.', when:'stoolLab'}
@@ -889,7 +895,9 @@ const WHEN_TEXT = {
   rapidFlu:'Rapid flu is checked',
   tamiflu:'Rapid flu is checked and Tamiflu is the recorded preference',
   strepLabConflict:'rapid strep is positive and a strep lab is selected',
-  viralLabConflict:'rapid flu or COVID is positive and 4plex / RPP is selected',
+  viralLabConflict:'rapid flu or COVID is positive and a matching viral lab is selected',
+  strepLabNeedsReview:'a strep lab selected with positive rapid strep needs confirmation',
+  viralLabNeedsReview:'a matching viral lab selected with a positive rapid flu or COVID needs confirmation',
   urineCollection:'a urine dip or urine lab is selected',
   uti:'urine is collected for suspected UTI',
   stoolLab:'stool culture or GPP is selected',
@@ -901,6 +909,7 @@ const WHEN_TEXT = {
   blood:'Blood is in labs collected/sent',
   viralPcr:'4plex or RPP is in labs collected/sent',
   strep:'a strep test was done or sent',
+  strepLab:'a strep lab was ordered or sent',
   ears:'Ears is ticked',
   urine:'Urine dip is ticked',
   anyTest:'any test was done or sent'
@@ -1099,8 +1108,23 @@ function normalizeLayout(){
   if(tamifluForm?.type === 'choice') tamifluForm.when = 'tamiflu';
   const vitalNote = fieldById('vitals_note');
   if(vitalNote?.label === 'Collect temperature, height and weight for every patient. If unavailable or refused, record why. Patient-reported approximate height is acceptable.') vitalNote.label = 'Collect temperature, height and weight for every patient. Patient-reported approximate height is acceptable.';
+  const correctionTag = fieldById('k_tagcorr');
+  if(correctionTag?.label === 'Correction: tagged the person who posted the stop') correctionTag.label = 'Correction: tagged the office staff';
+  const strepReq = fieldById('o_strep');
+  if(strepReq?.label === 'Req: strep throat PCR checked, unless the provider ordered a culture'){
+    strepReq.label = 'Req: the ordered strep PCR or culture is checked';
+    strepReq.when = 'strepLab';
+  }
   const aware = fieldById('aware');
   if(aware && aware.type === 'choice' && aware.unawareValue === undefined && aware.opts.includes('Unaware')) aware.unawareValue = 'Unaware';
+  for(const [id, when] of [['strep_lab_note', 'strepLabNeedsReview'], ['viral_lab_note', 'viralLabNeedsReview']]){
+    const note = fieldById(id);
+    if(note?.type === 'note') note.when = when;
+  }
+  const viralNote = fieldById('viral_lab_note'), viralRequest = fieldById('viral_lab_requested');
+  if(viralNote?.label === 'Positive rapid flu or COVID: do not send 4plex / RPP unless specifically requested by the clinician.') viralNote.label = 'Positive rapid flu or COVID: do not send a matching viral lab unless specifically requested by the clinician.';
+  if(viralRequest?.label === '4plex / RPP specifically requested by clinician') viralRequest.label = 'Viral lab specifically requested by clinician';
+  preserveUnscopedRapidAnswers();
   const antibiotic = fieldById('abx');
   if(antibiotic?.type === 'choice' && antibiotic.yesValue === undefined){
     if(antibiotic.opts.includes('Yes')) antibiotic.yesValue = 'Yes';
@@ -1109,6 +1133,17 @@ function normalizeLayout(){
   }
   migrateRecentAntibioticValues(V, true);
   if(M.sentVals) migrateRecentAntibioticValues(M.sentVals);
+}
+function preserveUnscopedRapidAnswers(){
+  for(const id of ['aware', 'strep_lab_requested', 'viral_lab_requested']){
+    const oldValue = V[id];
+    const field = fieldById(id);
+    if(id === 'aware' ? !field?.underPositive || typeof oldValue !== 'string' || !oldValue.trim() : oldValue !== true) continue;
+    const label = (field?.label || id) + ' (previous answer, scope unknown)';
+    const value = oldValue === true ? 'Checked' : oldValue;
+    if(!preservedAnswers.some(answer => answer.label === label && answer.value === value)) preservedAnswers.push({label, value});
+    delete V[id];
+  }
 }
 function migrateRecentAntibioticValues(values, keepReference = false){
   const field = fieldById('abx');
@@ -1150,6 +1185,7 @@ function layoutChanged(){ normalizeLayout(); saveLayout(); renderAll(); }
 
 let officeWritable = true;
 let officeReadFailed = false;
+let officeVisitChanges = false;
 function normalizeOffice(list){
   return list.filter(o => o && typeof o.id === 'string' && o.id && page.matchesShift(o)).map(o => ({
     ...o,
@@ -1180,6 +1216,7 @@ function loadOffice(){
 }
 function saveOffice(){
   if(lifecycle.signal.aborted || !page.isCurrentShift()) return false;
+  if(officeVisitChanges && !page.canUpdateVisit()) return false;
   // Apply only this page's changes to the newest stored list. A failed save may
   // be retried after another tab has added, edited or removed other patients.
   const baseline = new Map(officeBaseline.map(o => [o.id, o]));
@@ -1213,11 +1250,12 @@ function saveOffice(){
     officeBaseline = JSON.parse(JSON.stringify(office));
     officeWritable = true;
     officeReadFailed = false;
+    officeVisitChanges = false;
   }catch(e){ officeWritable = false; }
   if(!officeWritable) flash('Couldn’t save the office list in this browser', 'bad');
   return officeWritable;
 }
-function mutateOffice(fn){
+function mutateOffice(fn, fromVisit = false){
   if(lifecycle.signal.aborted || !page.isCurrentShift()) return;
   if(!loadOffice() && saveOffice()){
     // Apply earlier successful copies before a newer saved-entry edit/removal.
@@ -1226,6 +1264,7 @@ function mutateOffice(fn){
     loadOffice();
   }
   const r = fn();
+  officeVisitChanges ||= fromVisit;
   saveOffice();
   if(lifecycle.signal.aborted) return;
   renderOfficePanel();
@@ -1250,6 +1289,7 @@ function hasContent(vals){
 
 function reconcileValues(values, layout, migrations){
   const next = {};
+  const awareness = fieldById('aware', layout);
   const migrate = (kind, id, value, itemId) => {
     const change = ((migrations && migrations[kind]) || []).find(c => c.id === id && c.from === value && c.itemId === itemId);
     return change ? change.to : value;
@@ -1258,9 +1298,12 @@ function reconcileValues(values, layout, migrations){
     const value = values[f.id];
     if(['text','textarea','dob'].includes(f.type)){
       if(typeof value === 'string') next[f.id] = value;
+    }else if(f.type === 'check' && isLabRequestField(f.id)){
+      if(typeof value === 'string' && value) next[f.id] = value;
     }else if(f.type === 'check'){
       if(value === true) next[f.id] = true;
     }else if(f.type === 'choice'){
+      if(f === awareness && f.underPositive) continue;
       const chosen = migrate('choices', f.id, value);
       if(f.opts.includes(chosen)) next[f.id] = chosen;
       if(f.detail && typeof values[f.detail.id] === 'string') next[f.detail.id] = values[f.detail.id];
@@ -1275,6 +1318,7 @@ function reconcileValues(values, layout, migrations){
           state.r = old.r;
           const subtype = migrate('subtypes', f.id, old.s, item.id);
           if(old.r === 'Positive' && item.sub && item.sub.includes(subtype)) state.s = subtype;
+          if(canMarkTestAwareness(item, state) && awareness?.underPositive && awareness.opts.includes(old.aware)) state.aware = old.aware;
         }
         tests[item.id] = state;
       }
@@ -1313,38 +1357,66 @@ function preserveLayoutAnswers(layout, migrations){
 /* ---------- what applies ---------- */
 
 function context(vals, layout = L){
-  const ticked = [], positive = [];
+  const ticked = [];
   for(const sec of secsOf('visit', layout)) for(const f of sec.fields){
     if(f.type !== 'tests') continue;
     const tv = vals[f.id] || {};
     for(const it of f.items || []){
       const s = tv[it.id];
       if(!s || !s.on) continue;
-      ticked.push(it);
-      if(it.kind !== 'done' && s.r === 'Positive') positive.push(it);
+      ticked.push({field:f.id, item:it, state:s});
     }
   }
   let lab = norm(vals.overnights);
   if(/^(none|no|n\/?a|nothing|-+)\.?$/.test(lab)) lab = '';
-  const did = (id, re) => ticked.some(it => it.id === id || re.test(it.n));
-  const isPositive = (id, re) => positive.some(it => it.id === id || re.test(it.n));
-  const obtained = value => {
-    const text = String(value || '').trim();
-    return !!text && !/^(n\/?a|unknown|not obtained|not measured|refused|unable to obtain)$/i.test(text);
+  const labs = lab.split(/[,;\n]/).map(item => item.trim().replace(/\s+/g, ' ')).filter(Boolean);
+  const strepLabs = labs.filter(item => /^strep(?:\s+(?:a|throat|group a))?\s+(?:pcr|culture)\b/.test(item));
+  const viralPanels = labs.filter(item => /^(?:4\s*-?\s*plex|rpp)\b/.test(item));
+  const viralPCRs = labs.filter(item => /\bpcr\b/.test(item) && /^(?:pcr\s+(?:for\s+)?|rapid\s+)?(?:viral|flu|influenza|covid|sars-cov-2)\b/.test(item));
+  const matchingLabs = {
+    strep:strepLabs,
+    flu:[...viralPanels, ...viralPCRs.filter(item => /\b(?:flu|influenza)\b/.test(item))],
+    covid:[...viralPanels, ...viralPCRs.filter(item => /\b(?:covid|sars-cov-2)\b/.test(item))]
   };
+  const genericViralPCRs = viralPCRs.filter(item => !/\b(?:flu|influenza|covid|sars-cov-2)\b/.test(item));
+  const positive = ticked.filter(({item, state}) => item.kind !== 'done' && state.r === 'Positive');
+  const strepLabScope = labRequestScope(strepLabs, positive.filter(test => rapidLabGroup(test.item) === 'strep'));
+  const positiveViral = positive.filter(({item}) => {
+    const group = rapidLabGroup(item);
+    return (group === 'flu' || group === 'covid') && (matchingLabs[group].length || genericViralPCRs.length);
+  });
+  const viralOrders = positiveViral.flatMap(({item}) => matchingLabs[rapidLabGroup(item)]);
+  const viralLabScope = labRequestScope([...viralOrders, ...genericViralPCRs], positiveViral);
+  const rapidLabWarnings = {};
+  if(layout.njGuidelinesVersion === 1) for(const {field, item, state} of ticked){
+    if(state.r && state.r !== 'Negative') continue;
+    const group = rapidLabGroup(item);
+    if(group && !matchingLabs[group].length){
+      const options = group === 'strep' ? 'strep PCR or culture' : '4plex, RPP, or matching PCR';
+      rapidLabWarnings[field + ':' + item.id] = item.n + ': no matching overnight lab selected (' + options + ').';
+    }
+  }
+  const did = (id, re) => ticked.some(({item}) => item.id === id || re.test(item.n));
+  const tempMeasurement = vitalMeasurement('temp', vals.temp);
+  const weightMeasurement = vitalMeasurement('weight', vals.weight);
   const hasHeight = heightParts(vals) !== null;
   const urineCollection = did('urine', /urine|dip/i) || /urine|\b(?:ua|uc|urinalysis)\b/.test(lab);
   const anyPositive = positive.length > 0;
   const awareness = fieldById('aware', layout);
   return {
-    missingTemp: !obtained(vals.temp),
-    missingWeight: !obtained(vals.weight),
+    tempMeasurement, weightMeasurement,
+    missingTemp: !tempMeasurement,
+    missingWeight: !weightMeasurement,
     missingHeight: !hasHeight,
     hasHeight,
     rapidFlu: did('flu', /flu/i),
     tamiflu: did('flu', /flu/i) && vals.flu_pref === 'Tamiflu',
-    strepLabConflict: isPositive('strep', /strep/i) && /strep/.test(lab),
-    viralLabConflict: (isPositive('flu', /flu/i) || isPositive('covid', /covid/i)) && /4\s*-?\s*plex|\brpp\b|(flu|covid|viral)[^,]*pcr/.test(lab),
+    strepLabConflict: !!strepLabScope,
+    viralLabConflict: !!viralLabScope,
+    strepLabNeedsReview: !!strepLabScope && vals.strep_lab_requested !== strepLabScope,
+    viralLabNeedsReview: !!viralLabScope && vals.viral_lab_requested !== viralLabScope,
+    labRequestScopes:{strep_lab_requested:strepLabScope, viral_lab_requested:viralLabScope},
+    rapidLabWarnings,
     urineCollection,
     uti: urineCollection && vals.urine_reason === 'Suspected UTI',
     stoolLab: /stool|\bgpp\b/.test(lab),
@@ -1352,14 +1424,51 @@ function context(vals, layout = L){
     added: !!vals.added,
     correction: !!String(vals.correction || '').trim(),
     anyPositive,
-    positiveUnaware: anyPositive && !!awareness && !!awareness.unawareValue && vals.aware === awareness.unawareValue,
-    blood: /blood/.test(lab),
-    viralPcr: /4\s*-?\s*plex|\brpp\b|(flu|covid|viral)[^,]*pcr/.test(lab),
+    positiveUnaware: !!awareness?.underPositive && !!awareness.unawareValue && positive.some(({item, state}) => canMarkTestAwareness(item, state) && state.aware === awareness.unawareValue),
+    blood: labs.some(item => /^blood\b/.test(item)),
+    viralPcr: viralPanels.length > 0 || viralPCRs.length > 0,
     strep: did('strep', /strep/i) || /strep/.test(lab),
+    strepLab: strepLabs.length > 0,
     ears: did('ears', /\bears?\b/i),
     urine: did('urine', /urine|dip/i),
     anyTest: ticked.length > 0 || lab !== ''
   };
+}
+function isLabRequestField(id){
+  return id === 'strep_lab_requested' || id === 'viral_lab_requested';
+}
+function rapidLabGroup(item){
+  if(item.kind !== 'posneg') return null;
+  if(item.id === 'strep' || /^rapid strep$/i.test(item.n)) return 'strep';
+  if(item.id === 'flu' || /^rapid flu$/i.test(item.n)) return 'flu';
+  if(item.id === 'covid' || /^rapid covid$/i.test(item.n)) return 'covid';
+  return null;
+}
+function labRequestScope(labs, tests){
+  if(!labs.length || !tests.length) return '';
+  return JSON.stringify([[...new Set(labs)].sort(), tests.map(({field, item, state}) => [field, item.id, state.s || '']).sort()]);
+}
+function canMarkTestAwareness(item, state){
+  return item.kind !== 'done' && state.r === 'Positive' && (!item.sub?.length || item.sub.includes(state.s));
+}
+function vitalMeasurement(id, value){
+  const text = String(value ?? '').trim();
+  const parts = text.match(/^([+-]?(?:\d+(?:\.\d+)?|\.\d+))[^\S\r\n]*(.*)$/);
+  if(!parts) return '';
+  const amount = Number(parts[1]), unit = parts[2];
+  if(!Number.isFinite(amount)) return '';
+  if(id === 'temp'){
+    return !unit || /^(?:(?:[°º]\s*|deg(?:rees?)?\.?\s*)?(?:f(?:ahrenheit)?|c(?:elsius)?)|[℉℃])$/i.test(unit) ? text : '';
+  }
+  if(amount < 0) return '';
+  const remainingOunces = unit.match(/^(?:lbs?\.?|pounds?)[^\S\r\n]+(\d+(?:\.\d+)?|\.\d+)[^\S\r\n]*(?:oz\.?|ounces?)$/i);
+  if(remainingOunces){
+    const ounces = Number(remainingOunces[1]);
+    return Number.isFinite(ounces) && (amount > 0 || ounces > 0) ? text : '';
+  }
+  if(amount === 0) return '';
+  if(!unit) return text + ' lb';
+  return /^(?:lbs?\.?|pounds?|kgs?\.?|kilos?|kilograms?|g\.?|grams?|oz\.?|ounces?|st\.?|stones?)$/i.test(unit) ? text : '';
 }
 function heightParts(vals){
   let feet = String(vals.height_ft ?? '').trim(), inches = String(vals.height_in ?? '').trim();
@@ -1380,14 +1489,14 @@ function buildOutput(vals, layout = L){
   // which the "Before you copy" sheet shows. Nothing like NOT MARKED is ever printed.
   const ctx = context(vals, layout);
   const lines = [], issues = [];
+  let hasInvalidEntry = false;
   const visitFields = secsOf('visit', layout).flatMap(sec => sec.fields);
   const antibioticChoice = visitFields.find(f => f.id === 'abx');
   const antibioticFields = ['abx_name', 'abx_when'].map(id => visitFields.find(f => f.id === id));
   const combineAntibiotics = antibioticChoice?.type === 'choice' && antibioticFields.every(f => f && ['text', 'textarea'].includes(f.type));
   const height = ['height_ft', 'height_in'].map(id => visitFields.find(f => f.id === id));
   const combineHeight = height.every(f => f?.type === 'text');
-  let aware = '';   // printed in capitals under each positive test
-  for(const sec of secsOf('visit', layout)) for(const f of sec.fields) if(f.underPositive && vals[f.id]) aware = vals[f.id];
+  const awareness = fieldById('aware', layout);
   for(const sec of secsOf('visit', layout)) for(const f of sec.fields){
     if(!whenOK(f.when, ctx)) continue;
     const name = (f.outAlt && whenOK(f.outAlt.when, ctx)) ? f.outAlt.out : (f.out || f.label);
@@ -1397,7 +1506,10 @@ function buildOutput(vals, layout = L){
       if(feet || inches){
         const height = heightParts(vals);
         if(height) lines.push('Height: ' + height.feet + ' ft ' + height.inches + ' in');
-        else issues.push('Height: enter feet and inches (0 to less than 12 inches)');
+        else {
+          hasInvalidEntry = true;
+          issues.push('Height: enter feet and inches (0 to less than 12 inches)');
+        }
       }
       continue;
     }
@@ -1416,14 +1528,20 @@ function buildOutput(vals, layout = L){
     if(f.type === 'text' || f.type === 'textarea' || f.type === 'dob'){
       let v = String(vals[f.id] || '').trim();
       if(v){
+        if(f.type === 'dob' && !validDob(v, f.id !== 'dob')){
+          hasInvalidEntry = true;
+          issues.push(name + ': enter a valid date (MM/DD/YYYY) that is today or earlier');
+          continue;
+        }
+        if(f.id === 'temp' || f.id === 'weight'){
+          v = f.id === 'temp' ? ctx.tempMeasurement : ctx.weightMeasurement;
+          if(!v){ hasInvalidEntry = true; continue; }
+        }
         if(!f.keepLines) v = v.replace(/\s*\n+\s*/g, '; ');
-        if(f.id === 'weight' && /^\d+(?:\.\d+)?$/.test(v)) v += ' lb';
         lines.push(name + ': ' + v);
-        if(f.type === 'dob' && !validDob(v)) issues.push(name + ': enter a valid date (MM/DD/YYYY)');
       } else if(f.req) issues.push(name + ': not entered');
-    } else if(f.type === 'choice' && f.underPositive){
-      if(!vals[f.id] && f.req) issues.push(name + ': not marked');
     } else if(f.type === 'choice'){
+      if(f.underPositive) continue;
       const v = vals[f.id];
       if(v){
         let line = name + ': ' + v;
@@ -1451,19 +1569,23 @@ function buildOutput(vals, layout = L){
         if(!s.r){ issues.push(it.n + ': result not marked'); continue; }
         const needsType = s.r === 'Positive' && it.sub && it.sub.length;
         lines.push(it.n + ': ' + (s.r === 'running' ? 'running' : s.r.toUpperCase()) + (needsType && s.s ? ' (' + s.s + ')' : ''));
-        if(s.r === 'Positive' && aware) lines.push('PATIENT ' + String(aware).toUpperCase());
+        if(awareness?.underPositive && s.r === 'Positive'){
+          if(canMarkTestAwareness(it, s) && awareness.opts.includes(s.aware)) lines.push('PATIENT ' + s.aware.toUpperCase());
+          else if(awareness.req) issues.push(awareness.label + ': not marked for ' + it.n);
+        }
         if(needsType && !s.s) issues.push(it.n + ': ' + it.sub.join(' or ') + ' not marked');
       }
     }
   }
-  if(!lines.length) return { text: '', issues: [], ctx };
+  if(!lines.length && !hasInvalidEntry && !Object.keys(ctx.rapidLabWarnings).length) return { text: '', issues: [], ctx };
   if(layout.njGuidelinesVersion === 1){
     for(const [id, label, missing] of [['temp', 'Temperature', ctx.missingTemp], ['weight', 'Weight', ctx.missingWeight], ['height', 'Height', ctx.missingHeight]]){
       const field = id === 'height' ? 'height_ft' : id;
       if(visitFields.some(f => f.id === field) && missing && !String(vals[id + '_reason'] || '').trim()) issues.push(label + ': enter a measurement or explain why it was unavailable / refused');
     }
-    if(ctx.strepLabConflict && !vals.strep_lab_requested) issues.push('Positive rapid strep: confirm the strep lab was specifically requested by the clinician');
-    if(ctx.viralLabConflict && !vals.viral_lab_requested) issues.push('Positive rapid flu / COVID: confirm 4plex / RPP was specifically requested by the clinician');
+    if(ctx.strepLabNeedsReview) issues.push('Positive rapid strep: confirm the strep lab was specifically requested by the clinician');
+    if(ctx.viralLabNeedsReview) issues.push('Positive rapid flu / COVID: confirm 4plex, RPP, or the matching PCR was specifically requested by the clinician');
+    issues.push(...Object.values(ctx.rapidLabWarnings));
     if(ctx.uti){
       if(!ctx.urine) issues.push('Suspected UTI: run a urine dip and post its photo');
       const labs = String(vals.overnights || '').toLowerCase();
@@ -1711,6 +1833,7 @@ function renderSection(sec){
   const feet = sec.fields.find(f => f.id === 'height_ft' && f.type === 'text');
   const inches = sec.fields.find(f => f.id === 'height_in' && f.type === 'text');
   for(const f of sec.fields){
+    if(f.type === 'choice' && f.underPositive) continue;
     if(['temp_reason', 'weight_reason', 'height_reason'].includes(f.id)) continue;
     if(feet && inches && f === inches) continue;
     if(feet && inches && f === feet){
@@ -1750,7 +1873,8 @@ function renderField(sec, f){
 function checkRow(fid, label, remind, domId){
   const cb = h('input', {type:'checkbox', id:domId, data:{fid}});
   cb.addEventListener('change', () => {
-    if(cb.checked) V[fid] = true; else delete V[fid];
+    const value = isLabRequestField(fid) ? context(V).labRequestScopes[fid] : true;
+    if(cb.checked && value) V[fid] = value; else delete V[fid];
     refresh({user:true});
   });
   return h('label', {class:'checkrow' + (remind ? ' remind' : ''), for:domId}, cb, h('span', {text:label, data:{labelOf:fid}}));
@@ -1847,7 +1971,7 @@ function testsField(f){
       if(cb.checked) tv[it.id] = { on:true }; else delete tv[it.id];
       refresh({user:true});
     });
-    const row = h('div', {class:'testrow', data:{fid:f.id, item:it.id}});
+    const row = h('div', {class:'testrow', data:{fid:f.id, item:it.id, testName:it.n}});
     row.append(h('label', {class:'thead', for:cid}, cb, h('span', {text:it.n}),
       it.kind === 'done' ? h('span', {class:'tkind', text:'no result to mark'}) : null));
     if(it.hint) row.append(h('div', {class:'hint', text:it.hint}));
@@ -1857,6 +1981,7 @@ function testsField(f){
         res.append(h('button', {type:'button', class:'chip' + (r === 'Positive' ? ' pos' : r === 'Negative' ? ' neg' : ''), role:'radio', 'aria-checked':'false', data:{r}, text:r, onclick:() => {
           const tv = V[f.id] = Object.assign({}, V[f.id]);
           const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
+          delete s.aware;
           if(s.r === r){ delete s.r; delete s.s; }
           else { s.r = r; if(r !== 'Positive') delete s.s; }
           refresh({user:true});
@@ -1869,16 +1994,48 @@ function testsField(f){
           sub.append(h('button', {type:'button', class:'chip', role:'radio', 'aria-checked':'false', data:{s:sv}, text:sv, onclick:() => {
             const tv = V[f.id] = Object.assign({}, V[f.id]);
             const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
+            delete s.aware;
             if(s.s === sv) delete s.s; else s.s = sv;
             refresh({user:true});
           }}));
         }
         row.append(sub);
       }
+      row.append(h('div', {class:'test-awareness', hidden:true}));
+      row.append(h('p', {class:'hint', hidden:true, data:{rapidLabWarning:''}}));
     }
     box.append(row);
   }
   return [h('div', {class:'flabel', text:f.label, data:{labelOf:f.id}}), box];
+}
+
+function renderTestAwareness(row, state, visible){
+  const area = row.querySelector('.test-awareness');
+  if(!area) return;
+  const field = visible ? fieldById('aware') : null;
+  if(!field?.underPositive){
+    if(!area.hidden){
+      area.hidden = true;
+      delete area.dataset.field;
+      area.replaceChildren();
+    }
+    return;
+  }
+  if(area.hidden){
+    area.hidden = false;
+    area.dataset.field = field.id;
+    const group = h('div', {class:'chips', role:'radiogroup', 'aria-label':row.dataset.testName + ' · ' + field.label});
+    for(const opt of field.opts){
+      group.append(h('button', {type:'button', class:'chip', role:'radio', text:opt, data:{choice:field.id, v:opt, testAware:''}, onclick:() => {
+        const test = V[row.dataset.fid]?.[row.dataset.item];
+        if(!test || test.r !== 'Positive') return;
+        if(test.aware === opt) delete test.aware; else test.aware = opt;
+        refresh({user:true});
+      }}));
+    }
+    area.append(h('div', {class:'flabel', text:field.label}), group);
+  }
+  area.querySelectorAll('[data-test-aware]').forEach(button => button.setAttribute('aria-checked', state.aware === button.dataset.v ? 'true' : 'false'));
 }
 
 /* ---------- refresh: everything that depends on the values ---------- */
@@ -1887,9 +2044,10 @@ function refresh(opts){
   opts = opts || {};
   if(hasContent(V) && !M.seenAt) M.seenAt = Date.now();
   const beforeEdit = previousValues;
-  previousValues = clone(V);
   const res = buildOutput(V);
   const ctx = res.ctx;
+  for(const [field, scope] of Object.entries(ctx.labRequestScopes)) if(V[field] !== scope) delete V[field];
+  previousValues = clone(V);
 
   $$('[data-when]').forEach(el => {
     let w = null; try{ w = JSON.parse(el.dataset.when); }catch(e){}
@@ -1906,7 +2064,7 @@ function refresh(opts){
     const on = ch.dataset.mode === 'add' ? listHas(cur, ch.dataset.v) : norm(cur) === norm(ch.dataset.v);
     ch.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  $$('[data-choice]').forEach(b => b.setAttribute('aria-checked', V[b.dataset.choice] === b.dataset.v ? 'true' : 'false'));
+  $$('[data-choice]:not([data-test-aware])').forEach(b => b.setAttribute('aria-checked', V[b.dataset.choice] === b.dataset.v ? 'true' : 'false'));
   $$('input[type="checkbox"][data-fid]').forEach(cb => {
     const on = !!V[cb.dataset.fid];
     cb.checked = on;
@@ -1928,6 +2086,13 @@ function refresh(opts){
     if(sub){
       sub.hidden = !(on && s.r === 'Positive');
       sub.querySelectorAll('[data-s]').forEach(b => b.setAttribute('aria-checked', s.s === b.dataset.s ? 'true' : 'false'));
+    }
+    renderTestAwareness(row, s, on && s.r === 'Positive' && (!sub || !!s.s));
+    const warning = row.querySelector('[data-rapid-lab-warning]');
+    if(warning){
+      const message = ctx.rapidLabWarnings[row.dataset.fid + ':' + row.dataset.item] || '';
+      if(warning.textContent !== message) warning.textContent = message;
+      warning.hidden = !message;
     }
   });
   $$('[role="radiogroup"]').forEach(group => {
@@ -1959,9 +2124,9 @@ function renderTagLine(ctx){
   if(!el) return;
   const parts = [];
   if(ctx.anyPositive) parts.push('the provider (positive result)');
+  if(ctx.correction) parts.push('office staff (correction)');
   const why = [];
   if(ctx.positiveUnaware) why.push('patient unaware');
-  if(ctx.correction) why.push('correction');
   if(ctx.added) why.push('added patient');
   if(why.length) parts.push('the person who posted the stop (' + why.join(', ') + ')');
   el.hidden = !parts.length;
@@ -2073,9 +2238,11 @@ function setTab(t){
 
 /* ---------- copy ---------- */
 
-function onCopy(){
+function onCopy(byHand = false){
+  if(!page.canUpdateVisit()){ flash('This tab can’t save a copy. Open the current saved shift first.', 'warn'); return; }
   const res = buildOutput(V);
-  if(!res.text){ flash('Nothing to copy yet', 'bad'); return; }
+  if(!res.text && !res.issues.length){ flash('Nothing to copy yet', 'bad'); return; }
+  const copy = text => doCopy(text, byHand);
   const missing = L.njGuidelinesVersion === 1 ? [
     {id:'temp', label:'Temperature', field:'temp', missing:res.ctx.missingTemp},
     {id:'height', label:'Height', field:'height_ft', missing:res.ctx.missingHeight},
@@ -2083,16 +2250,16 @@ function onCopy(){
   ].filter(vital => vital.missing && fieldById(vital.field)) : [];
   const warn = res.issues.filter(issue => !missing.some(vital => issue.startsWith(vital.label + ':') && /enter a measurement|enter feet and inches/.test(issue)));
   if(fieldById('inspic') && !V.inspic) warn.unshift('Insurance pic box isn’t ticked');
-  if(missing.length){ vitalCopyReview(missing, warn); return; }
+  if(missing.length){ vitalCopyReview(missing, warn, copy); return; }
   if(warn.length){
     sheet({ title:'Before you copy', body:['Check these first:', h('ul', {class:'steplist'}, warn.map(w => h('li', {text:w})))],
-      buttons:[ {label:'Go back', kind:'primary'}, {label:'Copy anyway', on:() => doCopy(buildOutput(V).text)} ] });
+      buttons:[ {label:'Go back', kind:'primary'}, {label:'Copy anyway', on:() => copy(buildOutput(V).text)} ] });
     return;
   }
-  doCopy(res.text);
+  copy(res.text);
 }
 
-function vitalCopyReview(missing, warnings){
+function vitalCopyReview(missing, warnings, finishCopy){
   const error = h('p', {class:'err', role:'alert'});
   const rows = missing.map(vital => {
     const original = String(V[vital.id + '_reason'] || '').trim();
@@ -2129,7 +2296,7 @@ function vitalCopyReview(missing, warnings){
         const height = heightParts(values);
         return height ? {height_ft:height.feet, height_in:height.inches} : null;
       }
-      return context({...V, ...values})[vital.id === 'temp' ? 'missingTemp' : 'missingWeight'] ? null : values;
+      return vitalMeasurement(vital.id, values[vital.id]) ? values : null;
     };
     if(vital.id === 'height') inputs.height_in.addEventListener('blur', () => {
       const height = heightParts(enteredValues());
@@ -2163,7 +2330,8 @@ function vitalCopyReview(missing, warnings){
       selected = buttons[next].dataset.reason; changed = true; update(); buttons[next].focus();
     });
     const node = h('fieldset', {class:'vital-copy-review', data:{vitalReview:vital.id}},
-      h('legend', {text:vital.label + ' is missing'}), group, measurementBox, explanation);
+      h('legend', {text:measurementFields.some(id => String(V[id] ?? '').trim()) ? 'Review ' + vital.label.toLowerCase() : vital.label + ' is missing'}),
+      group, measurementBox, explanation);
     update();
     return {node, selected:() => selected, invalidMeasurement:() => selected === 'measurement' && !measurement(),
       invalidLabel:vital.label, save:() => {
@@ -2186,15 +2354,20 @@ function vitalCopyReview(missing, warnings){
     }};
   });
   const copy = () => {
-    if(lifecycle.signal.aborted || !page.isCurrentShift()) return;
+    if(lifecycle.signal.aborted || !page.canUpdateVisit()) return;
     rows.forEach(row => row.save());
     refresh();
-    doCopy(buildOutput(V).text);
+    finishCopy(buildOutput(V).text);
   };
   const validate = skipMissing => {
     const invalid = rows.find(row => row.invalidMeasurement());
     if(invalid){
-      error.textContent = invalid.invalidLabel + ': enter ' + (invalid.invalidLabel === 'Height' ? 'feet and inches (inches must be less than 12), or total inches with Feet blank.' : 'a measurement, or choose a reason instead.');
+      const format = {
+        Height:'feet and inches (inches must be less than 12), or total inches with Feet blank.',
+        Temperature:'a measurement such as 98.6 °F or 37 °C, or choose a reason instead.',
+        Weight:'a measurement such as 145 lb or 65.8 kg, or choose a reason instead.'
+      };
+      error.textContent = invalid.invalidLabel + ': enter ' + format[invalid.invalidLabel];
       return false;
     }
     if(skipMissing || rows.every(row => row.selected())) return true;
@@ -2202,7 +2375,7 @@ function vitalCopyReview(missing, warnings){
     return false;
   };
   sheet({title:'Missing vitals', body:[
-    'Enter each missing measurement or choose why it was not recorded. Copy anyways skips vitals left without a measurement or reason.',
+    'Enter each measurement or choose why it was not recorded. Copy anyways skips vitals left without a valid measurement or reason.',
     ...rows.map(row => row.node),
     warnings.length ? h('div', {}, h('p', {text:'Also check:'}), h('ul', {class:'steplist'}, warnings.map(text => h('li', {text})))) : null,
     error
@@ -2213,11 +2386,14 @@ function vitalCopyReview(missing, warnings){
   ]});
 }
 
-function doCopy(text){
+function doCopy(text, byHand = false){
+  if(!text){ flash('Nothing to copy yet', 'bad'); return; }
+  if(!page.canUpdateVisit()){ flash('This tab can’t save a copy. Open the current saved shift first.', 'warn'); return; }
   const request = page.beginCopy(root);
   if(!request){ flash('Another message is still copying. Wait for it to finish.', 'warn'); return; }
   const copiedValues = JSON.parse(JSON.stringify(V));
   const copiedMeta = M;
+  if(byHand){ manualCopy(text, copiedValues, copiedMeta, request, true); return; }
   const payload = COPY_PREFIX + text;
   let settled = false;
   const stale = () => lifecycle.signal.aborted || copiedMeta !== M || !page.isCopyCurrent(request) || !page.isCurrentShift();
@@ -2229,6 +2405,11 @@ function doCopy(text){
   const fail = () => {
     if(settled || stale()) return;
     settled = true;
+    if(!page.canUpdateVisit()){
+      page.finishCopy(request);
+      flash('This tab can’t save a copy. Open the current saved shift first.', 'warn');
+      return;
+    }
     if(legacyCopy(payload)){
       try{ afterCopy(text, copiedValues, copiedMeta); }finally{ page.finishCopy(request); }
     }else manualCopy(text, copiedValues, copiedMeta, request);
@@ -2250,10 +2431,11 @@ function legacyCopy(text){
   return ok;
 }
 
-function manualCopy(text, copiedValues, copiedMeta, request){
+function manualCopy(text, copiedValues, copiedMeta, request, byHand = false){
   const ta = h('textarea', {class:'inp mono', readonly:true, rows:'8'});
   ta.value = COPY_PREFIX + text;
-  sheet({ title:'Copy it by hand', body:['Copying was blocked. Press and hold in the box, Select All, then Copy.', ta],
+  const instructions = 'Select all of the message in this box, copy it, then choose I copied it.';
+  sheet({ title:'Copy it by hand', body:[byHand ? instructions : 'Copying was blocked. ' + instructions, ta],
     onDismiss:() => page.finishCopy(request),
     buttons:[ {label:'I copied it', kind:'primary', on:() => {
       try{ if(page.isCopyCurrent(request)) afterCopy(text, copiedValues, copiedMeta); }finally{ page.finishCopy(request); }
@@ -2264,6 +2446,10 @@ function manualCopy(text, copiedValues, copiedMeta, request){
 function afterCopy(text, copiedValues = V, copiedMeta = M){
   // A pending clipboard request must not mark a cleared form as copied.
   if(lifecycle.signal.aborted || copiedMeta !== M || !page.isCurrentShift()) return;
+  if(!page.canUpdateVisit()){
+    flash('Clipboard copy finished, but this tab cannot record it or update Office. Check the current saved shift before posting.', 'warn');
+    return;
+  }
   M.sentAt = Date.now();
   M.sentText = text;
   M.sentVals = JSON.parse(JSON.stringify(copiedValues));
@@ -2279,7 +2465,7 @@ function copiedVisitSnapshot(vals, meta){
 }
 
 function saveCopiedOffice(copiedValues, copiedMeta, savedVisit = copiedVisitSnapshot(copiedValues, copiedMeta)){
-  if(lifecycle.signal.aborted || !page.isCurrentShift()) return 'Copied';
+  if(lifecycle.signal.aborted || !page.canUpdateVisit()) return 'Copied';
   if(!savedVisit || !savedVisit.meta || typeof savedVisit.meta !== 'object' || Array.isArray(savedVisit.meta) || !validLayout(savedVisit.layout)) savedVisit = copiedVisitSnapshot(copiedValues, copiedMeta);
   savedVisit = {...savedVisit, vals:clone(copiedValues)};
   pendingOfficeSync = pendingOfficeSync.filter(pending => pending.meta !== copiedMeta);
@@ -2298,7 +2484,7 @@ function saveCopiedOffice(copiedValues, copiedMeta, savedVisit = copiedVisitSnap
   if(!overnightText(copiedValues)){
     if(copiedMeta.officeId){
       const removedId = copiedMeta.officeId;
-      mutateOffice(() => { office = office.filter(o => o.id !== removedId); });
+      mutateOffice(() => { office = office.filter(o => o.id !== removedId); }, true);
       copiedMeta.officeId = null;
       msg = 'Copied. No labs — removed from Office';
     }
@@ -2327,7 +2513,7 @@ function syncOfficeCard(steps, vals = V, meta = M, savedVisit = copiedVisitSnaps
     const nm = String(vals.name || '').trim(), db = String(vals.dob || '').trim();
     if(nm !== ov.name){ ov.name = nm; changed = true; }
     if(db !== ov.dob){ ov.dob = db; changed = true; }
-  });
+  }, true);
   return changed;
 }
 
@@ -2350,7 +2536,7 @@ function syncVisitSteps(ov, steps){
 function addToOffice(name, dob, vals = V, meta = M, savedVisit = copiedVisitSnapshot(vals, meta)){
   const visit = { id: uid('v'), name, dob, t: Date.now(), shift:page.generation(), completed:false, ...officeDetails(vals), steps: officeSteps(vals).map(s => ({ id:s.id, label:s.label, done:false })) };
   visit.visit = {...clone(savedVisit), meta:{...clone(savedVisit.meta), officeId:visit.id}};
-  mutateOffice(() => { office.push(visit); });
+  mutateOffice(() => { office.push(visit); }, true);
   meta.officeId = visit.id;
   saveDraft();
 }
@@ -2383,7 +2569,11 @@ function editOfficeVisit(o, pending){
       : !page.patientForOffice(o.id) ? h('p', {class:'small', text:'Open visit page restores the latest saved visit, or the last copied message if no newer visit is available. Changes made only to this Office entry stay here.'}) : null, err],
     buttons:[ {label:'Save changes', kind:'primary', validate:() => {
                   if(!f.nameIn.value.trim()){ err.textContent = 'Type a name.'; return false; }
-                  if(f.dobIn.value.trim() && !validDob(f.dobIn.value)){ err.textContent = 'DOB: enter a valid date (MM/DD/YYYY).'; return false; }
+                  const dob = f.dobIn.value.trim();
+                  if(dob && dob !== String(original.dob).trim() && !validDob(dob)){
+                    err.textContent = 'DOB: enter a valid date (MM/DD/YYYY) that is today or earlier.';
+                    return false;
+                  }
                   if(!overnightText({overnights:tests.value})){ err.textContent = 'Enter the labs collected/sent, or cancel and remove this entry if no samples were collected or sent.'; return false; }
                   return true; },
                 on:() => {
@@ -2541,15 +2731,12 @@ function bind(){
   $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
   $('#nextHouseBtn').addEventListener('click', page.newHouse);
   $('#messageNewHouseBtn').addEventListener('click', page.newHouse);
-  $('#selectBtn').addEventListener('click', () => {
-    setTab('visit');
-    const o = $('#output');
-    if(!o) return;
-    o.scrollIntoView({block:'center'});
-    try{ o.focus({preventScroll:true}); o.setSelectionRange(0, o.value.length); }catch(e){}
-    flash('Message selected');
+  $('#selectBtn').addEventListener('click', () => onCopy(true));
+  $('#output').addEventListener('copy', event => {
+    event.preventDefault();
+    onCopy(true);
   });
-  $('#copyBtn').addEventListener('click', onCopy);
+  $('#copyBtn').addEventListener('click', () => onCopy());
   window.addEventListener('storage', e => { if(e.key === OFFICE_KEY){ loadOffice(); renderOfficePanel(); updateBadges(); renderSaveState(); } }, {signal:lifecycle.signal});
 
 }
@@ -2586,6 +2773,10 @@ return {
     officeBaseline = normalizeOffice(recovery.baseline);
     officeWritable = false;
     officeReadFailed = recovery.readFailed === true;
+    const saved = new Map(officeBaseline.map(entry => [entry.id, entry.visit]));
+    // Older recovery drafts did not explicitly mark changes from a copied visit.
+    officeVisitChanges = recovery.visitChanges === true || office.some(entry =>
+      JSON.stringify(entry.visit) !== JSON.stringify(saved.get(entry.id)));
     renderOfficePanel(); updateBadges();
   },
   title:(number) => {
@@ -2599,8 +2790,8 @@ return {
   },
   focus:() => { setCollapsed(false); root.scrollIntoView({block:'start'}); $('#patientTitle').focus({preventScroll:true}); },
   offerRestore,
-  applyOffice:(values, writable, baseline, readFailed = false) => { office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = readFailed; renderOfficePanel(); updateBadges(); renderSaveState(); },
-  getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline, readFailed:officeReadFailed}),
+  applyOffice:(values, writable, baseline, readFailed = false, visitChanges = false) => { office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = readFailed; officeVisitChanges = visitChanges; renderOfficePanel(); updateBadges(); renderSaveState(); },
+  getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline, readFailed:officeReadFailed, visitChanges:officeVisitChanges}),
   renderOffice:renderOfficePanel,
   retryOffice:() => { saveOffice(); if(lifecycle.signal.aborted) return; renderOfficePanel(); updateBadges(); page.officeChanged(root, office); },
   retryPendingOffice:() => {
@@ -2659,6 +2850,12 @@ function createPatientPage(){
   const clone = value => JSON.parse(JSON.stringify(value));
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const parsedDraft = raw => { try{ return JSON.parse(raw); }catch(e){ return null; } };
+  const sameValue = (a, b) => {
+    if(a === b) return true;
+    if(!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(key => Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
+  };
   const draftBase = raw => {
     if(raw === null) return {revision:null};
     const saved = parsedDraft(raw);
@@ -2667,9 +2864,29 @@ function createPatientPage(){
   const matchesBase = (base, raw) => JSON.stringify(base) === JSON.stringify(draftBase(raw));
   const sameDraft = (a, b) => {
     if(!object(a) || !object(b)) return false;
-    const contents = value => { const copy = {...value}; for(const key of ['t','revision','appDraftBase']) delete copy[key]; return JSON.stringify(copy); };
-    return contents(a) === contents(b);
+    const contents = ({t, revision, appDraftBase, ...value}) => value;
+    return sameValue(contents(a), contents(b));
   };
+  const draftWriteState = () => {
+    try{ return appDraftWriteBlocked || window.localStorage.getItem(appDraftKey) !== appDraftBaseline ? 'conflict' : 'current'; }
+    catch(e){ return 'unavailable'; }
+  };
+  function renderDraftWarning(state){
+    warning.hidden = state === 'current';
+    if(!warning.hidden) warning.textContent = state === 'conflict'
+      ? 'Another window changed the saved shift. Keep this tab open to recover text from the Teams message preview. Open the saved device shift to copy through the app or clear it.'
+      : 'This shift could not be saved for reopening. Keep this tab open to recover text from the Teams message preview.';
+  }
+  function canClearShift(){
+    if(!page.isCurrentShift()) return false;
+    const state = draftWriteState();
+    if(state === 'current') return true;
+    renderDraftWarning(state);
+    clearError.textContent = state === 'conflict'
+      ? 'Another window changed the saved shift. Reopen that shift and review it before clearing. Nothing was cleared.'
+      : 'The saved shift could not be checked. Nothing was cleared. Try again.';
+    return false;
+  }
   const matchesSearch = (query, name, dob) => !query || name.toLowerCase().includes(query) || dob.toLowerCase().includes(query)
     || (/^[\d\s/.-]+$/.test(query) && query.replace(/\D/g, '').length > 0 && dob.replace(/\D/g, '').includes(query.replace(/\D/g, '')));
   const snapshotHasContent = visit => object(visit?.vals) && (Object.values(visit.vals).some(value =>
@@ -2683,6 +2900,20 @@ function createPatientPage(){
     return typeof visit?.id === 'string' && /^patient-[a-z0-9-]+$/.test(visit.id) ? 'visit-form-' + visit.id : null;
   };
   const patientSnapshot = p => p.snapshot ? p.snapshot() : {...p.serialize(), id:p.root.id, layout:p.getLayout(), houseId:p.root.dataset.houseId};
+  const runningRapidResults = visit => {
+    const running = [];
+    for(const section of visit.layout.sections){
+      if(section.tab !== 'visit') continue;
+      for(const field of section.fields){
+        if(field.type !== 'tests') continue;
+        for(const test of field.items){
+          const state = visit.vals[field.id]?.[test.id];
+          if(test.kind === 'posneg' && state?.on && state.r === 'running') running.push(test.n + ' running');
+        }
+      }
+    }
+    return running;
+  };
   const page = {
     isDeviceDraft:value => sameDraft(value, parsedDraft(appDraftBaseline)),
     dialogHosts:document.querySelector('#dialogHosts'),
@@ -2745,6 +2976,12 @@ function createPatientPage(){
       if(latest === generation) return true;
       page.resetShift(latest, 'Shift cleared in another tab. Ready for the next patient.');
       return false;
+    },
+    canUpdateVisit:() => {
+      if(!page.isCurrentShift()) return false;
+      const state = draftWriteState();
+      if(state !== 'current') renderDraftWarning(state);
+      return state === 'current';
     },
     isOfficeOwner:root => !patients.length || patients[0].root === root,
     showOffice:() => {
@@ -2820,6 +3057,8 @@ function createPatientPage(){
         card.append(progressNode('h3', name));
         card.append(progressNode('p', visit.vals.dob ? 'DOB ' + visit.vals.dob : 'DOB not entered', 'small'));
         if(visit.meta.seenAt) card.append(progressNode('p', new Date(visit.meta.seenAt).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}), 'small'));
+        const running = runningRapidResults(visit);
+        if(running.length) card.append(progressNode('p', running.join(' · '), 'small warn'));
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn';
         button.dataset.seenVisit = visitIdentity(visit);
         button.textContent = 'Open visit'; button.setAttribute('aria-label', 'Open visit for ' + name);
@@ -2963,6 +3202,7 @@ function createPatientPage(){
         if(state.messageStatus === 'not-copied') reasons.push('Not copied');
         if(state.messageStatus === 'changed') reasons.push('Changes not copied');
         if(state.pendingCurrentOffice) reasons.push('Office save pending');
+        reasons.push(...runningRapidResults(patientSnapshot(patient)));
         const house = 'House ' + (houses.indexOf(patient.root.dataset.houseId) + 1);
         if(reasons.length) items.push({id:patient.root.id, patient, officeId:state.officeId, name:patient.name() || 'Unnamed patient', dob:state.dob, house, number:index + 1, reasons});
         state.pendingCopies.forEach((copy, i) => items.push({id:patient.root.id + '-pending-' + i, patient, officeId:copy.officeId, name:copy.name || 'Unnamed earlier patient', dob:copy.dob, house, earlier:true, reasons:['Office save pending', 'Earlier copied visit; original form unavailable']}));
@@ -2972,7 +3212,9 @@ function createPatientPage(){
         if(page.patientForVisit(id)) continue;
         const message = patients[0].snapshotMessageStatus(visit);
         const reason = message === 'not-copied' ? 'Not copied' : message === 'changed' ? 'Changes not copied' : null;
-        if(reason) items.push({id:'archived-' + id, visitId:id, archived:true, name:String(visit.vals.name || '').trim() || 'Unnamed patient', dob:String(visit.vals.dob || '').trim(), reasons:[reason]});
+        const reasons = runningRapidResults(visit);
+        if(reason) reasons.unshift(reason);
+        if(reasons.length) items.push({id:'archived-' + id, visitId:id, archived:true, name:String(visit.vals.name || '').trim() || 'Unnamed patient', dob:String(visit.vals.dob || '').trim(), reasons});
       }
       if(patients.length){
         const state = patients[0].getOffice();
@@ -2999,7 +3241,7 @@ function createPatientPage(){
       reviewSignature = signature;
       document.querySelector('#shiftReviewSummary').textContent = items.length
         ? items.length + (items.length === 1 ? ' item to review' : ' items to review') + ' before clearing. Open an item to review it without clearing anything.'
-        : 'No uncopied messages, changes after copying, or pending Office saves found.';
+        : 'No uncopied messages, changes after copying, running tests, or pending Office saves found.';
       const list = document.querySelector('#shiftReviewList');
       const focusedId = document.activeElement?.dataset?.reviewItem;
       const scrollTop = list.scrollTop || 0;
@@ -3033,7 +3275,8 @@ function createPatientPage(){
       if(held) return;
       if(!page.isCurrentShift()) return;
       const state = patients[0].getOffice();
-      const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed} : null;
+      const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed,
+        ...(state.visitChanges ? {visitChanges:true} : {})} : null;
       const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
       const liveIds = new Set(patients.map(p => p.visitId()));
       const history = archivedVisits.filter(visit => !liveIds.has(visitIdentity(visit)));
@@ -3044,15 +3287,21 @@ function createPatientPage(){
           ...(JSON.stringify(p.getLayout()) !== serializedLayout ? {layout:p.getLayout()} : {})})),
         ...(history.length ? {seenVisits:history.map(visit => { const saved = {...visit}; if(JSON.stringify(saved.layout) === serializedLayout) delete saved.layout; return saved; })} : {}),
         ...(officeRecovery ? {officeRecovery} : {})};
-      const serialized = empty ? null : JSON.stringify(snapshot);
+      let serialized = empty ? null : JSON.stringify(snapshot), sessionSnapshot = snapshot;
       let appSaved = false, appConflict = false;
       try{
         const current = window.localStorage.getItem(appDraftKey);
         // An older browser or app window must not overwrite a newer saved shift.
         appConflict = appDraftWriteBlocked || current !== appDraftBaseline;
         if(!appConflict){
-          if(serialized === null) window.localStorage.removeItem(appDraftKey);
-          else window.localStorage.setItem(appDraftKey, serialized);
+          const previous = parsedDraft(current);
+          if(serialized === null){
+            if(current !== null) window.localStorage.removeItem(appDraftKey);
+          }else if(sameDraft(snapshot, previous)){
+            // Reading or restoring the same visit must not take over a second tab's draft.
+            serialized = current;
+            sessionSnapshot = previous;
+          }else window.localStorage.setItem(appDraftKey, serialized);
           appDraftBaseline = serialized;
           appDraftSourceBase = draftBase(serialized);
           appSaved = true;
@@ -3060,12 +3309,9 @@ function createPatientPage(){
       }catch(e){}
       try{
         if(serialized === null) window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, JSON.stringify({...snapshot, appDraftBase:appDraftSourceBase}));
+        else window.sessionStorage.setItem(key, JSON.stringify({...sessionSnapshot, appDraftBase:appDraftSourceBase}));
       }catch(e){}
-      warning.hidden = appSaved;
-      if(!warning.hidden) warning.textContent = appConflict
-        ? 'Another window changed the saved shift. This window has not replaced it. Keep this page open and copy your messages before closing it.'
-        : 'This shift could not be saved for reopening. Keep this page open and copy your messages before closing it.';
+      renderDraftWarning(appSaved ? 'current' : appConflict ? 'conflict' : 'unavailable');
     },
     addPatient:(after, seed = {}, focus = true, keepSavedLayout = false) => {
       if(!page.isCurrentShift()) return;
@@ -3079,7 +3325,7 @@ function createPatientPage(){
       const index = after ? patients.findIndex(p => p.root === after) + 1 : patients.length;
       if(after) after.after(root); else host.append(root);
       const patient = mountPatient(root, seed, page);
-      if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable, clone(state.baseline), state.readFailed); }
+      if(patients.length){ const state = patients[0].getOffice(); patient.applyOffice(clone(state.values), state.writable, clone(state.baseline), state.readFailed, state.visitChanges); }
       patients.splice(index, 0, patient);
       page.keepOfficeVisits();
       page.updateTitles();
@@ -3094,7 +3340,7 @@ function createPatientPage(){
       const owner = patients.find(p => p.root === source);
       if(!owner) return;
       const state = owner.getOffice();
-      patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline), state.readFailed); });
+      patients.forEach(p => { if(p.root !== source) p.applyOffice(clone(values), state.writable, clone(state.baseline), state.readFailed, state.visitChanges); });
       owner.renderSaveState(); page.updateOfficeStatus();
       page.saveDraft();
     },
@@ -3122,7 +3368,7 @@ function createPatientPage(){
       activeHouseId = 'house-1';
       for(const seed of draft.patients){
         const savedLayout = acceptsLayout(seed.layout) ? clone(seed.layout) : layout;
-        const timedSeed = {...seed, meta:{...seed.meta, seenAt:seed.meta?.seenAt || draft.t}};
+        const timedSeed = {...seed, meta:{...seed.meta, seenAt:seed.meta?.seenAt || (snapshotHasContent(seed) ? draft.t : null)}};
         page.addPatient(null, savedLayout ? {...timedSeed, layout:savedLayout} : timedSeed, false, true);
       }
       page.restoreOfficeRecovery(draft);
@@ -3157,6 +3403,15 @@ function createPatientPage(){
           }
         }
       }catch(e){ cleared = false; }
+      if(generation !== 'initial'){
+        // Migration copied these patient records. They must be cleared with their current counterparts.
+        for(const [kind, legacyKey] of [['localStorage', 'hvnb_office'], ['sessionStorage', 'hvnb_draft']]){
+          try{
+            const storage = window[kind];
+            if(storage.getItem(legacyKey) !== null) storage.removeItem(legacyKey);
+          }catch(e){ cleared = false; }
+        }
+      }
       for(const [kind, draftKey] of [['sessionStorage', key], ['localStorage', appDraftKey]]){
         try{
           const storage = window[kind], raw = storage.getItem(draftKey);
@@ -3182,6 +3437,7 @@ function createPatientPage(){
       activeHouseId = 'house-1';
       document.querySelector('#patientNavigator').open = false;
       generation = nextGeneration;
+      appDraftBaseline = null;
       document.querySelector('#patientSearch').value = '';
       document.querySelector('#seenSearch').value = '';
       if(clearDialog.open) clearDialog.close();
@@ -3194,7 +3450,7 @@ function createPatientPage(){
       status.textContent = cleared ? message : 'Patient forms cleared. Saved-data removal still needs a retry.';
     },
     clearShift:() => {
-      if(draftReadBlocked) return;
+      if(!canClearShift()) return;
       const nextGeneration = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
       try{ window.localStorage.setItem(shiftKey, nextGeneration); }
       catch(e){ clearError.textContent = 'Couldn’t clear this shift because browser storage is unavailable. Nothing was cleared. Try again.'; return; }
@@ -3298,14 +3554,21 @@ function createPatientPage(){
   });
   document.querySelector('#clearShiftBtn').addEventListener('click', () => {
     if(!page.isCurrentShift()) return;
-    clearError.textContent = ''; reviewSignature = ''; page.renderShiftReview(); clearDialog.showModal(); document.querySelector('#cancelClearShift').focus();
+    clearError.textContent = ''; canClearShift(); reviewSignature = ''; page.renderShiftReview(); clearDialog.showModal(); document.querySelector('#cancelClearShift').focus();
   });
   document.querySelector('#cancelClearShift').addEventListener('click', () => clearDialog.close());
   document.querySelector('#confirmClearShift').addEventListener('click', page.clearShift);
   document.querySelector('#retryShiftClear').addEventListener('click', () => {
     if(page.isCurrentShift() && page.cleanupSavedData()) status.textContent = 'Saved information from the cleared shift was removed.';
   });
-  window.addEventListener('storage', e => { if(e.key === shiftKey || e.key === null) page.isCurrentShift(); });
+  window.addEventListener('storage', e => {
+    if((e.key === shiftKey || e.key === null) && !page.isCurrentShift()) return;
+    if(!held && (e.key === appDraftKey || e.key === null)){
+      const state = draftWriteState();
+      if(state !== 'current') renderDraftWarning(state);
+      if(clearDialog.open) canClearShift();
+    }
+  });
   window.addEventListener('focus', page.isCurrentShift);
   window.addEventListener('pageshow', page.isCurrentShift);
   const flushBeforeLeaving = page.saveDraft;

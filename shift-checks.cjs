@@ -188,19 +188,19 @@ test('a pending clipboard operation cannot repopulate patient drafts or Office a
 
 test('clearing resets other tabs including pending copies and unfinished patient drafts', async ({ page, origin }) => {
   await fillTwoSaved(page);
+  await page.evaluate(() => { window.__deferCopy = true; });
+  await local(patient(page), 'copyBtn').click();
+  await acknowledgeCopyWarning(page);
+  await page.waitForFunction(() => typeof window.__resolveCopy === 'function');
   const second = await page.context().newPage();
   await second.goto(origin);
   await second.getByRole('button', {name:'Start fresh', exact:true}).click();
   await fillPatient(second, 'TEST OTHER TAB PENDING', 'RPP');
   await addPatient(second);
   await fillPatient(second, 'TEST OTHER TAB UNFINISHED', 'Urine culture', 1);
-  await second.evaluate(() => { window.__deferCopy = true; });
-  await local(patient(second), 'copyBtn').click();
-  await acknowledgeCopyWarning(second);
-  await second.waitForFunction(() => typeof window.__resolveCopy === 'function');
-  await clearShift(page);
-  await assertBlank(second);
-  await second.evaluate(() => { window.__resolveCopy(); });
+  await clearShift(second);
+  await assertBlank(page);
+  await page.evaluate(() => { window.__resolveCopy(); });
   await assertStoredEmpty(second);
   await assertBlank(page);
   await second.reload();

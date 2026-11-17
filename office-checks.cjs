@@ -426,11 +426,16 @@ test('failed Office storage warns visibly, keeps copied records in memory, and r
 test('another open tab receives Office changes without altering its unfinished patient', async ({ page, origin }) => {
   const secondTab = await page.context().newPage();
   await secondTab.goto(origin);
-  await fillPatient(patient(secondTab), 'TEST SEPARATE TAB DRAFT', 'Uncopied custom test');
   await fillPatient(patient(page), 'TEST CROSS TAB COPIED', '4plex');
   await copyPatient(page, patient(page), 1);
   await secondTab.waitForFunction(() => document.querySelectorAll('#officeContent .office-patient').length === 1);
   assert.match(await cards(secondTab).innerText(), /TEST CROSS TAB COPIED/);
+  await fillPatient(patient(secondTab), 'TEST SEPARATE TAB DRAFT', 'Uncopied custom test');
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Edit saved entry', exact:true}).click();
+  await page.locator('[data-local-id="sheet_overnights"]').fill('RPP');
+  await page.getByRole('button', {name:'Save changes', exact:true}).click();
+  await secondTab.waitForFunction(() => document.querySelector('#officeContent .office-patient .overnight-tests')?.textContent === 'RPP');
   assert.equal(await local(patient(secondTab), 'f_name').inputValue(), 'TEST SEPARATE TAB DRAFT');
   assert.equal(await local(patient(secondTab), 'f_overnights').inputValue(), 'Uncopied custom test');
   await showOffice(secondTab);
@@ -441,39 +446,45 @@ test('another open tab receives Office changes without altering its unfinished p
   assert.equal(await local(patient(secondTab, 1), 'f_name').inputValue(), 'TEST CROSS TAB COPIED');
 });
 
-test('retrying a failed Copy save merges another tab\'s newly saved patient', async ({ page, origin }) => {
+test('retrying a failed Copy save merges a different patient restored in another tab', async ({ page, origin }) => {
+  await fillPatient(patient(page), 'TEST RETRY TAB BETA', 'RPP');
+  await copyPatient(page, patient(page), 1);
+  await showOffice(page);
+  await cards(page).getByRole('button', {name:'Remove', exact:true}).click();
+  await page.locator('[role="dialog"]:visible').getByRole('button', {name:'Remove', exact:true}).click();
+  assert.deepEqual(await records(page), []);
   const secondTab = await page.context().newPage();
   await secondTab.goto(origin);
-  await fillPatient(patient(page), 'TEST RETRY TAB ALPHA', '4plex');
-  await fillPatient(patient(secondTab), 'TEST RETRY TAB BETA', 'RPP');
-  await page.evaluate(() => {
+  await secondTab.getByRole('button', {name:'Start fresh', exact:true}).click();
+  await fillPatient(patient(secondTab), 'TEST RETRY TAB ALPHA', '4plex');
+  await secondTab.evaluate(() => {
     window.__originalStorageSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
       if (this === localStorage && key === 'hvnb_current_office') throw new DOMException('Synthetic quota failure', 'QuotaExceededError');
       return window.__originalStorageSetItem.call(this, key, value);
     };
   });
-  await copyPatient(page, patient(page));
-  await showOffice(page);
-  await page.locator('#officeSaveWarning').waitFor({ state: 'visible' });
-  assert.deepEqual(await records(page), []);
-  assert.match(await cards(page).innerText(), /TEST RETRY TAB ALPHA/);
-  await copyPatient(secondTab, patient(secondTab), 1);
+  await copyPatient(secondTab, patient(secondTab));
+  await showOffice(secondTab);
+  await secondTab.locator('#officeSaveWarning').waitFor({ state: 'visible' });
+  assert.deepEqual(await records(secondTab), []);
+  assert.match(await cards(secondTab).innerText(), /TEST RETRY TAB ALPHA/);
+  await page.locator('#undoAction').click();
   assert.deepEqual((await records(page)).map(item => item.name), ['TEST RETRY TAB BETA']);
-  assert.match(await cards(page).innerText(), /TEST RETRY TAB ALPHA/, 'The failed copy remains available in memory');
-  await page.evaluate(() => { Storage.prototype.setItem = window.__originalStorageSetItem; });
-  await page.locator('#retryOfficeSave').click();
-  await page.locator('#officeSaveWarning').waitFor({ state: 'hidden' });
-  const merged = await records(page);
+  assert.match(await cards(secondTab).innerText(), /TEST RETRY TAB ALPHA/, 'The failed copy remains available in memory');
+  await secondTab.evaluate(() => { Storage.prototype.setItem = window.__originalStorageSetItem; });
+  await secondTab.locator('#retryOfficeSave').click();
+  await secondTab.locator('#officeSaveWarning').waitFor({ state: 'hidden' });
+  const merged = await records(secondTab);
   assert.deepEqual(merged.map(item => item.name).sort(), ['TEST RETRY TAB ALPHA', 'TEST RETRY TAB BETA']);
   assert.equal(merged.find(item => item.name === 'TEST RETRY TAB ALPHA').overnights, '4plex');
   assert.equal(merged.find(item => item.name === 'TEST RETRY TAB BETA').overnights, 'RPP');
-  assert.equal(await cards(page).count(), 2);
-  assert.equal(await local(patient(page), 'badge-office').count(), 0);
-  await secondTab.waitForFunction(() => document.querySelectorAll('#officeContent .office-patient').length === 2);
-  await page.reload();
-  assert.deepEqual(await records(page), merged);
-  assert.equal(await cards(page).count(), 2);
+  assert.equal(await cards(secondTab).count(), 2);
+  assert.equal(await local(patient(secondTab), 'badge-office').count(), 0);
+  await page.waitForFunction(() => document.querySelectorAll('#officeContent .office-patient').length === 2);
+  await secondTab.reload();
+  assert.deepEqual(await records(secondTab), merged);
+  assert.equal(await cards(secondTab).count(), 2);
 });
 
 test('retrying a failed removal keeps the deletion and another tab\'s newly saved patient', async ({ page, origin }) => {

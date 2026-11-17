@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.5 — Rapid and lab warnings, safer copying and shift clearing (November 17, 2026)
+
+The Tests section and Copy review flag a matching lab alongside a positive rapid and a negative or unmarked rapid without a matching lab. The clinician exception applies to the actual lab order. Patient awareness is recorded separately for each positive result. Running rapid results get a follow-up indicator in Patients Seen and the Clear shift review.
+
+Stale windows cannot clear a newer saved shift or overwrite its visit-linked Office records. Clear shift removes migrated legacy drafts and Office entries as well. The Copy by hand option uses the same review as Copy message and records the copy when confirmed. Invalid temperatures, weights, and patient DOBs are flagged in review and omitted from the message until corrected. The offline cache advances with the release.
+
 ## v9.3.4 — Weight units in messages (November 9, 2026)
 
 Numeric weights now include `lb` in the message preview and copied message, including measurements entered from the Copy popup. Decimal weights are preserved, and entries that already include units are unchanged. Release metadata and the offline cache advance together.
