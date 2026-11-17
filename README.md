@@ -1,6 +1,10 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.4.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.5.
+
+The Tests section and Copy review flag a matching lab alongside a positive rapid, and a checked negative or unmarked rapid without a matching lab. Strep matches PCR or culture. Flu and COVID can match 4plex or RPP. Running tests appear in Patients Seen and the Clear shift review. Clinician request confirmations apply to the selected lab order, and patient awareness is recorded for each positive result.
+
+Copy by hand goes through the same review as Copy message. Choose I copied it in the manual dialog to record the copy and save any labs to Office. The review catches malformed vital entries and invalid patient dates of birth.
 
 Numeric weights include pounds in the message preview and copied message, such as `Weight: 100 lb` or `Weight: 145.5 lb`. Entries that already include units stay as entered.
 

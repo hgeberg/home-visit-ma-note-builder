@@ -229,7 +229,7 @@ for (const change of ['name', 'choice', 'test result']) {
     assert.equal(saved.patients[0].vals.abx, 'No');
     assert.equal(saved.patients[0].vals.abx_name, 'SYNTHETIC RETAINED MEDICINE');
     assert.equal(saved.patients[0].vals.abx_when, 'Last week');
-    assert.deepEqual(saved.patients[0].vals.tests.flu, {on:true, r:'Positive', s:'B'});
+    assert.deepEqual(saved.patients[0].vals.tests.flu, {on:true, r:'Positive', s:'B', aware:'Aware'});
     assert.equal((await office(page)).length, 1);
     await page.reload(); await restore(page);
     const restored = patient(page, 0);

@@ -169,13 +169,22 @@ const pass = name => { checks.push(name); console.log(`PASS ${name}`); };
     await fallback.locator('#view-office').click();
     assert.equal(await fallback.locator('.office-patient').count(),0);
     await fallback.locator('#view-patients').click();
-    await fallback.locator('[data-local-id="copyBtn"]').click();
+    const copiedFromPreview = await fallback.locator('[data-local-id="output"]').evaluate(el =>
+      el.dispatchEvent(new Event('copy', {cancelable:true})));
+    assert.equal(copiedFromPreview,false,'Direct preview copying should open review');
+    await fallback.getByRole('heading',{name:'Missing vitals',exact:true}).waitFor();
+    await fallback.getByRole('button',{name:'Go back',exact:true}).click();
+    await fallback.getByRole('button',{name:'Copy by hand',exact:true}).click();
     await acknowledgeCopyWarning(fallback);
+    const manualDialog = fallback.locator('dialog[open]');
+    assert.match(await manualDialog.locator('textarea').inputValue(),/Labs collected\/sent: 4plex/);
+    assert.doesNotMatch(await manualDialog.innerText(),/Copying was blocked/);
     await fallback.getByRole('button',{name:'I copied it',exact:true}).click();
+    await fallback.locator('[data-local-id="sentBanner"]').waitFor({state:'visible'});
     await fallback.locator('#view-office').click();
     assert.equal(await fallback.locator('.office-patient').count(),1);
     await fallbackContext.close();
-    pass('Manual-copy dialog selection, Escape/copy-lock release, and confirmation work');
+    pass('Manual copy and preview shortcuts run review, release the copy lock, and save to Office on confirmation');
 
     assert.deepEqual(errors,[]);
     pass('All exercised browser workflows complete without page errors');
