@@ -11,6 +11,8 @@ const test = (name, run, options = {}) => checks.push({ name, run, ...options })
 const patient = (page, n = 0) => page.locator('.patient').nth(n);
 const local = (page, id, n = 0) => patient(page, n).locator('[data-local-id="' + id + '"]');
 const rail = (page, n = 0) => patient(page, n).locator('.message-rail');
+const houseNav = page => page.getByRole('navigation', {name:'Patients in this house', exact:true});
+const houseJump = (page, name) => houseNav(page).getByRole('button', {name, exact:true});
 const nextFrame = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function seed(page, name, n = 0) {
   await local(page, 'f_name', n).fill(name);
@@ -51,6 +53,121 @@ async function reachableRail(page, label) {
     assert.ok(Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x) <= 1 || Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y) <= 1, label + ': action buttons do not overlap');
   }
 }
+
+async function jumpToField(page, name, id, n = 0) {
+  await houseJump(page, name).click();
+  const field = local(page, id, n);
+  await page.waitForFunction(fieldId => document.activeElement?.id === fieldId, await field.getAttribute('id'));
+  await nextFrame(page);
+  assert.equal(await field.evaluate(el => {
+    const {left, top, width, height} = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(left + width / 2, top + height / 2));
+  }), true, name + ' resumes at an unobstructed ' + id);
+}
+
+test('House patient navigation resumes each of three separate forms at its last populated field', async page => {
+  await seed(page, 'SYNTHETIC NAV ALPHA');
+  assert.equal(await houseNav(page).isVisible(), false, 'one patient needs no jump list');
+  await page.locator('#appendPatient').click();
+  assert.equal(await houseJump(page, 'Patient 2').isVisible(), true, 'an unnamed patient can be reached');
+  await houseJump(page, 'Patient 2').click();
+  assert.equal(await local(page, 'patientTitle', 1).evaluate(el => el === document.activeElement), true);
+  await seed(page, 'SYNTHETIC NAV BETA', 1);
+  await page.locator('#appendPatient').click();
+  await seed(page, 'SYNTHETIC NAV GAMMA', 2);
+  await local(page, 'f_weight').fill('132');
+  await local(page, 'f_weight', 1).fill('146');
+  await local(page, 'f_weight', 2).fill('158');
+
+  const nav = await houseNav(page).boundingBox();
+  const form = await patient(page, 2).locator('.visit-main').boundingBox();
+  assert.ok(nav && nav.x + nav.width <= form.x, 'wide layout keeps the navigation beside the form');
+  await reachable(houseJump(page, 'SYNTHETIC NAV ALPHA'), 'desktop patient jump after scrolling', {top:0, height:1000});
+  await jumpToField(page, 'SYNTHETIC NAV ALPHA', 'f_weight');
+  await local(page, 'f_temp').fill('98.4');
+  await local(page, 'f_notes').focus();
+  await jumpToField(page, 'SYNTHETIC NAV BETA', 'f_weight', 1);
+  await jumpToField(page, 'SYNTHETIC NAV GAMMA', 'f_weight', 2);
+  await jumpToField(page, 'SYNTHETIC NAV ALPHA', 'f_temp');
+
+  await local(page, 'tab-check', 1).click();
+  await local(page, 'collapseBtn', 1).click();
+  await jumpToField(page, 'SYNTHETIC NAV BETA', 'f_weight', 1);
+  assert.equal(await local(page, 'tab-visit', 1).getAttribute('aria-selected'), 'true');
+  assert.equal(await local(page, 'collapseBtn', 1).getAttribute('aria-expanded'), 'true');
+  await local(page, 'tab-check', 1).click();
+  await local(page, 'f_k_confirm', 1).check();
+  await local(page, 'tab-visit', 1).click();
+  await jumpToField(page, 'SYNTHETIC NAV BETA', 'f_k_confirm', 1);
+  assert.equal(await local(page, 'tab-check', 1).getAttribute('aria-selected'), 'true');
+
+  await local(page, 'f_temp').fill('');
+  await jumpToField(page, 'SYNTHETIC NAV ALPHA', 'f_weight');
+  const flu = patient(page).locator('.testrow[data-item="flu"] input[type="checkbox"]');
+  const tamiflu = patient(page).locator('[data-choice="flu_pref"][data-v="Tamiflu"]');
+  await flu.check();
+  await tamiflu.click();
+  await jumpToField(page, 'SYNTHETIC NAV ALPHA', await tamiflu.getAttribute('data-local-id'));
+  await flu.uncheck();
+  assert.equal(await tamiflu.isVisible(), false);
+  await jumpToField(page, 'SYNTHETIC NAV ALPHA', 'f_weight');
+  assert.equal(await local(page, 'f_weight').inputValue(), '132');
+  assert.equal(await local(page, 'f_weight', 1).inputValue(), '146');
+  assert.equal(await local(page, 'f_weight', 2).inputValue(), '158');
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await page.reload();
+  await page.getByRole('button', {name:'Restore all 3 patients', exact:true}).click();
+  await jumpToField(page, 'SYNTHETIC NAV GAMMA', 'f_weight', 2);
+  await jumpToField(page, 'SYNTHETIC NAV BETA', 'f_k_confirm', 1);
+  await jumpToField(page, 'SYNTHETIC NAV ALPHA', 'f_weight');
+});
+
+test('Phone house patient navigation stays reachable while scrolling and with the keyboard open', async page => {
+  await page.setViewportSize({width:390, height:844});
+  await page.evaluate(() => { Object.assign(window.__viewport, {width:390, height:844}); window.__viewport.dispatchEvent(new Event('resize')); });
+  await seed(page, 'SYNTHETIC PHONE ALPHA');
+  await local(page, 'f_weight').fill('132');
+  await page.locator('#appendPatient').click();
+  await seed(page, 'SYNTHETIC PHONE BETA', 1);
+  await local(page, 'f_weight', 1).fill('146');
+  await local(page, 'f_notes', 1).evaluate(el => el.scrollIntoView({block:'center'}));
+  await nextFrame(page);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await reachable(houseJump(page, 'SYNTHETIC PHONE ALPHA'), 'phone patient jump after scrolling', {top:0, height:844});
+  await jumpToField(page, 'SYNTHETIC PHONE ALPHA', 'f_weight');
+  await page.evaluate(() => {
+    Object.assign(window.__viewport, {height:350, offsetTop:170});
+    window.__viewport.dispatchEvent(new Event('resize'));
+  });
+  await nextFrame(page);
+  await reachable(houseJump(page, 'SYNTHETIC PHONE BETA'), 'phone patient jump with keyboard', {top:170, height:350});
+  await reachable(page.locator('#phoneNewHouseBtn'), 'phone New house with keyboard and patient navigation', {top:170, height:350});
+  await jumpToField(page, 'SYNTHETIC PHONE BETA', 'f_weight', 1);
+  const visibleField = await local(page, 'f_weight', 1).boundingBox();
+  assert.ok(visibleField && visibleField.y >= 170 && visibleField.y + visibleField.height <= 520, 'resumed field fits above the phone keyboard');
+  await page.evaluate(() => {
+    window.__viewport.height = 300;
+    window.__viewport.dispatchEvent(new Event('resize'));
+  });
+  await nextFrame(page);
+  await jumpToField(page, 'SYNTHETIC PHONE ALPHA', 'f_weight');
+  await reachable(local(page, 'f_weight'), 'resumed field with a shorter keyboard viewport', {top:170, height:300});
+  await page.evaluate(() => {
+    Object.assign(window.__viewport, {height:844, offsetTop:0});
+    window.__viewport.dispatchEvent(new Event('resize'));
+  });
+  for (const view of ['seen', 'office']) {
+    await page.locator('#view-' + view).click();
+    assert.equal(await houseNav(page).isVisible(), false);
+    await page.locator('#view-patients').click();
+    assert.equal(await houseNav(page).isVisible(), true);
+  }
+  await page.locator('#phoneNewHouseBtn').click();
+  assert.equal(await page.locator('#houseHeading').innerText(), 'House 2');
+  assert.equal(await houseNav(page).isVisible(), false, 'a new house has no jump list until another patient is added');
+  await page.locator('#appendPatient').click();
+  assert.deepEqual((await houseNav(page).getByRole('button').allTextContents()).map(label => label.trim()), ['Patient 3', 'Patient 4']);
+}, {keyboard:true});
 
 test('Preview remains beside the form and follows scrolling at tablet and desktop widths', async page => {
   await seed(page, 'SYNTHETIC SIDE RAIL');

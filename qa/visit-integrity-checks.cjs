@@ -266,7 +266,7 @@ check('The copied-edit dialog keeps focus on the newly added patient', () => {
   const oldInput = node('patient-1_f_name'), replacement = node(oldInput.id), newTitle = node('patient-2_patientTitle'), host = node('host');
   elements.set(oldInput.id, oldInput);
   environment = {
-    console, V:{name:'NEXT PATIENT'}, M:{sentAt:100}, clone, fmtTime:() => '',
+    console, V:{name:'NEXT PATIENT'}, M:{sentAt:100,recentFields:['f_weight','f_name']}, clone, fmtTime:() => '',
     lifecycle:{signal:{aborted:false}}, root:node('patient-1'),
     document:{activeElement:oldInput, body:{}, querySelector:() => null, getElementById:id => elements.get(id)},
     h:(tag, attrs) => { const el = node(attrs?.id || tag); Object.assign(el, attrs || {}); if(tag === 'button') buttons.push(el); return el; },
@@ -277,10 +277,11 @@ check('The copied-edit dialog keeps focus on the newly added patient', () => {
   vm.createContext(environment);
   vm.runInContext('let sheetOpen=false, sheetDismiss=null, sheetDialog=null, sheetReturnFocus=null, activePatientSheet=null;' +
     section('function openSheet(opts){', 'function drainSheets(){') +
-    section('function sentGuard(beforeEdit){', '/* ---------- restore + layout updates ---------- */') +
-    '\nfunction sheet(opts){ openSheet(opts); }\nsentGuard({name:"ORIGINAL PATIENT"});', environment);
+    section('function sentGuard(', '/* ---------- restore + layout updates ---------- */') +
+    '\nfunction sheet(opts){ openSheet(opts); }\nsentGuard({name:"ORIGINAL PATIENT"}, ["f_weight"]);', environment);
   buttons.find(button => button.text === 'No, undo this edit and add a patient').onclick();
   assert.equal(environment.V.name, 'ORIGINAL PATIENT');
+  assert.equal(Array.from(environment.M.recentFields).join(','), 'f_weight');
   assert.equal(environment.document.activeElement.id, newTitle.id);
 });
 

@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.6 — Jump to a patient’s last field (November 19, 2026)
+
+Houses with two or more patients show a sticky list of names, on the left on wide screens and below the workspace tabs on smaller screens. Selecting a name expands that patient’s form and returns to their latest filled field in Visit or Checklist. Each patient’s position is saved with their draft.
+
 ## v9.3.5 — Rapid and lab warnings, safer copying and shift clearing (November 17, 2026)
 
 The Tests section and Copy review flag a matching lab alongside a positive rapid and a negative or unmarked rapid without a matching lab. The clinician exception applies to the actual lab order. Patient awareness is recorded separately for each positive result. Running rapid results get a follow-up indicator in Patients Seen and the Clear shift review.
