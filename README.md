@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.5.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.6.
+
+When a house has multiple patients, use the sticky list of names to jump to the last field you filled for each patient. On smaller screens, the names appear in a scrollable row. If a patient has no field to return to, the shortcut opens the top of their Visit form. The shortcuts remember your place when you restore a saved shift on the same device.
 
 The Tests section and Copy review flag a matching lab alongside a positive rapid, and a checked negative or unmarked rapid without a matching lab. Strep matches PCR or culture. Flu and COVID can match 4plex or RPP. Running tests appear in Patients Seen and the Clear shift review. Clinician request confirmations apply to the selected lab order, and patient awareness is recorded for each positive result.
 

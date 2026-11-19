@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.3.5">
+<meta name="note-builder-version" content="v9.3.6">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -79,7 +79,7 @@ try {
   --tab-on:#374b5d; --tab-shadow:inset 0 -2px 0 var(--accent); --bar:rgba(27,37,49,.96); --scrim:rgba(6,12,20,.72); --shadow:0 18px 44px rgba(0,0,0,.38);
 }
 *{box-sizing:border-box}
-html{overscroll-behavior-y:none;scroll-padding-top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px) + 12px)}
+html{--visit-sticky-height:calc(var(--workspace-sticky-height,0px) + var(--house-nav-sticky-height,0px));overscroll-behavior-y:none;scroll-padding-top:calc(var(--visit-sticky-height) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px) + 12px)}
 [hidden]{display:none!important}
 body{
   margin:0;background:var(--bg);color:var(--ink);
@@ -174,6 +174,22 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .house-controls>.btn{flex:1;min-height:44px}
 .patient-actions .house-controls .add-patient{width:auto}
 @media(max-width:420px){.house-toolbar>.house-controls{width:100%}.house-controls>.btn{white-space:normal}}
+.house-patient-nav{
+  position:sticky;top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px));
+  z-index:25;display:flex;gap:6px;min-width:0;padding:5px 2px;background:var(--bg);
+  overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;
+}
+.house-patient-nav .btn{flex:none;max-width:min(75vw,260px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(min-width:1100px){
+  .house-visit-layout{display:flex;align-items:flex-start;gap:16px}
+  #patients{min-width:0;flex:1}
+  .house-patient-nav{
+    flex:0 0 166px;flex-direction:column;margin-top:24px;padding:4px;
+    max-height:calc(var(--message-viewport-height,100dvh) - var(--workspace-sticky-height,0px) - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    overflow:auto;overscroll-behavior-y:contain;
+  }
+  .house-patient-nav .btn{max-width:none;text-align:start;white-space:normal;overflow-wrap:anywhere}
+}
 .undo-notice{position:fixed;z-index:60;bottom:12px;left:50%;transform:translateX(-50%);width:min(728px,calc(100% - 24px));box-shadow:var(--shadow);display:flex;align-items:center;gap:10px}
 .undo-notice span{flex:1;min-width:0;overflow-wrap:anywhere}
 .change-details,.preserved-answers{margin:10px 0;padding:10px 12px;border:1px solid var(--warn-line);border-radius:10px;background:var(--warn-soft)}
@@ -204,7 +220,8 @@ dialog.sheet::backdrop{background:var(--scrim)}
 .btn.small{min-height:36px;padding:7px 11px;font-size:14px}
 .btn:active{transform:translateY(1px)}
 
-.tabs{position:sticky;top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px));z-index:20;background:var(--bg);padding-block:10px 8px;margin-top:6px}
+.tabs{position:sticky;top:calc(var(--visit-sticky-height) + var(--message-viewport-top,0px) + env(safe-area-inset-top,0px));z-index:20;background:var(--bg);padding-block:10px 8px;margin-top:6px}
+:root[data-house-nav-compact] .tabs{position:static}
 .seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;border-radius:12px;background:var(--chip);border:1px solid var(--chip-line)}
 .tab{
   appearance:none;border:0;background:transparent;color:var(--muted);font-weight:720;font-size:15px;
@@ -308,8 +325,8 @@ textarea.inp{min-height:84px;resize:vertical}
   .app{max-width:1200px}
   .visit-workspace{display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,30vw,350px);align-items:start;gap:24px}
   .message-rail{
-    position:sticky;top:calc(var(--workspace-sticky-height,0px) + var(--message-viewport-top,0px) + 12px + env(safe-area-inset-top,0px));
-    max-height:min(var(--message-room,100dvh),calc(var(--message-viewport-height,100dvh) - var(--workspace-sticky-height,0px) - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+    position:sticky;top:calc(var(--visit-sticky-height) + var(--message-viewport-top,0px) + 12px + env(safe-area-inset-top,0px));
+    max-height:min(var(--message-room,100dvh),calc(var(--message-viewport-height,100dvh) - var(--visit-sticky-height) - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
     display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:thin;
   }
   .message-card{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;margin:0;overflow:hidden}
@@ -332,7 +349,7 @@ textarea.inp{min-height:84px;resize:vertical}
 }
 @media(min-width:760px) and (max-width:1040px){.visit-main .grid{grid-template-columns:minmax(0,1fr)}.visit-main .full{grid-column:1}}
 @media print{.visit-workspace{display:block}.message-rail{position:static;max-height:none;overflow:visible}.message-card{display:block}.message-rail .out-wrap{display:block}.message-rail .output{max-height:none}}
-@media print{.workspace-tools,.tabs{position:static}.phone-house-action{display:none}}
+@media print{.workspace-tools,.tabs{position:static}.house-visit-layout{display:block}.phone-house-action,.house-patient-nav{display:none}}
 
 .scrim{
   position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;
@@ -366,7 +383,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.3.5</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.3.6</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -407,7 +424,10 @@ dialog.scrim::backdrop{background:transparent}
     <div class="house-controls"><button class="btn" type="button" id="appendPatient">+ Add patient in this house</button><button class="btn primary" type="button" id="newHouseBtn">New house →</button></div>
     <div class="row"><button class="btn small" type="button" id="collapsePatients">Collapse all</button><button class="btn small" type="button" id="expandPatients">Expand all</button></div>
   </section>
-  <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
+  <div class="house-visit-layout">
+    <nav id="housePatientNav" class="house-patient-nav" aria-label="Patients in this house" hidden></nav>
+    <div id="patients" role="tabpanel" aria-labelledby="view-patients"></div>
+  </div>
   <div id="phoneHouseAction" class="phone-house-action"><button type="button" class="btn primary" id="phoneNewHouseBtn">New house</button></div>
   <section id="seenSection" class="seen-section" role="tabpanel" aria-labelledby="view-seen" hidden>
     <h2 id="seenHeading" tabindex="-1">Patients Seen</h2>
@@ -543,7 +563,17 @@ renderTheme();
 // The keyboard can shrink and pan Safari's visual viewport without changing
 // the layout viewport. Keep the sticky preview inside the area actually visible.
 const messageViewport = window.visualViewport;
+const housePatientNav = document.querySelector('#housePatientNav');
+const widePatientSidebar = window.matchMedia('(min-width:1100px)');
+const fixedVisitControls = document.querySelectorAll('#phoneHouseAction, #undoNotice');
 let messageViewportFrame = 0;
+function visitViewportBottom(top, height){
+  let bottom = top + height;
+  for(const control of fixedVisitControls){
+    if(control.getClientRects().length) bottom = Math.min(bottom, control.getBoundingClientRect().top);
+  }
+  return bottom;
+}
 function updateMessageViewport(){
   messageViewportFrame = 0;
   const top = Math.max(0, messageViewport?.offsetTop || 0);
@@ -553,7 +583,12 @@ function updateMessageViewport(){
   style.setProperty('--message-viewport-height', height + 'px');
   style.setProperty('--message-viewport-bottom', Math.max(0, window.innerHeight - top - height) + 'px');
   const workspaceHeight = document.querySelector('.workspace-tools').getBoundingClientRect().height;
+  const houseNavHeight = widePatientSidebar.matches ? 0 : housePatientNav.getBoundingClientRect().height;
   style.setProperty('--workspace-sticky-height', workspaceHeight + 'px');
+  style.setProperty('--house-nav-sticky-height', houseNavHeight + 'px');
+  // Let the patient tabs scroll away when the sticky bars and keyboard leave too little room to edit.
+  const formRoom = visitViewportBottom(top, height) - top - workspaceHeight - houseNavHeight;
+  document.documentElement.toggleAttribute('data-house-nav-compact', houseNavHeight > 0 && formRoom < 132);
   document.documentElement.toggleAttribute('data-message-compact', height < 430);
   // Near the final field, the grid's bottom can otherwise push a tall sticky
   // panel above its top boundary. Shrink the preview to the remaining form area.
@@ -571,7 +606,12 @@ messageViewport?.addEventListener('scroll', scheduleMessageViewport);
 window.addEventListener('resize', scheduleMessageViewport);
 window.addEventListener('scroll', scheduleMessageViewport, {passive:true});
 window.addEventListener('pageshow', scheduleMessageViewport);
-if(window.ResizeObserver) new ResizeObserver(scheduleMessageViewport).observe(document.querySelector('.workspace-tools'));
+if(window.ResizeObserver){
+  const stickyObserver = new ResizeObserver(scheduleMessageViewport);
+  stickyObserver.observe(document.querySelector('.workspace-tools'));
+  stickyObserver.observe(housePatientNav);
+  fixedVisitControls.forEach(control => stickyObserver.observe(control));
+}
 updateMessageViewport();
 
 // Migrate once, then never read keys used by older versions again. Existing
@@ -980,6 +1020,10 @@ function restoreMeta(value){
   if(typeof value.visitId === 'string' && /^visit-[a-z0-9-]+$/.test(value.visitId)) meta.visitId = value.visitId;
   else if(typeof value.officeId === 'string' && /^[a-z0-9-]+$/i.test(value.officeId)) meta.visitId = 'visit-office-' + value.officeId;
   if(Number.isFinite(value.seenAt) && value.seenAt > 0) meta.seenAt = value.seenAt;
+  if(Array.isArray(value.recentFields)){
+    const fields = value.recentFields.filter(id => typeof id === 'string' && /^[\w-]+$/.test(id));
+    if(fields.length) meta.recentFields = fields;
+  }
   if(Number.isFinite(value.sentAt) && value.sentAt > 0 && typeof value.sentText === 'string'){
     meta.sentAt = value.sentAt;
     meta.sentText = value.sentText;
@@ -1875,7 +1919,7 @@ function checkRow(fid, label, remind, domId){
   cb.addEventListener('change', () => {
     const value = isLabRequestField(fid) ? context(V).labRequestScopes[fid] : true;
     if(cb.checked && value) V[fid] = value; else delete V[fid];
-    refresh({user:true});
+    refresh({user:true, field:domId});
   });
   return h('label', {class:'checkrow' + (remind ? ' remind' : ''), for:domId}, cb, h('span', {text:label, data:{labelOf:fid}}));
 }
@@ -1897,7 +1941,7 @@ function textField(f){
     if(f.type === 'dob'){ const m = maskDob(inp.value); if(m !== inp.value) inp.value = m; }
     if(f.id === 'height_ft') inp.value = inp.value.replace(/\D/g, '').slice(0, 1);
     V[f.id] = inp.value;
-    refresh({user:true});
+    refresh({user:true, field:id});
     if(f.id === 'height_ft' && /^\d$/.test(inp.value) && !event.isComposing && !String(event.inputType || '').startsWith('delete') && !sheetOpen){
       const inches = $('#f_height_in');
       if(inches){ inches.focus(); inches.select(); }
@@ -1922,7 +1966,7 @@ function shortcutRow(f, inp, data){
       const cur = String(V[f.id] || '');
       V[f.id] = c.m === 'add' ? listToggle(cur, c.v) : (norm(cur) === norm(c.v) ? '' : c.v);
       inp.value = V[f.id];
-      refresh({user:true});
+      refresh({user:true, field:inp.dataset.localId});
     }}));
   }
   return row;
@@ -1932,9 +1976,10 @@ function choiceField(f){
   const parts = [h('div', {class:'flabel', id:'l_' + f.id, text:f.label, data:{labelOf:f.id}})];
   const group = h('div', {class:'chips', role:'radiogroup', 'aria-labelledby':'l_' + f.id});
   (f.opts || []).forEach((opt, i) => {
-    group.append(h('button', {type:'button', class:'chip', role:'radio', id:'c_' + f.id + '_' + i, 'aria-checked':'false', data:{choice:f.id, v:opt}, text:opt, onclick:() => {
+    const id = 'c_' + f.id + '_' + i;
+    group.append(h('button', {type:'button', class:'chip', role:'radio', id, 'aria-checked':'false', data:{choice:f.id, v:opt}, text:opt, onclick:() => {
       if(V[f.id] === opt) delete V[f.id]; else V[f.id] = opt;
-      refresh({user:true});
+      refresh({user:true, field:id});
     }}));
   });
   parts.push(group);
@@ -1942,7 +1987,7 @@ function choiceField(f){
     const d = f.detail;
     const inp = h('input', {type:'text', class:'inp detail', id:'f_' + d.id, placeholder:d.ph || '', 'aria-label':d.ph || f.label + ' details', autocomplete:'off', data:{detailOf:f.id, detailOn:d.on}});
     inp.value = V[d.id] || '';
-    inp.addEventListener('input', () => { V[d.id] = inp.value; refresh({user:true}); });
+    inp.addEventListener('input', () => { V[d.id] = inp.value; refresh({user:true, field:inp.dataset.localId}); });
     parts.push(inp);
     if(d.chips && d.chips.length) parts.push(shortcutRow(d, inp, {detailOf:f.id, detailOn:d.on}));
   }
@@ -1951,9 +1996,10 @@ function choiceField(f){
     const row = h('div', {class:'chips subchoice', role:'radiogroup', 'aria-label':f.label + ', which', data:{subOf:f.id, subOn:sb.on}},
       h('span', {class:'sublabel', text:sb.label || 'Which?'}));
     (sb.opts || []).forEach((opt, i) => {
-      row.append(h('button', {type:'button', class:'chip', role:'radio', id:'c_' + sb.id + '_' + i, 'aria-checked':'false', data:{choice:sb.id, v:opt}, text:opt, onclick:() => {
+      const id = 'c_' + sb.id + '_' + i;
+      row.append(h('button', {type:'button', class:'chip', role:'radio', id, 'aria-checked':'false', data:{choice:sb.id, v:opt}, text:opt, onclick:() => {
         if(V[sb.id] === opt) delete V[sb.id]; else V[sb.id] = opt;
-        refresh({user:true});
+        refresh({user:true, field:id});
       }}));
     });
     parts.push(row);
@@ -1969,7 +2015,7 @@ function testsField(f){
     cb.addEventListener('change', () => {
       const tv = V[f.id] = Object.assign({}, V[f.id]);
       if(cb.checked) tv[it.id] = { on:true }; else delete tv[it.id];
-      refresh({user:true});
+      refresh({user:true, field:cid});
     });
     const row = h('div', {class:'testrow', data:{fid:f.id, item:it.id, testName:it.n}});
     row.append(h('label', {class:'thead', for:cid}, cb, h('span', {text:it.n}),
@@ -1978,27 +2024,29 @@ function testsField(f){
     if(it.kind !== 'done'){
       const res = h('div', {class:'chips res', role:'radiogroup', 'aria-label':it.n + ' result'});
       for(const r of ['Positive', 'Negative', 'running']){
-        res.append(h('button', {type:'button', class:'chip' + (r === 'Positive' ? ' pos' : r === 'Negative' ? ' neg' : ''), role:'radio', 'aria-checked':'false', data:{r}, text:r, onclick:() => {
+        const id = 'result_' + cid + '_' + r;
+        res.append(h('button', {type:'button', class:'chip' + (r === 'Positive' ? ' pos' : r === 'Negative' ? ' neg' : ''), role:'radio', id, 'aria-checked':'false', data:{r}, text:r, onclick:() => {
           const tv = V[f.id] = Object.assign({}, V[f.id]);
           const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
           delete s.aware;
           if(s.r === r){ delete s.r; delete s.s; }
           else { s.r = r; if(r !== 'Positive') delete s.s; }
-          refresh({user:true});
+          refresh({user:true, field:id});
         }}));
       }
       row.append(res);
       if(it.sub && it.sub.length){
         const sub = h('div', {class:'chips sub', role:'radiogroup', 'aria-label':it.n + ' type'}, h('span', {class:'sublabel', text:'Type'}));
-        for(const sv of it.sub){
-          sub.append(h('button', {type:'button', class:'chip', role:'radio', 'aria-checked':'false', data:{s:sv}, text:sv, onclick:() => {
+        it.sub.forEach((sv, i) => {
+          const id = 'type_' + cid + '_' + i;
+          sub.append(h('button', {type:'button', class:'chip', role:'radio', id, 'aria-checked':'false', data:{s:sv}, text:sv, onclick:() => {
             const tv = V[f.id] = Object.assign({}, V[f.id]);
             const s = tv[it.id] = Object.assign({ on:true }, tv[it.id]);
             delete s.aware;
             if(s.s === sv) delete s.s; else s.s = sv;
-            refresh({user:true});
+            refresh({user:true, field:id});
           }}));
-        }
+        });
         row.append(sub);
       }
       row.append(h('div', {class:'test-awareness', hidden:true}));
@@ -2025,20 +2073,35 @@ function renderTestAwareness(row, state, visible){
     area.hidden = false;
     area.dataset.field = field.id;
     const group = h('div', {class:'chips', role:'radiogroup', 'aria-label':row.dataset.testName + ' · ' + field.label});
-    for(const opt of field.opts){
-      group.append(h('button', {type:'button', class:'chip', role:'radio', text:opt, data:{choice:field.id, v:opt, testAware:''}, onclick:() => {
+    field.opts.forEach((opt, i) => {
+      const id = 'aware_t_' + row.dataset.fid + '_' + row.dataset.item + '_' + i;
+      group.append(h('button', {type:'button', class:'chip', role:'radio', id, text:opt, data:{choice:field.id, v:opt, testAware:''}, onclick:() => {
         const test = V[row.dataset.fid]?.[row.dataset.item];
         if(!test || test.r !== 'Positive') return;
         if(test.aware === opt) delete test.aware; else test.aware = opt;
-        refresh({user:true});
+        refresh({user:true, field:id});
       }}));
-    }
+    });
     area.append(h('div', {class:'flabel', text:field.label}), group);
   }
   area.querySelectorAll('[data-test-aware]').forEach(button => button.setAttribute('aria-checked', state.aware === button.dataset.v ? 'true' : 'false'));
 }
 
 /* ---------- refresh: everything that depends on the values ---------- */
+
+function filledField(control){
+  if(!control) return false;
+  if(control.matches('input[type="checkbox"]')) return control.checked;
+  if(control.matches('input,textarea')) return !!control.value.trim();
+  return control.getAttribute('aria-checked') === 'true';
+}
+
+function rememberField(id){
+  const fields = (M.recentFields || []).filter(field => field !== id);
+  if(filledField($('#' + id))) fields.push(id);
+  if(fields.length) M.recentFields = fields;
+  else delete M.recentFields;
+}
 
 function refresh(opts){
   opts = opts || {};
@@ -2107,10 +2170,12 @@ function refresh(opts){
   renderSent(res.text);
   renderSaveState(res.text);
   updateBadges(ctx);
+  const beforeFields = M.recentFields;
+  if(opts.field) rememberField(opts.field);
   page.updateTitles();
   saveDraftSoon();
 
-  if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard(beforeEdit);
+  if(opts.user && M.sentAt && !M.sentAck && !sheetOpen && res.text !== M.sentText) sentGuard(beforeEdit, beforeFields);
 }
 
 function autoSize(el){
@@ -2221,7 +2286,7 @@ function updateBadges(ctx){
 function configurePatientTabs(){
   PATIENT_TABS.forEach(t => { $('#tab-' + t).tabIndex = t === tab ? 0 : -1; });
 }
-function setTab(t){
+function setTab(t, scroll = true){
   if(t === 'office'){ page.showOffice(); return; }
   if(!PATIENT_TABS.includes(t)) return;
   page.showPatients(false);
@@ -2232,8 +2297,36 @@ function setTab(t){
   }
   configurePatientTabs();
   if(t === 'visit') autoSize($('#output'));
-  root.scrollIntoView({block:'start'});
+  if(scroll) root.scrollIntoView({block:'start'});
   saveDraftSoon();
+}
+
+function focusPatient(){
+  setCollapsed(false);
+  root.scrollIntoView({block:'start'});
+  $('#patientTitle').focus({preventScroll:true});
+}
+
+function resumePatient(){
+  setCollapsed(false);
+  for(const id of (M.recentFields || []).slice().reverse()){
+    const field = $('#' + id);
+    if(!filledField(field) || field.disabled) continue;
+    const panel = field.closest('[role="tabpanel"]');
+    const hidden = field.closest('[hidden]');
+    if(!panel || (hidden && hidden !== panel)) continue;
+    if(panel.hidden) setTab(panel.dataset.localId === 'panel-check' ? 'check' : 'visit', false);
+    field.focus({preventScroll:true});
+    const tabs = $('.tabs');
+    const stickyTabsHeight = getComputedStyle(tabs).position === 'sticky' ? tabs.offsetHeight : 0;
+    const top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) + stickyTabsHeight;
+    const bottom = visitViewportBottom(messageViewport?.offsetTop || 0, messageViewport?.height || window.innerHeight);
+    const box = field.getBoundingClientRect();
+    window.scrollBy(0, box.top - top - Math.max(0, (bottom - top - box.height) / 2));
+    return;
+  }
+  if(tab !== 'visit') setTab('visit', false);
+  focusPatient();
 }
 
 /* ---------- copy ---------- */
@@ -2261,6 +2354,7 @@ function onCopy(byHand = false){
 
 function vitalCopyReview(missing, warnings, finishCopy){
   const error = h('p', {class:'err', role:'alert'});
+  const editedMeasurements = new Set(), appliedMeasurements = new Set();
   const rows = missing.map(vital => {
     const original = String(V[vital.id + '_reason'] || '').trim();
     const refused = /^(pt\.?\s+refused|patient\s+refused|refused)\b/i.test(original);
@@ -2277,6 +2371,8 @@ function vitalCopyReview(missing, warnings, finishCopy){
         placeholder:field?.ph || '', inputmode:field?.im || 'decimal', autocomplete:'off', data:{vitalValue:id}});
       if(id === 'height_ft') input.maxLength = 1;
       input.addEventListener('input', event => {
+        editedMeasurements.delete(id);
+        editedMeasurements.add(id);
         error.textContent = '';
         if(id !== 'height_ft') return;
         input.value = input.value.replace(/\D/g, '').slice(0, 1);
@@ -2341,7 +2437,9 @@ function vitalCopyReview(missing, warnings, finishCopy){
         if(!values) return;
         for(const [id, value] of Object.entries(values)){
           V[id] = value;
-          const input = $('#f_' + id); if(input) input.value = value;
+          const input = $('#f_' + id);
+          if(input) input.value = value;
+          appliedMeasurements.add(id);
         }
         delete V[key];
         return;
@@ -2356,6 +2454,9 @@ function vitalCopyReview(missing, warnings, finishCopy){
   const copy = () => {
     if(lifecycle.signal.aborted || !page.canUpdateVisit()) return;
     rows.forEach(row => row.save());
+    for(const id of editedMeasurements){
+      if(appliedMeasurements.has(id)) rememberField('f_' + id);
+    }
     refresh();
     finishCopy(buildOutput(V).text);
   };
@@ -2661,12 +2762,13 @@ function clearVisit(msg){
   });
 }
 
-function sentGuard(beforeEdit){
+function sentGuard(beforeEdit, beforeFields){
   sheet({ title:'You already copied this visit', dismissable:false,
     body:['You copied it at ' + fmtTime(M.sentAt) + '. Is this still the same patient?'],
     buttons:[ {label:'Same patient, keep editing', kind:'primary', on:() => { M.sentAck = true; saveDraft(); }},
               {label:'No, undo this edit and add a patient', restoreFocus:false, on:() => {
                 V = clone(beforeEdit);
+                if(beforeFields) M.recentFields = beforeFields; else delete M.recentFields;
                 renderAll();
                 page.addPatient(root);
               }} ] });
@@ -2788,7 +2890,8 @@ return {
     $('#newBtn').setAttribute('aria-label', 'Clear ' + label);
     $('#addPatientBtn').setAttribute('aria-label', 'Add another patient after ' + label);
   },
-  focus:() => { setCollapsed(false); root.scrollIntoView({block:'start'}); $('#patientTitle').focus({preventScroll:true}); },
+  focus:focusPatient,
+  resume:resumePatient,
   offerRestore,
   applyOffice:(values, writable, baseline, readFailed = false, visitChanges = false) => { office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = readFailed; officeVisitChanges = visitChanges; renderOfficePanel(); updateBadges(); renderSaveState(); },
   getOffice:() => ({values:office, writable:officeWritable, baseline:officeBaseline, readFailed:officeReadFailed, visitChanges:officeVisitChanges}),
@@ -2823,6 +2926,7 @@ return {
 
 function createPatientPage(){
   const host = document.querySelector('#patients');
+  const houseNav = document.querySelector('#housePatientNav');
   const officeSection = document.querySelector('#officeSection');
   const seenSection = document.querySelector('#seenSection');
   const template = document.querySelector('#patientTemplate');
@@ -2844,7 +2948,7 @@ function createPatientPage(){
   let activeCopy = null;
   let replayingOffice = false;
   let generation = 'initial', resetting = false;
-  let undo = null, undoTimer = null, navSignature = '', seenSignature = '', reviewSignature = '';
+  let undo = null, undoTimer = null, houseNavSignature = '', navSignature = '', seenSignature = '', reviewSignature = '';
   const readGeneration = () => { try{ return window.localStorage.getItem(shiftKey) || 'initial'; }catch(e){ return generation; } };
   generation = readGeneration();
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -3071,10 +3175,12 @@ function createPatientPage(){
     housePatients:() => patients.filter(p => p.root.dataset.houseId === activeHouseId),
     showHouse:(houseId, scroll = true) => {
       if(!page.isCurrentShift() || !page.houseIds().includes(houseId)) return;
+      const changedHouse = activeHouseId !== houseId;
       activeHouseId = houseId;
       patients.forEach(p => { p.root.hidden = p.root.dataset.houseId !== activeHouseId; });
       page.updateTitles();
       page.showPatients(scroll);
+      if(changedHouse) houseNav.scrollLeft = 0;
       page.saveDraft();
     },
     openPatient:patient => {
@@ -3128,6 +3234,7 @@ function createPatientPage(){
     showPatients:(scroll = true) => { page.setView('patients', scroll); page.housePatients().forEach(p => p.resize()); },
     setView:(view, scroll = true) => {
       host.hidden = view !== 'patients';
+      houseNav.hidden = host.hidden || page.housePatients().length < 2;
       document.querySelector('#patientNavigator').hidden = view !== 'patients';
       document.querySelector('#houseToolbar').hidden = view !== 'patients';
       document.querySelector('#phoneHouseAction').hidden = view !== 'patients';
@@ -3145,12 +3252,37 @@ function createPatientPage(){
     updateTitles:() => {
       patients.forEach((p, i) => p.title(i + 1));
       const houses = page.houseIds();
-      const count = page.housePatients().length;
+      const current = page.housePatients();
+      const count = current.length;
       document.querySelector('#houseHeading').textContent = 'House ' + (houses.indexOf(activeHouseId) + 1);
       document.querySelector('#houseSummary').textContent = count + (count === 1 ? ' patient' : ' patients') + ' in this house · Only this house is shown.';
+      page.renderHouseNav(current);
       page.renderPatientNavigation();
       page.renderSeenVisits();
       if(clearDialog.open) page.renderShiftReview();
+    },
+    renderHouseNav:current => {
+      houseNav.hidden = host.hidden || current.length < 2;
+      const labels = current.map(patient => [patient.name(), 'Patient ' + (patients.indexOf(patient) + 1)]);
+      const signature = JSON.stringify(current.map((patient, i) => [patient.root.id, ...labels[i]]));
+      if(signature === houseNavSignature) return;
+      houseNavSignature = signature;
+      houseNav.replaceChildren();
+      if(current.length < 2) return;
+      current.forEach((patient, i) => {
+        const [name, number] = labels[i];
+        const duplicate = name && labels.some(([other], j) => j !== i && name.toLowerCase() === other.toLowerCase());
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn';
+        button.textContent = duplicate ? number + ' · ' + name : name || number;
+        button.title = button.textContent;
+        button.setAttribute('aria-controls', patient.root.id);
+        button.addEventListener('click', () => {
+          if(page.isCurrentShift() && !houseNav.hidden) patient.resume();
+        });
+        houseNav.append(button);
+      });
     },
     renderPatientNavigation:() => {
       const houses = page.houseIds();
@@ -3520,7 +3652,7 @@ function createPatientPage(){
   }
   function setDraftReadBlocked(blocked){
     readWarning.hidden = !blocked;
-    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#patients', '#phoneHouseAction', '#seenSection', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
+    for(const selector of ['.workspace-tools', '#patientNavigator', '#houseToolbar', '#housePatientNav', '#patients', '#phoneHouseAction', '#seenSection', '#officeSection', '#undoNotice']) document.querySelector(selector).inert = blocked;
   }
   document.querySelector('#retryDraftRead').addEventListener('click', readSavedDrafts);
   document.querySelector('#retryOfficeSave').addEventListener('click', () => {
