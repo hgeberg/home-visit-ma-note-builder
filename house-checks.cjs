@@ -247,6 +247,7 @@ test('Delete patient: stable visit identity handles duplicate names, collapsed c
 test('Delete patient: removing the first copied form preserves its history, latest edits and Office owner',async p=>{
   await seed(p,'SYNTHETIC COPIED');await field(p,'f_overnights').fill('RPP');await copy(p);
   await field(p,'f_notes').fill('Latest synthetic note');
+  await dialog(p).getByRole('button',{name:'Same patient, keep editing',exact:true}).click();
   await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC REMAINING',1);await flush(p);
   const before=await officeDraft(p), saved=await deviceDraft(p);
   await deletePatient(p,0,'Remove from house');
