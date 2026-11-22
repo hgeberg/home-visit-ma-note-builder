@@ -67,10 +67,11 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
   const p=abxEnv(),layout=p.layout;
   const h=(tag,attrs,...children)=>({tag,...attrs,children,append(...items){this.children.push(...items);},addEventListener(){}});
   const env={h,V:{tests:{flu:{on:true,r:'Positive',s:'B'}}},refresh(){}};
-  vm.createContext(env);vm.runInContext(section('function testsField(f){','\n/* ---------- refresh:')+'\nglobalThis.render=testsField;',env);
+  vm.createContext(env);vm.runInContext(section('function rapidLabGroup(item){','\nfunction labRequestScope(')+section('function testsField(f){','\n/* ---------- refresh:')+'\nglobalThis.render=testsField;',env);
   const f=layout.sections.flatMap(sec=>sec.fields).find(f=>f.id==='tests');
   const rows=env.render(f)[1].children;
   for(const row of rows){
+   assert.equal(row.children.some(child=>child.class==='positive-flu-preference'),row.data.item==='flu');
    const res=row.children.find(child=>child.class==='chips res');
    if(['strep','flu','covid'].includes(row.data.item)){
     const button=res.children.find(child=>child.text==='running');
@@ -81,6 +82,24 @@ const shell=version=>'<meta name="note-builder-app" content="shell"><meta name="
     assert.equal(env.V.tests[row.data.item].r,'Negative');
    }else assert.equal(res,undefined);
   }
+ });
+ await check('Positive flu reuses the exact preference controls and returns them to Pharmacy when the result changes',()=>{
+  function node(name){
+   const n={name,children:[],parentNode:null,hidden:false,append(...items){for(const item of items){detach(item);item.parentNode=this;this.children.push(item);}},before(item){const parent=this.parentNode;detach(item);item.parentNode=parent;parent.children.splice(parent.children.indexOf(this),0,item);},replaceWith(item){const parent=this.parentNode;detach(item);const index=parent.children.indexOf(this);parent.children.splice(index,1,item);this.parentNode=null;item.parentNode=parent;}};return n;
+  }
+  function detach(item){if(item.parentNode){const siblings=item.parentNode.children;siblings.splice(siblings.indexOf(item),1);item.parentNode=null;}}
+  const pharmacy=node('pharmacy'), first=node('pharmacy name'), pref=node('flu_pref'), form=node('tamiflu_form'), last=node('next field');
+  pharmacy.append(first,pref,form,last);
+  const area=node('positive flu'), row={dataset:{fid:'tests',item:'flu'}};
+  area.closest=()=>row;
+  const env={V:{tests:{flu:{on:true,r:'running'}},flu_pref:'Tamiflu',tamiflu_form:'Liquid'},$:(sel)=>sel.includes('flu_pref')?pref:form,$$:()=>[area],document:{createComment:()=>node('anchor')}};
+  vm.createContext(env);
+  vm.runInContext('const fluPreferenceHomes=new WeakMap();'+section('function positionFluPreferences(){','\n/* ---------- refresh:')+'\nglobalThis.place=positionFluPreferences;',env);
+  env.place();assert.equal(area.hidden,true);assert.deepEqual(pharmacy.children,[first,pref,form,last]);
+  env.V.tests.flu.r='Positive';env.place();assert.equal(area.hidden,false);assert.deepEqual(area.children,[pref,form]);
+  env.place();assert.deepEqual(area.children,[pref,form]);
+  env.V.tests.flu.r='Negative';env.place();assert.equal(area.hidden,true);assert.deepEqual(pharmacy.children,[first,pref,form,last]);assert.equal(area.children.length,0);
+  env.V.tests.flu.r='Positive';env.place();delete env.V.tests.flu;env.place();assert.deepEqual(pharmacy.children,[first,pref,form,last]);assert.equal(env.V.flu_pref,'Tamiflu');assert.equal(env.V.tamiflu_form,'Liquid');
  });
  await check('Undoing a copied-patient edit preserves all answers from immediately before that edit',()=>{
   const copied={name:'SYNTHETIC ORIGINAL',inspic:true,tests:{flu:{on:true,r:'Positive',s:'B'}}};
