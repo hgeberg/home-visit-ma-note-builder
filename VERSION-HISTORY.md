@@ -1,5 +1,11 @@
 # Home Visit MA Note Builder versions
 
+## v9.3.7 — Delete a canceled patient and record positive-flu medication preferences (November 22, 2026)
+
+Multi-patient houses have a Delete patient button on each patient’s header, including collapsed forms. Confirming deletion of an uncopied visit removes only that patient’s form, checklist and Patients Seen entry. Removing an already copied visit from the house retains its history and Office work. The app preserves the remaining patients and house grouping, transfers pending earlier Office copies, and refuses to delete from a stale or unwritable saved shift. Release metadata and the offline cache advance together.
+
+Selecting a positive rapid flu result shows the existing medication preference choices directly in the test row, including capsule/liquid when Tamiflu is selected. The same saved fields and copied-message output are used; while the result is not positive, the choices remain in Pharmacy for checked rapid flu tests.
+
 ## v9.3.6 — Jump to a patient’s last field (November 19, 2026)
 
 Houses with two or more patients show a sticky list of names, on the left on wide screens and below the workspace tabs on smaller screens. Selecting a name expands that patient’s form and returns to their latest filled field in Visit or Checklist. Each patient’s position is saved with their draft.

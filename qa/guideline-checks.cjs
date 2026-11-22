@@ -257,6 +257,58 @@ test('Flu preferences require Tamiflu formulation only when relevant and preserv
   const copied = await copy(page);assert.match(copied, /Tamiflu/);assert.match(copied, /Liquid/);assert.doesNotMatch(copied, /Capsules/);
 });
 
+test('Positive flu shows the same medication preference choices directly in the test row before flu type is selected', async page => {
+  await seed(page);
+  const prompt = testRow(page, 'flu').locator('.positive-flu-preference');
+  const preferences = patient(page).locator('[data-field="flu_pref"]');
+  assert.equal(await prompt.isVisible(), false);
+  await selectTest(page, 'flu', 'running');
+  await choice(page, 'flu_pref', 'Tamiflu').click();
+  await choice(page, 'tamiflu_form', 'Capsules').click();
+  assert.equal(await prompt.isVisible(), false);
+  assert.equal(await patient(page).locator('[data-sec="s_rx"] [data-field="flu_pref"]').count(), 1);
+  await selectTest(page, 'flu', 'Positive');
+  assert.equal(await prompt.isVisible(), true);
+  assert.match(await prompt.innerText(), /Ask which flu medication/);
+  assert.equal(await preferences.count(), 1);
+  assert.equal(await prompt.locator('[data-field="flu_pref"]').count(), 1);
+  assert.equal(await prompt.locator('[data-choice="flu_pref"][data-v="Tamiflu"]').getAttribute('aria-checked'), 'true');
+  assert.equal(await prompt.locator('[data-choice="tamiflu_form"][data-v="Capsules"]').getAttribute('aria-checked'), 'true');
+  await choice(page, 'flu_pref', 'Xofluza').click();
+  assert.equal(await prompt.locator('[data-field="tamiflu_form"]').isVisible(), false);
+  assert.equal((await output(page)).match(/Flu treatment preference: Xofluza/g).length, 1);
+  await choice(page, 'flu_pref', 'Tamiflu').click();await choice(page, 'tamiflu_form', 'Liquid').click();
+  await testRow(page, 'flu').getByRole('radio', {name:'A',exact:true}).click();
+  await choice(page, 'aware', 'Aware').click();
+  const copied = await copy(page);
+  assert.match(copied, /Flu treatment preference: Tamiflu/);assert.match(copied, /Tamiflu form: Liquid/);
+  await checkpoint(page);await page.reload();await restore(page);
+  assert.equal(await prompt.isVisible(), true);
+  assert.equal(await preferences.count(), 1);
+  assert.equal(await choice(page,'tamiflu_form','Liquid').getAttribute('aria-checked'),'true');
+});
+
+test('Changing from positive flu returns the recorded preference to Pharmacy without duplication or loss', async page => {
+  await seed(page);await selectTest(page, 'flu', 'Positive');
+  const prompt = testRow(page, 'flu').locator('.positive-flu-preference');
+  await choice(page, 'flu_pref', 'Declined').click();
+  await selectTest(page, 'flu', 'Negative');
+  assert.equal(await prompt.isVisible(), false);
+  assert.equal(await patient(page).locator('[data-sec="s_rx"] [data-field="flu_pref"]').count(), 1);
+  assert.equal(await choice(page, 'flu_pref', 'Declined').getAttribute('aria-checked'), 'true');
+  await testRow(page,'flu').locator('input[type="checkbox"]').uncheck();
+  assert.equal(await patient(page).locator('[data-field="flu_pref"]').isVisible(), false);
+  assert.doesNotMatch(await output(page), /Flu treatment preference/);
+  await selectTest(page, 'flu', 'Positive');
+  assert.equal(await prompt.isVisible(), true);
+  assert.equal(await choice(page, 'flu_pref', 'Declined').getAttribute('aria-checked'), 'true');
+  await page.locator('#appendPatient').click();await seed(page,'SYNTHETIC SECOND FLU PREFERENCE',1);
+  await selectTest(page, 'flu', 'Positive',1);
+  await choice(page,'flu_pref','Xofluza',1).click();
+  assert.match(await output(page), /Flu treatment preference: Declined/);
+  assert.match(await output(page,1), /Flu treatment preference: Xofluza/);
+});
+
 test('A positive rapid strep with a strep lab warns until the clinician request is confirmed', async page => {
   await seed(page);
   await selectTest(page, 'strep', 'Positive');await choice(page, 'aware', 'Aware').click();

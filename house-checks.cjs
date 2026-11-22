@@ -7,6 +7,14 @@ const patient = (p, n=0) => p.locator('.patient').nth(n);
 const field = (p, id, n=0) => patient(p,n).locator('[data-local-id="'+id+'"]');
 const visibleCount = p => p.locator('.patient:visible').count();
 const draft = p => p.evaluate(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || 'null'));
+const deviceDraft = p => p.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_app_draft') || 'null'));
+const officeDraft = p => p.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]'));
+const flush = p => p.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+const dialog = p => p.locator('dialog[open]');
+async function deletePatient(p,n=0,label='Delete patient'){
+  await field(p,'deletePatientBtn',n).click();
+  await dialog(p).getByRole('button',{name:label,exact:true}).click();
+}
 async function seed(p, name, n=0){
   await field(p,'f_name',n).fill(name);
   await field(p,'f_dob',n).fill('01/01/2000');
@@ -186,6 +194,159 @@ test('House navigation and expanded history fit phone and desktop widths',async 
       await p.screenshot({path:'qa/houses/'+width+(open?'-history':'-collapsed')+'.png'});
     }
   }
+});
+
+test('Delete patient: cancel or delete one entered visit on a phone, preserving the survivor after reload',async p=>{
+  await p.setViewportSize({width:390,height:852});
+  assert.equal(await field(p,'deletePatientBtn').isVisible(),false);
+  await seed(p,'SYNTHETIC SURVIVOR');await field(p,'tab-check').click();await field(p,'f_k_confirm').check();
+  await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC CANCELED',1);await flush(p);
+  const before=await deviceDraft(p), survivor=before.patients[0], removed=before.patients[1];
+  assert.equal(await p.locator('#housePatientNav button').count(),2);
+  await field(p,'deletePatientBtn',1).click();
+  assert.match(await dialog(p).innerText(),/SYNTHETIC CANCELED/);
+  await dialog(p).getByRole('button',{name:'Cancel',exact:true}).click();
+  assert.equal(await visibleCount(p),2);
+  await deletePatient(p,1);
+  assert.equal(await visibleCount(p),1);assert.equal(await p.locator('#'+removed.id).count(),0);
+  assert.equal(await p.locator('#housePatientNav').isVisible(),false);
+  assert.equal(await field(p,'deletePatientBtn').isVisible(),false);
+  assert.equal(await field(p,'f_k_confirm').isChecked(),true);
+  assert.equal(await p.evaluate(()=>document.activeElement.dataset.localId),'patientTitle');
+  assert.deepEqual((await deviceDraft(p)).patients,[survivor]);
+  assert.deepEqual((await draft(p)).patients,[survivor]);
+  await p.locator('#view-seen').click();
+  assert.equal(await p.locator('.seen-visit').count(),1);assert.doesNotMatch(await p.locator('#seenList').innerText(),/CANCELED/);
+  await p.locator('#clearShiftBtn').click();assert.doesNotMatch(await p.locator('#shiftReviewList').innerText(),/CANCELED/);await p.locator('#cancelClearShift').click();
+  await p.reload();await restore(p);
+  assert.equal(await visibleCount(p),1);assert.equal(await field(p,'f_name').inputValue(),'SYNTHETIC SURVIVOR');
+  assert.equal(await field(p,'f_k_confirm').isChecked(),true);
+  await p.locator('#view-seen').click();assert.equal(await p.locator('.seen-visit').count(),1);
+});
+
+test('Delete patient: stable visit identity handles duplicate names, collapsed cards and other houses',async p=>{
+  await seed(p,'SYNTHETIC SAME NAME');await field(p,'f_notes').fill('Keep first');
+  await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC SAME NAME',1);await field(p,'f_notes',1).fill('Remove second');
+  await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC THIRD',2);
+  await p.locator('#newHouseBtn').click();await seed(p,'SYNTHETIC OTHER HOUSE',3);
+  assert.equal(await field(p,'deletePatientBtn',3).isVisible(),false);
+  await openPatient(p,'2. SYNTHETIC SAME NAME');await field(p,'collapseBtn',1).click();await flush(p);
+  const before=await deviceDraft(p);
+  assert.equal(await field(p,'patientBody',1).isVisible(),false);
+  assert.equal(await field(p,'deletePatientBtn',1).isVisible(),true);
+  await deletePatient(p,1);
+  assert.equal(await visibleCount(p),2);assert.equal(await p.locator('.patient').count(),3);
+  assert.equal(await p.locator('#housePatientNav button').count(),2);
+  assert.match(await p.locator('#housePatientNav').innerText(),/SYNTHETIC THIRD/);
+  assert.equal(await field(p,'f_notes').inputValue(),'Keep first');
+  assert.deepEqual((await deviceDraft(p)).patients,[before.patients[0],before.patients[2],before.patients[3]]);
+  await openPatient(p,'3. SYNTHETIC OTHER HOUSE');assert.equal(await field(p,'f_name',2).inputValue(),'SYNTHETIC OTHER HOUSE');
+  assert.equal(await field(p,'deletePatientBtn',2).isVisible(),false);
+});
+
+test('Delete patient: removing the first copied form preserves its history, latest edits and Office owner',async p=>{
+  await seed(p,'SYNTHETIC COPIED');await field(p,'f_overnights').fill('RPP');await copy(p);
+  await field(p,'f_notes').fill('Latest synthetic note');
+  await dialog(p).getByRole('button',{name:'Same patient, keep editing',exact:true}).click();
+  await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC REMAINING',1);await flush(p);
+  const before=await officeDraft(p), saved=await deviceDraft(p);
+  await deletePatient(p,0,'Remove from house');
+  assert.equal(await visibleCount(p),1);assert.equal(await field(p,'f_name').inputValue(),'SYNTHETIC REMAINING');
+  assert.deepEqual(await officeDraft(p),before);
+  const after=await deviceDraft(p);assert.deepEqual(after.patients,[saved.patients[1]]);
+  assert.equal(after.seenVisits[0].meta.visitId,saved.patients[0].meta.visitId);
+  assert.equal(after.seenVisits[0].vals.notes,'Latest synthetic note');
+  await p.locator('#view-office').click();assert.equal(await p.locator('.office-patient').count(),1);
+  await p.locator('[data-office-completed]').check();assert.equal((await officeDraft(p))[0].completed,true);
+  await p.locator('#view-seen').click();assert.equal(await p.locator('.seen-visit').count(),2);
+  await p.locator('#seenList').getByRole('button',{name:'Open visit for SYNTHETIC COPIED',exact:true}).click();
+  assert.equal(await field(p,'f_notes',1).inputValue(),'Latest synthetic note');
+});
+
+test('Delete patient: dropping a reopened uncopied visit also removes its earlier archive',async p=>{
+  await seed(p,'SYNTHETIC KEEP');await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC ARCHIVE CANCELED',1);await flush(p);
+  const removedId=(await deviceDraft(p)).patients[1].meta.visitId;
+  await field(p,'newBtn',1).click();await dialog(p).getByRole('button',{name:'Clear this patient',exact:true}).click();
+  await p.locator('#view-seen').click();
+  await p.locator('#seenList').getByRole('button',{name:'Open visit for SYNTHETIC ARCHIVE CANCELED',exact:true}).click();
+  assert.equal(await visibleCount(p),3);
+  await deletePatient(p,2);
+  assert.equal(await visibleCount(p),2);
+  const saved=await deviceDraft(p);assert.ok(!saved.patients.some(v=>v.meta.visitId===removedId));
+  assert.ok(!(saved.seenVisits||[]).some(v=>v.meta.visitId===removedId));
+  await p.locator('#view-seen').click();assert.equal(await p.locator('.seen-visit').count(),1);
+  assert.doesNotMatch(await p.locator('#seenList').innerText(),/CANCELED/);
+});
+
+test('Delete patient: a cleared form transfers earlier pending Office copies without restoring the cancellation',async p=>{
+  await seed(p,'SYNTHETIC EARLIER COPY');await field(p,'f_overnights').fill('RPP');
+  await p.evaluate(()=>{
+    window.syntheticFailOfficeRead=true;
+    const original=Storage.prototype.getItem;
+    Storage.prototype.getItem=function(key){if(this===localStorage&&key==='hvnb_current_office'&&window.syntheticFailOfficeRead)throw Error('Synthetic read failure');return original.call(this,key);};
+  });
+  await copy(p);await field(p,'newBtn').click();
+  await seed(p,'SYNTHETIC CANCELED');await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC KEEPER',1);await flush(p);
+  const before=await deviceDraft(p);assert.equal(before.patients[0].pendingOfficeSync.length,1);
+  await deletePatient(p,0);
+  const saved=await deviceDraft(p);assert.equal(saved.patients.length,1);
+  assert.equal(saved.patients[0].pendingOfficeSync.length,1);
+  assert.equal(saved.patients[0].pendingOfficeSync[0].values.name,'SYNTHETIC EARLIER COPY');
+  assert.equal(saved.patients[0].pendingOfficeSync[0].current,false);
+  await p.evaluate(()=>{window.syntheticFailOfficeRead=false;});
+  await p.locator('#retryOfficeSave').click();await p.locator('#officeSaveWarning').waitFor({state:'hidden'});
+  assert.equal((await officeDraft(p))[0].name,'SYNTHETIC EARLIER COPY');
+  await p.locator('#view-seen').click();assert.equal(await p.locator('.seen-visit').count(),2);
+  assert.doesNotMatch(await p.locator('#seenList').innerText(),/CANCELED/);
+});
+
+test('Delete patient: a failed device write leaves both original forms and recovery copies intact',async p=>{
+  await seed(p,'SYNTHETIC KEEP');await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC CANCEL',1);await flush(p);
+  const before=await deviceDraft(p);
+  await p.evaluate(()=>{
+    window.syntheticFailDeviceWrite=true;
+    const original=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(key,value){if(this===localStorage&&key==='hvnb_current_app_draft'&&window.syntheticFailDeviceWrite)throw Error('Synthetic quota');return original.call(this,key,value);};
+  });
+  await deletePatient(p,1);
+  assert.match(await dialog(p).innerText(),/No patient was removed/);
+  assert.equal(await visibleCount(p),2);assert.deepEqual(await deviceDraft(p),before);
+  assert.deepEqual((await draft(p)).patients,before.patients);
+  await dialog(p).getByRole('button',{name:'OK',exact:true}).click();
+  await p.evaluate(()=>{window.syntheticFailDeviceWrite=false;});
+  await deletePatient(p,1);assert.equal(await visibleCount(p),1);
+  assert.equal((await deviceDraft(p)).patients.length,1);
+});
+
+test('Delete patient: a stale confirmation cannot delete a newer shift or resurrect a canceled patient',async(p,c,url)=>{
+  await seed(p,'SYNTHETIC KEEP');await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC CANCEL',1);await flush(p);
+  const q=await c.newPage();await q.goto(url);await restore(q);await flush(q);
+  await field(p,'deletePatientBtn',1).click();
+  await field(q,'f_notes').fill('Newer work in second window');await flush(q);const newer=await deviceDraft(q);
+  await dialog(p).getByRole('button',{name:'Delete patient',exact:true}).click();
+  assert.match(await dialog(p).innerText(),/No patient was removed/);
+  assert.deepEqual(await deviceDraft(q),newer);assert.equal(await visibleCount(p),2);
+  await dialog(p).getByRole('button',{name:'OK',exact:true}).click();
+  await deletePatient(q,1);await flush(p);
+  assert.equal((await deviceDraft(q)).patients.length,1);assert.equal((await deviceDraft(q)).patients[0].vals.notes,'Newer work in second window');
+  assert.equal(await p.locator('#draftWarning').isVisible(),true);
+});
+
+test('Delete patient: a failed session update cannot restore a cancellation, and one remaining blank form stays usable',async p=>{
+  await seed(p,'SYNTHETIC KEEP');await p.locator('#appendPatient').click();await seed(p,'SYNTHETIC CANCELED',1);await flush(p);
+  await p.evaluate(()=>{
+    const original=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(key,value){if(this===sessionStorage&&key==='hvnb_current_draft')throw Error('Synthetic session quota');return original.call(this,key,value);};
+  });
+  await deletePatient(p,1);
+  assert.equal((await deviceDraft(p)).patients.length,1);assert.equal(await draft(p),null);
+  await p.reload();await restore(p);assert.equal(await field(p,'f_name').inputValue(),'SYNTHETIC KEEP');
+  await p.locator('#appendPatient').click();
+  await deletePatient(p,0);
+  assert.equal(await visibleCount(p),1);assert.equal(await field(p,'f_name').inputValue(),'');
+  assert.equal(await deviceDraft(p),null);assert.equal(await draft(p),null);
+  await p.reload();assert.equal(await dialog(p).count(),0);assert.equal(await visibleCount(p),1);
+  await seed(p,'SYNTHETIC NEW PATIENT');await flush(p);assert.equal((await deviceDraft(p)).patients[0].vals.name,'SYNTHETIC NEW PATIENT');
 });
 
 (async()=>{

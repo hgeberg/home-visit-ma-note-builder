@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.6.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.3.7.
+
+When a house has multiple patients, Delete patient at the top of a patient’s form removes just that patient after confirmation. A canceled, uncopied visit and its checklist are removed from the house and Patients Seen. If the visit was already copied, removing it from the house keeps its visit history and Office work. Other patients and houses remain intact. Deletion is blocked when the saved shift changed in another window or the reduced draft cannot be saved.
 
 When a house has multiple patients, use the sticky list of names to jump to the last field you filled for each patient. On smaller screens, the names appear in a scrollable row. If a patient has no field to return to, the shortcut opens the top of their Visit form. The shortcuts remember your place when you restore a saved shift on the same device.
 
@@ -14,7 +16,7 @@ New house is available beneath the Teams message on tablets and desktops and in 
 
 The NJ visit workflow asks for temperature, height, and weight for every patient. Pressing Copy with missing or incomplete vitals opens a popup with Enter measurement, Unable to obtain with an optional explanation, Pt refused, or Copy anyways to omit remaining measurements. Copy message applies entered measurements and selected reasons to the visit and message; Go back discards popup edits. Previously saved reasons appear for review. Heights can be marked Measured or Patient-reported. BP remains available when requested or warranted.
 
-Pharmacy shows flu-treatment preference only while Rapid flu is checked, with capsule/liquid preference when Tamiflu is selected. Unchecking Rapid flu hides these controls and excludes them from the copied message while retaining the selections for reuse. Treatment decisions remain with the clinician.
+Flu-treatment preferences appear in Pharmacy while Rapid flu is checked. Selecting Positive moves the same choices directly under the rapid flu result, prompting the MA to ask the patient which medication they prefer. Tamiflu still offers capsule/liquid preference. Changing away from Positive returns the choices to Pharmacy; unchecking Rapid flu hides them and excludes them from the copied message while retaining selections for reuse. Treatment decisions remain with the clinician.
 
 Labs collected/sent replaces the public "Overnights" wording, with UA, stool culture, and GPP shortcuts alongside the existing choices. Lab-selection reference explains strep PCR versus culture and 4plex versus RPP. A positive rapid strep paired with a strep lab, or positive rapid flu/COVID paired with 4plex/RPP, prompts a reminder unless the clinician specifically requested the lab. Entered orders are never automatically removed.
 
