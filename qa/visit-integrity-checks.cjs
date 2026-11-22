@@ -40,11 +40,11 @@ function dom(){
   function element(id = ''){
     const listeners = new Map();
     return {
-      id, dataset:{}, style:{}, children:[], hidden:false, open:false, value:'', textContent:'',
+      id, dataset:{}, style:{}, children:[], hidden:false, open:false, value:'', textContent:'', isConnected:true,
       content:{firstElementChild:{cloneNode:() => element()}},
       append(...children){ this.children.push(...children); },
       replaceChildren(...children){ this.children = children; },
-      after(){}, remove(){}, setAttribute(){}, scrollIntoView(){},
+      after(){}, remove(){ this.isConnected = false; }, setAttribute(){}, scrollIntoView(){},
       querySelector:() => null, querySelectorAll:() => [],
       addEventListener(type, fn){ listeners.set(type, fn); },
       click(){ listeners.get('click')?.(); },
@@ -69,15 +69,17 @@ function patientSource(){
 }
 
 function app(local = new MemoryStorage(), session = new MemoryStorage()){
-  const {document} = dom();
+  const {document, element} = dom();
   const mounted = [];
   const environment = {
     console, document, Math,
     window:{localStorage:local, sessionStorage:session, addEventListener(){}, scrollTo(){}},
-    setTimeout:() => 1, clearTimeout(){}
+    setTimeout:() => 1, clearTimeout(){}, scheduleMessageViewport(){}
   };
   environment.mountPatient = (root, seed, page) => {
     environment.page = page;
+    const heading = element(root.id + '_patientTitle');
+    root.querySelector = selector => selector === '[data-local-id="patientTitle"]' ? heading : null;
     const patientEnvironment = {
       console, root, seed:clone(seed), page, clone, Math, Date,
       DEFAULT_BASE:12, PHARMACY_PRESETS:['Madison', 'Westgate', 'Maple', 'Refuah'],
@@ -113,7 +115,7 @@ function app(local = new MemoryStorage(), session = new MemoryStorage()){
           office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = !!readFailed;
         },
         hasPendingOffice:() => false,
-        keepPendingOffice(){}, renderOffice(){}, renderSaveState(){}, title(){}, collapse(){}, resize(){},
+        keepPendingOffice(){ return () => {}; }, renderOffice(){}, renderSaveState(){}, title(){}, collapse(){}, resize(){},
         showVisit(){ this.visitShown = true; },
         focus(){ this.focused = true; },
         destroy(){ this.destroyed = true; },
@@ -137,6 +139,61 @@ function seedVisit(patient, id = 'visit-synthetic'){
   patient.setValues({name:'SYNTHETIC PATIENT', dob:'01/01/2000', notes:'Original note'});
   patient.setMeta({visitId:id, seenAt:1000});
 }
+
+check('Deleting an uncopied household patient removes its live form and archived visit, not the other patient', () => {
+  const a = app(), keep = a.first;
+  seedVisit(keep, 'visit-keep');
+  const cancel = a.page.addPatient(keep.root, {vals:{name:'SYNTHETIC PATIENT', notes:'Canceled'}, meta:{visitId:'visit-cancel'}}, false);
+  a.page.archiveVisit(cancel.snapshot());
+  a.page.saveDraft();
+  const original = clone(JSON.parse(a.local.getItem('hvnb_current_app_draft')).patients[0]);
+  assert.equal(a.page.removePatient(cancel.root), true);
+  assert.equal(cancel.destroyed, true);
+  assert.equal(cancel.root.isConnected, false);
+  assert.equal(a.patients.length, 1);
+  assert.equal(a.page.canRemovePatient(keep.root), false);
+  assert.equal(a.page.seenVisits().length, 1);
+  for(const [storage, key] of [[a.local,'hvnb_current_app_draft'], [a.session,'hvnb_current_draft']]){
+    const saved = JSON.parse(storage.getItem(key));
+    assert.deepEqual(saved.patients, [original]);
+    assert.equal(saved.seenVisits, undefined);
+  }
+});
+
+check('Removing a copied household patient keeps the complete latest visit and its Office record', () => {
+  const a = app(), copied = a.first;
+  seedVisit(copied, 'visit-copied');
+  copied.setMeta({...copied.snapshot().meta, sentAt:1100, sentText:copied.output(), sentVals:copied.snapshot().vals, officeId:'office-copied'});
+  const office = [{id:'office-copied', name:'SYNTHETIC PATIENT', shift:'initial', steps:[], visit:copied.snapshot()}];
+  copied.applyOffice(clone(office), true, clone(office), false);
+  a.local.setItem('hvnb_current_office', JSON.stringify(office));
+  copied.setValues({...copied.snapshot().vals, notes:'Newest synthetic answers'});
+  const keep = a.page.addPatient(copied.root, {vals:{name:'SYNTHETIC REMAINING'}, meta:{visitId:'visit-remaining'}}, false);
+  assert.equal(a.page.removalKeepsVisit(copied.root), true);
+  assert.equal(a.page.removePatient(copied.root), true);
+  assert.equal(a.first, keep);
+  const saved = JSON.parse(a.local.getItem('hvnb_current_app_draft'));
+  assert.equal(saved.seenVisits[0].meta.visitId, 'visit-copied');
+  assert.equal(saved.seenVisits[0].vals.notes, 'Newest synthetic answers');
+  assert.deepEqual(JSON.parse(a.local.getItem('hvnb_current_office')), clone(office));
+  assert.equal(a.page.seenVisits().length, 2);
+});
+
+check('A failed reduced-draft write refuses an individual patient deletion without changing either recovery copy', () => {
+  const a = app(), keep = a.first;
+  seedVisit(keep, 'visit-keep');
+  const cancel = a.page.addPatient(keep.root, {vals:{name:'SYNTHETIC CANCELED'}, meta:{visitId:'visit-cancel'}}, false);
+  const device = a.local.getItem('hvnb_current_app_draft'), session = a.session.getItem('hvnb_current_draft');
+  const write = a.local.setItem.bind(a.local);
+  a.local.setItem = (key, value) => { if(key === 'hvnb_current_app_draft') throw Error('Synthetic quota failure'); write(key, value); };
+  assert.equal(a.page.removePatient(cancel.root), false);
+  assert.equal(cancel.destroyed, false);
+  assert.equal(a.patients.length, 2);
+  assert.equal(a.local.getItem('hvnb_current_app_draft'), device);
+  assert.equal(a.session.getItem('hvnb_current_draft'), session);
+  a.local.setItem = write;
+  assert.equal(a.page.removePatient(cancel.root), true);
+});
 
 check('Office reopening preserves newer archived answers and checklist checks', () => {
   const a = app(), original = a.first;
