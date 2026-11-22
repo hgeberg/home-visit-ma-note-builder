@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.3.6">
+<meta name="note-builder-version" content="v9.3.7">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -285,6 +285,9 @@ textarea.inp{min-height:84px;resize:vertical}
 .tkind{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted)}
 .testrow .res,.testrow .sub{margin-top:10px;align-items:center}
 .test-awareness{margin-top:10px}
+.positive-flu-preference{display:grid;gap:10px;min-width:0;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.positive-flu-preference>p{margin:0}
+.positive-flu-preference>.field{min-width:0}
 .subchoice{margin-top:10px;align-items:center}
 .sublabel{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
 .hint{font-size:12.5px;font-weight:650;color:var(--warn);margin:6px 0 0 34px}
@@ -383,7 +386,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.3.6</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.3.7</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -431,7 +434,7 @@ dialog.scrim::backdrop{background:transparent}
   <div id="phoneHouseAction" class="phone-house-action"><button type="button" class="btn primary" id="phoneNewHouseBtn">New house</button></div>
   <section id="seenSection" class="seen-section" role="tabpanel" aria-labelledby="view-seen" hidden>
     <h2 id="seenHeading" tabindex="-1">Patients Seen</h2>
-    <p class="office-summary">All patients from this shift, with or without tests. Visits save automatically as you enter them and stay here until you clear the shift.</p>
+    <p class="office-summary">All patients from this shift, with or without tests. Visits save automatically as you enter them. Delete a canceled, uncopied patient from their house to remove that visit; copied visits stay here until you clear the shift.</p>
     <div class="patient-search">
       <label class="flabel" for="seenSearch">Find a saved visit</label>
       <div class="patient-search-controls"><input class="inp" type="search" id="seenSearch" placeholder="Name or DOB" autocomplete="off" aria-controls="seenList"><button type="button" class="btn small" id="clearSeenSearch">Clear search</button></div>
@@ -488,7 +491,7 @@ dialog.scrim::backdrop{background:transparent}
   <section class="patient">
     <header class="top">
       <div><h2 id="patientTitle" tabindex="-1"></h2><p class="sub">Other patients in this house stay on this page. Open earlier houses from Patients today.</p></div>
-      <div class="patient-heading-actions"><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button></div>
+      <div class="patient-heading-actions"><button type="button" class="btn small danger" id="deletePatientBtn" hidden>Delete patient</button><button type="button" class="btn small" id="collapseBtn" aria-expanded="true" aria-controls="patientBody">Collapse</button></div>
     </header>
     <div id="saveState" class="save-state" role="status"></div>
     <div id="patientBody">
@@ -1012,6 +1015,7 @@ let collapsed = seed.collapsed === true;
 let preservedAnswers = Array.isArray(seed.preservedAnswers) ? seed.preservedAnswers.filter(x => x && typeof x.label === 'string' && typeof x.value === 'string') : [];
 const clone = value => JSON.parse(JSON.stringify(value));
 let previousValues = clone(V);
+const fluPreferenceHomes = new WeakMap();
 
 function freshMeta(){ return { visitId:uid('visit-'), seenAt:null, sentAt:null, sentText:'', sentVals:null, sentAck:false, officeId:null, officeSkipped:false }; }
 function restoreMeta(value){
@@ -2050,6 +2054,8 @@ function testsField(f){
         row.append(sub);
       }
       row.append(h('div', {class:'test-awareness', hidden:true}));
+      if(rapidLabGroup(it) === 'flu') row.append(h('div', {class:'positive-flu-preference', hidden:true},
+        h('p', {class:'small', text:'Ask which flu medication the patient prefers. Treatment decisions remain with the clinician.'})));
       row.append(h('p', {class:'hint', hidden:true, data:{rapidLabWarning:''}}));
     }
     box.append(row);
@@ -2087,6 +2093,32 @@ function renderTestAwareness(row, state, visible){
   area.querySelectorAll('[data-test-aware]').forEach(button => button.setAttribute('aria-checked', state.aware === button.dataset.v ? 'true' : 'false'));
 }
 
+function positionFluPreferences(){
+  // Keep one set of fields and IDs. When the result is positive, move the
+  // existing Pharmacy choices to that test; otherwise return them to their
+  // original locations, retaining the recorded preferences in both cases.
+  const fields = ['flu_pref', 'tamiflu_form'].map(id => $('[data-field="' + id + '"]')).filter(Boolean);
+  const areas = $$('.positive-flu-preference');
+  const target = fields.length ? areas.find(area => {
+    const row = area.closest('.testrow');
+    const state = V[row.dataset.fid]?.[row.dataset.item];
+    return state?.on && state.r === 'Positive';
+  }) : null;
+  for(const area of areas) area.hidden = area !== target;
+  for(const field of fields){
+    const home = fluPreferenceHomes.get(field);
+    if(target && field.parentNode !== target){
+      if(!home){
+        const anchor = document.createComment('flu preference home');
+        field.before(anchor); fluPreferenceHomes.set(field, anchor);
+      }
+      target.append(field);
+    }else if(!target && home){
+      home.replaceWith(field); fluPreferenceHomes.delete(field);
+    }
+  }
+}
+
 /* ---------- refresh: everything that depends on the values ---------- */
 
 function filledField(control){
@@ -2112,6 +2144,7 @@ function refresh(opts){
   for(const [field, scope] of Object.entries(ctx.labRequestScopes)) if(V[field] !== scope) delete V[field];
   previousValues = clone(V);
 
+  positionFluPreferences();
   $$('[data-when]').forEach(el => {
     let w = null; try{ w = JSON.parse(el.dataset.when); }catch(e){}
     el.hidden = !whenOK(w, ctx);
@@ -2715,6 +2748,22 @@ function removeOfficeVisit(o){
 
 /* ---------- new patient ---------- */
 
+function confirmDeletePatient(){
+  if(!page.canRemovePatient(root)) return;
+  const label = $('#patientTitle').textContent;
+  const keepVisit = page.removalKeepsVisit(root);
+  sheet({title:keepVisit ? 'Remove ' + label + ' from this house?' : 'Delete ' + label + '?',
+    body:[keepVisit
+      ? 'This removes this patient’s form from the house. Their copied visit and any saved or pending Office work stay available.'
+      : 'This deletes this uncopied visit and checklist, including its entry in Patients Seen.',
+      'All other patients and their information stay unchanged.'],
+    buttons:[{label:'Cancel'}, {label:keepVisit ? 'Remove from house' : 'Delete patient', kind:'solid danger', restoreFocus:false, on:() => {
+      if(!page.removePatient(root)) sheet({title:'Patient not removed',
+        body:['The saved shift changed or could not be saved. No patient was removed. Reopen the current saved shift if another window changed it, or try again.'],
+        buttons:[{label:'OK'}]});
+    }}]});
+}
+
 function newPatient(opts){
   opts = opts || {};
   if(!hasContent(V)){ clearVisit('This patient is blank'); return; }
@@ -2829,6 +2878,7 @@ function bind(){
     buttons[next].focus({preventScroll:true});
   });
   $('#collapseBtn').addEventListener('click', () => setCollapsed(!collapsed));
+  $('#deletePatientBtn').addEventListener('click', confirmDeletePatient);
   $('#newBtn').addEventListener('click', () => newPatient());
   $('#addPatientBtn').addEventListener('click', () => page.addPatient(root));
   $('#nextHouseBtn').addEventListener('click', page.newHouse);
@@ -2869,7 +2919,11 @@ return {
   layoutImpact:(layout, migrations) => affectedAnswers(layout, migrations).map(a => a.label),
   renderSaveState,
   hasPendingOffice:() => pendingOfficeSync.length > 0,
-  keepPendingOffice:list => { pendingOfficeSync.push(...restorePendingOffice(list, false)); },
+  keepPendingOffice:list => {
+    const added = new Set(restorePendingOffice(list, false));
+    pendingOfficeSync.push(...added);
+    return () => { pendingOfficeSync = pendingOfficeSync.filter(copy => !added.has(copy)); };
+  },
   restoreOfficeRecovery:recovery => {
     office = normalizeOffice(recovery.values);
     officeBaseline = normalizeOffice(recovery.baseline);
@@ -2881,13 +2935,15 @@ return {
       JSON.stringify(entry.visit) !== JSON.stringify(saved.get(entry.id)));
     renderOfficePanel(); updateBadges();
   },
-  title:(number) => {
+  title:(number, removable) => {
     const name = String(V.name || '').trim();
     $('#patientTitle').textContent = 'Patient ' + number + (name ? ' · ' + name : '');
     const label = 'Patient ' + number + (name ? ', ' + name : '');
     $('#output').setAttribute('aria-label', label + ' Teams message');
     $('#copyBtn').setAttribute('aria-label', 'Copy message for ' + label);
     $('#newBtn').setAttribute('aria-label', 'Clear ' + label);
+    $('#deletePatientBtn').hidden = !removable;
+    $('#deletePatientBtn').setAttribute('aria-label', 'Delete ' + label);
     $('#addPatientBtn').setAttribute('aria-label', 'Add another patient after ' + label);
   },
   focus:focusPatient,
@@ -3052,6 +3108,7 @@ function createPatientPage(){
         button.disabled = !!activeCopy;
         button.textContent = activeCopy ? 'Copy in progress…' : 'Copy message';
       }
+      for(const button of host.querySelectorAll('[data-local-id="deletePatientBtn"]')) button.disabled = activeCopy?.root === button.closest('.patient');
     },
     beginCopy:root => {
       if(activeCopy || !page.isCurrentShift()) return null;
@@ -3173,6 +3230,55 @@ function createPatientPage(){
     },
     houseIds:() => [...new Set(patients.map(p => p.root.dataset.houseId))],
     housePatients:() => patients.filter(p => p.root.dataset.houseId === activeHouseId),
+    canRemovePatient:root => {
+      const house = page.housePatients();
+      return house.length > 1 && house.some(p => p.root === root) && activeCopy?.root !== root;
+    },
+    removalKeepsVisit:root => {
+      const patient = patients.find(p => p.root === root);
+      if(!patient) return false;
+      const {meta} = patient.serialize(), id = patient.visitId();
+      const office = patients[0].getOffice();
+      return !!(meta.sentAt || meta.officeId || [...office.values, ...office.baseline].some(o => o.visit?.meta?.visitId === id)
+        || patients.some(p => (p.serialize().pendingOfficeSync || []).some(copy => copy.meta?.visitId === id || copy.visit?.meta?.visitId === id)));
+    },
+    removePatient:root => {
+      if(!page.canRemovePatient(root) || !page.canUpdateVisit()) return false;
+      const house = page.housePatients(), index = house.findIndex(p => p.root === root);
+      const patient = house[index], neighbor = house[index + 1] || house[index - 1];
+      const remaining = patients.filter(p => p !== patient), snapshot = patientSnapshot(patient);
+      const keepVisit = page.removalKeepsVisit(root);
+      let history = archivedVisits.filter(visit => visitIdentity(visit) !== patient.visitId());
+      if(keepVisit){
+        if(snapshotHasContent(snapshot)) history.push(clone({...snapshot, meta:{...snapshot.meta, seenAt:snapshot.meta.seenAt || Date.now()}}));
+        else history = archivedVisits.slice();
+      }
+      // A cleared form can still own pending Office copies from earlier visits.
+      // Transfer them before saving, so removing the form never loses that work.
+      const rollbackPending = remaining[0].keepPendingOffice(clone(patient.serialize().pendingOfficeSync || []));
+      // Publish the reduced draft only if the current device copy can be updated.
+      // On failure leave every live form and recovery copy intact.
+      if(!page.saveDraft({patients:remaining, history, requireDevice:true})){
+        rollbackPending();
+        if(root.isConnected) page.saveDraftSoon();
+        return false;
+      }
+      patients = remaining;
+      archivedVisits = history;
+      seenSignature = '';
+      page.clearUndo();
+      patient.destroy();
+      root.remove();
+      patients[0].renderOffice();
+      page.updateTitles();
+      page.updateOfficeStatus();
+      page.updateCopyButtons();
+      status.textContent = keepVisit ? 'Patient removed from this house. The copied visit stays in Patients Seen.' : 'Patient deleted from this house and Patients Seen.';
+      neighbor.root.querySelector('[data-local-id="patientTitle"]').focus({preventScroll:true});
+      neighbor.root.scrollIntoView({block:'start'});
+      scheduleMessageViewport();
+      return true;
+    },
     showHouse:(houseId, scroll = true) => {
       if(!page.isCurrentShift() || !page.houseIds().includes(houseId)) return;
       const changedHouse = activeHouseId !== houseId;
@@ -3250,10 +3356,10 @@ function createPatientPage(){
     },
     hasPatients:() => patients.length > 0,
     updateTitles:() => {
-      patients.forEach((p, i) => p.title(i + 1));
       const houses = page.houseIds();
       const current = page.housePatients();
       const count = current.length;
+      patients.forEach((p, i) => p.title(i + 1, count > 1 && p.root.dataset.houseId === activeHouseId));
       document.querySelector('#houseHeading').textContent = 'House ' + (houses.indexOf(activeHouseId) + 1);
       document.querySelector('#houseSummary').textContent = count + (count === 1 ? ' patient' : ' patients') + ' in this house · Only this house is shown.';
       page.renderHouseNav(current);
@@ -3402,20 +3508,21 @@ function createPatientPage(){
       }
     },
     saveDraftSoon:() => { clearTimeout(timer); timer = setTimeout(page.saveDraft, 350); },
-    saveDraft:() => {
+    saveDraft:(options = {}) => {
       clearTimeout(timer);
-      if(held) return;
-      if(!page.isCurrentShift()) return;
-      const state = patients[0].getOffice();
+      if(held) return false;
+      if(!page.isCurrentShift()) return false;
+      const draftPatients = options.patients || patients, draftHistory = options.history || archivedVisits;
+      const state = draftPatients[0].getOffice();
       const officeRecovery = !state.writable ? {values:state.values, baseline:state.baseline, readFailed:state.readFailed,
         ...(state.visitChanges ? {visitChanges:true} : {})} : null;
-      const pending = officeRecovery || patients.some(p => p.hasPendingOffice());
-      const liveIds = new Set(patients.map(p => p.visitId()));
-      const history = archivedVisits.filter(visit => !liveIds.has(visitIdentity(visit)));
-      const empty = patients.length === 1 && !patients[0].hasContent() && !pending && !history.length;
-      const layout = patients[0].getLayout(), serializedLayout = JSON.stringify(layout);
+      const pending = officeRecovery || draftPatients.some(p => p.hasPendingOffice());
+      const liveIds = new Set(draftPatients.map(p => p.visitId()));
+      const history = draftHistory.filter(visit => !liveIds.has(visitIdentity(visit)));
+      const empty = draftPatients.length === 1 && !draftPatients[0].hasContent() && !pending && !history.length;
+      const layout = draftPatients[0].getLayout(), serializedLayout = JSON.stringify(layout);
       const snapshot = {version:4, revision:Date.now().toString(36) + '-' + Math.random().toString(36).slice(2), shift:generation, t:Date.now(), activeHouseId, layout,
-        patients:patients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId,
+        patients:draftPatients.map(p => ({...p.serialize(), houseId:p.root.dataset.houseId,
           ...(JSON.stringify(p.getLayout()) !== serializedLayout ? {layout:p.getLayout()} : {})})),
         ...(history.length ? {seenVisits:history.map(visit => { const saved = {...visit}; if(JSON.stringify(saved.layout) === serializedLayout) delete saved.layout; return saved; })} : {}),
         ...(officeRecovery ? {officeRecovery} : {})};
@@ -3439,11 +3546,20 @@ function createPatientPage(){
           appSaved = true;
         }
       }catch(e){}
+      if(options.requireDevice === true && !appSaved){
+        renderDraftWarning(appConflict ? 'conflict' : 'unavailable');
+        return false;
+      }
       try{
         if(serialized === null) window.sessionStorage.removeItem(key);
         else window.sessionStorage.setItem(key, JSON.stringify({...sessionSnapshot, appDraftBase:appDraftSourceBase}));
-      }catch(e){}
+      }catch(e){
+        // After a confirmed deletion, prefer the saved device copy to a stale
+        // session recovery copy that still contains the removed patient.
+        if(options.requireDevice === true) try{ window.sessionStorage.removeItem(key); }catch(e){}
+      }
       renderDraftWarning(appSaved ? 'current' : appConflict ? 'conflict' : 'unavailable');
+      return appSaved;
     },
     addPatient:(after, seed = {}, focus = true, keepSavedLayout = false) => {
       if(!page.isCurrentShift()) return;
