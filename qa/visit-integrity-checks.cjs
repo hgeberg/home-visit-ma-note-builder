@@ -114,6 +114,7 @@ function app(local = new MemoryStorage(), session = new MemoryStorage()){
         applyOffice:(values, writable, baseline, readFailed) => {
           office = values; officeWritable = writable; officeBaseline = baseline; officeReadFailed = !!readFailed;
         },
+        officeIncomplete:() => office.filter(entry => entry.completed !== true).map(entry => ({id:entry.id, name:entry.name})),
         hasPendingOffice:() => false,
         keepPendingOffice(){ return () => {}; }, renderOffice(){}, renderSaveState(){}, title(){}, collapse(){}, resize(){},
         showVisit(){ this.visitShown = true; },
@@ -340,6 +341,70 @@ check('The copied-edit dialog keeps focus on the newly added patient', () => {
   assert.equal(environment.V.name, 'ORIGINAL PATIENT');
   assert.equal(Array.from(environment.M.recentFields).join(','), 'f_weight');
   assert.equal(environment.document.activeElement.id, newTitle.id);
+});
+
+check('Clear-shift review groups Incomplete Office patients into one entry that opens Office', () => {
+  const a = app();
+  const office = [
+    {id:'office-open', name:'SYNTHETIC OPEN LABS', shift:'initial', overnights:'RPP', steps:[]},
+    {id:'office-unnamed', name:'', shift:'initial', overnights:'RPP', steps:[]},
+    {id:'office-done', name:'SYNTHETIC DONE LABS', shift:'initial', overnights:'RPP', steps:[], completed:true}
+  ];
+  a.first.applyOffice(clone(office), true, clone(office), false);
+  const items = a.page.reviewItems().filter(item => item.officeIncomplete);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].name, 'Office: 2 patients still Incomplete');
+  assert.equal(items[0].detail, 'SYNTHETIC OPEN LABS, Name not entered');
+  assert.deepEqual(Array.from(items[0].reasons), ['Clearing the shift removes these Office entries']);
+  a.page.renderShiftReview();
+  const button = a.document.querySelector('#shiftReviewList').children.flatMap(li => li.children).find(node => node.dataset.reviewItem === 'office-incomplete');
+  a.page.showPatients();
+  assert.equal(a.document.querySelector('#officeSection').hidden, true);
+  button.click();
+  assert.equal(a.document.querySelector('#officeSection').hidden, false, 'The entry opens the Office list');
+  office.forEach(entry => { entry.completed = true; });
+  a.first.applyOffice(clone(office), true, clone(office), false);
+  assert.equal(a.page.reviewItems().some(item => item.officeIncomplete), false);
+});
+
+check('Office entries name one shared layout: stored once, read by another window, and never without a usable form', () => {
+  const key = 'hvnb_current_office_layouts';
+  const a = app(), layout = clone(a.first.getLayout());
+  const id = a.page.officeLayoutId(layout);
+  assert.equal(a.page.officeLayoutId(clone(layout)), id, 'The same layout keeps its id');
+  const changed = clone(layout); changed.sections[0].title += ' (synthetic change)';
+  const changedId = a.page.officeLayoutId(changed);
+  assert.notEqual(changedId, id);
+  assert.equal(a.local.getItem(key), null, 'Naming a layout stores nothing by itself');
+  a.page.saveOfficeLayouts([{id:'office-a', visit:{layoutId:id}}, {id:'office-b', visit:{layoutId:id}}, {id:'office-own', visit:{layout}}, {id:'office-older'}]);
+  assert.deepEqual(JSON.parse(a.local.getItem(key)), {[id]:layout}, 'Only layouts that entries name are stored, once each');
+  const stored = a.local.getItem(key);
+  a.page.saveOfficeLayouts([{id:'office-a', visit:{layoutId:id}}]);
+  assert.equal(a.local.getItem(key), stored, 'A stored layout is not written again');
+
+  const b = app(a.local);
+  assert.deepEqual(clone(b.page.officeLayout(id)), layout, 'Another window reads the stored layout');
+  assert.equal(b.page.officeLayoutId(clone(layout)), id, 'and names the same layout by the stored id');
+  const write = a.local.setItem.bind(a.local);
+  a.local.setItem = (name, value) => { if(name === key) throw Error('Synthetic quota failure'); write(name, value); };
+  assert.throws(() => a.page.saveOfficeLayouts([{id:'office-c', visit:{layoutId:changedId}}]), /Synthetic quota failure/, 'A failed layout write fails the Office save that asked for it');
+  a.local.setItem = write;
+  a.page.saveOfficeLayouts([{id:'office-c', visit:{layoutId:changedId}}]);
+  assert.deepEqual(JSON.parse(a.local.getItem(key)), {[id]:layout, [changedId]:changed});
+  assert.deepEqual(clone(b.page.officeLayout(changedId)), changed, 'A layout stored later is found without reloading');
+
+  const visit = {version:1, vals:{name:'SYNTHETIC PATIENT'}, meta:{visitId:'visit-shared', officeId:'office-a'}, layoutId:changedId};
+  b.first.applyOffice([{id:'office-a', name:'SYNTHETIC PATIENT', shift:'initial', overnights:'RPP', steps:[], visit:clone(visit)}], true, [], false);
+  const saved = clone(b.page.savedOfficeVisit('office-a'));
+  assert.deepEqual(saved.layout, changed, 'A saved visit opens with the layout it was copied with');
+  assert.equal(saved.layoutId, undefined);
+  assert.deepEqual(clone(b.page.officeVisitLayout({layout})), layout, 'An entry from an earlier version keeps its own layout');
+  assert.deepEqual(clone(b.page.officeVisitLayout({layoutId:'layout-synthetic-lost'})), clone(b.first.getLayout()), 'A lost layout falls back to the current form');
+  assert.equal(b.page.officeVisitLayout({}), null, 'An entry saved without a form stays unavailable');
+  b.page.keepOfficeVisits();
+  const kept = b.page.seenVisits().find(entry => entry.visit.meta.visitId === 'visit-shared');
+  assert.deepEqual(clone(kept.visit.layout), changed, 'Patients Seen keeps the visit with its layout');
+  assert.equal(kept.visit.layoutId, undefined);
 });
 
 console.log(passed + '/' + (passed + failed) + ' visit integrity checks passed.');

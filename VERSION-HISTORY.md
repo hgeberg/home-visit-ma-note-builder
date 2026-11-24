@@ -1,5 +1,17 @@
 # Home Visit MA Note Builder versions
 
+## v9.4.0: Shortcuts ask before replacing answers, and shifts are easier to end (November 24, 2026)
+
+A one-tap shortcut that fills a field, such as NKDA, None, N/A or a duration, used to replace whatever the field held. It now asks first when that would discard an answer that was typed or built from other choices: the prompt shows the entered text and offers Keep what is entered or Replace. Empty fields, the shortcut’s own value, and switching between one-tap values of the same field change without a prompt, and shortcuts that add to a list never ask. On a copied visit, confirming a replacement is followed by the usual same-patient question, and undoing it restores the typed answer.
+
+The Clear shift review now lists Office patients that are still Incomplete as one entry with their names and a link to the Incomplete list. Before, a shift with unfinished Office work could report nothing to review, and Clear everything removed those entries.
+
+A shift never ends by itself. When the saved shift was last saved on an earlier calendar day and at least four hours ago, the app offers Review and clear shift. After reopening, it is the first choice in the saved-shift prompt, ahead of Restore and Start fresh. With only earlier Patients Seen visits and a blank form, or on a page that stayed open and is used again, it appears as its own prompt with Keep this shift. It is offered at most once a day, never over another dialog, and never from a window whose saved shift another window has changed. The four-hour gap keeps a shift that runs past midnight uninterrupted. Nothing is cleared until Clear everything is confirmed in the review, and saved shifts of any age can still be restored.
+
+Office entries no longer each store a copy of the form layout, which was about 11,800 of the 14,000 characters in every entry. Each distinct layout is stored once under `hvnb_current_office_layouts` and entries name it. The layout is written before the list, so a stored entry always has its layout; a failed layout write fails that Office save and is retried with it, and the recovery copy carries the layouts its unsaved entries name. A lost layout copy falls back to the current form instead of hiding the visit. Entries saved by earlier versions keep their own copy and are converted when the patient is copied again. Clear shift removes the stored layouts with the Office list. In a synthetic 50-patient shift on the test machine, the stored Office list went from about 704,000 to 126,000 characters and the work after pressing Copy from about 1.2 seconds to 0.24.
+
+Release metadata and the offline cache advance together. Validation adds 24 checks across shortcut replacement, shift review, shift age and Office layouts; each new safeguard was removed in turn to confirm that its check fails. Physical iPad behavior remains outside automated coverage.
+
 ## v9.3.7 — Delete a canceled patient and record positive-flu medication preferences (November 22, 2026)
 
 Multi-patient houses have a Delete patient button on each patient’s header, including collapsed forms. Confirming deletion of an uncopied visit removes only that patient’s form, checklist and Patients Seen entry. Removing an already copied visit from the house retains its history and Office work. The app preserves the remaining patients and house grouping, transfers pending earlier Office copies, and refuses to delete from a stale or unwritable saved shift. Release metadata and the offline cache advance together.
