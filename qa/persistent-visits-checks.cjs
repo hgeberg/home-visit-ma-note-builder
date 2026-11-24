@@ -221,18 +221,29 @@ test('Undo after typing a new patient retains the pending copied visit snapshot 
   assert.equal(await linked.locator('[data-local-id="f_notes"]').inputValue(), 'SYNTHETIC UNCOPIED CHANGE');
 });
 
-test('An archived visit with a different saved layout retains edited legacy answers through another reopening', async (page, context, url) => {
+// Entries from earlier versions carry their own layout; current entries name one in the shared table.
+for (const ownCopy of [true, false]) test('An archived visit with a different saved layout ' + (ownCopy ? 'in its own entry' : 'in the shared layout table') + ' retains edited legacy answers through another reopening', async (page, context, url) => {
   const name = 'SYNTHETIC CUSTOM LEGACY';
   await seed(page, name);
   await copy(page);
-  await page.evaluate(() => {
+  await page.evaluate(ownCopy => {
     const entries = JSON.parse(localStorage.getItem('hvnb_current_office'));
+    const layouts = JSON.parse(localStorage.getItem('hvnb_current_office_layouts'));
     const savedVisit = entries[0].visit;
-    savedVisit.layout.sections[0].fields.push({id:'synthetic_extra', type:'text', label:'Synthetic legacy answer'});
+    const layout = JSON.parse(JSON.stringify(layouts[savedVisit.layoutId]));
+    layout.sections[0].fields.push({id:'synthetic_extra', type:'text', label:'Synthetic legacy answer'});
+    if (ownCopy) {
+      savedVisit.layout = layout;
+      delete savedVisit.layoutId;
+    } else {
+      savedVisit.layoutId = 'layout-synthetic-legacy';
+      layouts[savedVisit.layoutId] = layout;
+      localStorage.setItem('hvnb_current_office_layouts', JSON.stringify(layouts));
+    }
     savedVisit.vals.synthetic_extra = 'SYNTHETIC LEGACY VALUE';
     savedVisit.meta.sentVals.synthetic_extra = 'SYNTHETIC LEGACY VALUE';
     localStorage.setItem('hvnb_current_office', JSON.stringify(entries));
-  });
+  }, ownCopy);
   await checkpoint(page);
   await page.close();
 

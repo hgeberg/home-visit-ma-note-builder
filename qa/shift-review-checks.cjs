@@ -13,7 +13,10 @@ const patient = (page, n = 0) => page.locator('#patients .patient').nth(n);
 const local = (page, id, n = 0) => patient(page, n).locator('[data-local-id="' + id + '"]');
 const historyButtons = page => page.locator('#patientJumps button:visible');
 const historyEntry = (page, name) => historyButtons(page).filter({hasText:name});
-const reviewEntry = (page, name) => page.locator('#shiftReviewList button').filter({hasText:name});
+// Per-patient review entries. The grouped Incomplete Office entry also names patients, so it has its own locator.
+const reviewEntry = (page, name) => page.locator('#shiftReviewList button:not([data-review-item="office-incomplete"])').filter({hasText:name});
+const officeReview = page => page.locator('#shiftReviewList button[data-review-item="office-incomplete"]');
+const officeCompleted = (page, name) => page.locator('#officeContent .office-patient').filter({hasText:name}).getByRole('checkbox', {name:'Completed', exact:true});
 
 async function seed(page, name, n = 0, dob = '01012000') {
   await local(page, 'f_name', n).fill(name);
@@ -194,6 +197,66 @@ test('A cleared copied form retains its failed Office save under the original na
   assert.equal(await page.locator('#officeSection').isVisible(), true);
   assert.match(await page.locator('#officeContent').innerText(), /SYNTHETIC CLEARED PENDING COPY/);
   assert.equal(await local(page, 'f_name').inputValue(), '');
+});
+
+test('Incomplete Office patients are listed before clearing, open the Incomplete list, and drop off once Completed', async page => {
+  await seed(page, 'SYNTHETIC LABS ALPHA');
+  await local(page, 'f_overnights').fill('RPP'); await copy(page);
+  await page.locator('#appendPatient').click();
+  await seed(page, 'SYNTHETIC LABS BETA', 1);
+  await local(page, 'f_overnights', 1).fill('Urine culture'); await copy(page, 1);
+  await page.locator('#appendPatient').click();
+  await seed(page, 'SYNTHETIC NO LABS', 2); await copy(page, 2);
+  await review(page);
+  assert.equal(await page.locator('#shiftReviewList button').count(), 1, 'Copied visits are finished; their unfinished Office work is the one item');
+  let text = await officeReview(page).innerText();
+  assert.match(text, /Office: 2 patients still Incomplete/);
+  assert.match(text, /SYNTHETIC LABS ALPHA, SYNTHETIC LABS BETA/);
+  assert.doesNotMatch(text, /SYNTHETIC NO LABS/);
+  assert.match(text, /Clearing the shift removes these Office entries/);
+  assert.match(await page.locator('#shiftReviewSummary').innerText(), /^1 item to review before clearing/);
+  await officeReview(page).click();
+  assert.equal(await page.locator('#clearShiftDialog').isVisible(), false);
+  assert.equal(await page.locator('#officeSection').isVisible(), true);
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.localId), 'office_incomplete');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office')).length), 2, 'Opening the item clears nothing');
+  await officeCompleted(page, 'SYNTHETIC LABS ALPHA').check();
+  await review(page);
+  text = await officeReview(page).innerText();
+  assert.match(text, /Office: 1 patient still Incomplete/);
+  assert.match(text, /SYNTHETIC LABS BETA/);
+  assert.doesNotMatch(text, /SYNTHETIC LABS ALPHA/);
+  assert.match(text, /Clearing the shift removes this Office entry/);
+  await page.locator('#cancelClearShift').click();
+  await officeCompleted(page, 'SYNTHETIC LABS BETA').check();
+  await review(page);
+  assert.equal(await page.locator('#shiftReviewList button').count(), 0);
+  assert.match(await page.locator('#shiftReviewSummary').innerText(), /^No uncopied messages.*Incomplete Office patients/);
+  await page.locator('#confirmClearShift').click();
+  assert.equal(await page.locator('#clearShiftDialog').isVisible(), false);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('hvnb_current_office') || '[]')), [], 'Clear everything still removes Completed entries');
+});
+
+test('The Office review entry follows the Office list: older entries count, Completed ones do not, and long lists are shortened', async page => {
+  await page.evaluate(() => {
+    const entry = (n, extra = {}) => ({id:'v-synthetic-' + n, name:'SYNTHETIC OFFICE ' + n, dob:'01/01/2000', t:1700000000000 + n * 60000, shift:'initial', overnights:'RPP', steps:[], ...extra});
+    const list = [8, 7, 6, 5, 4, 3, 2, 1].map(n => entry(n));
+    // Saved by an earlier version without lab names, and one entry without a name.
+    delete list.find(saved => saved.id === 'v-synthetic-2').overnights;
+    list.find(saved => saved.id === 'v-synthetic-3').name = '';
+    list.push(entry(9, {completed:true}), entry(10, {overnights:'None'}));
+    localStorage.setItem('hvnb_current_office', JSON.stringify(list));
+  });
+  await page.reload(); await patient(page).waitFor();
+  await page.locator('#view-office').click();
+  const shown = await page.locator('[data-office-status="incomplete"] .office-patient .visit-name').allInnerTexts();
+  assert.deepEqual(shown, ['SYNTHETIC OFFICE 1', 'Name not entered', 'SYNTHETIC OFFICE 4', 'SYNTHETIC OFFICE 5', 'SYNTHETIC OFFICE 6', 'SYNTHETIC OFFICE 7', 'SYNTHETIC OFFICE 8', 'SYNTHETIC OFFICE 2']);
+  await review(page);
+  const text = await officeReview(page).innerText();
+  assert.match(text, /Office: 8 patients still Incomplete/);
+  assert.ok(text.includes(shown.slice(0, 6).join(', ') + ' and 2 more'), 'The first six names match the Office list order: ' + text);
+  assert.doesNotMatch(text, /SYNTHETIC OFFICE (8|2|9|10)\b/);
+  assert.equal(await page.locator('#shiftReviewList button').count(), 1);
 });
 
 test('Cancel and Escape keep patient work; confirming clear resets search and all patient work', async page => {
