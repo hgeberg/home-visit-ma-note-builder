@@ -34,7 +34,7 @@ try {
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <meta name="note-builder-app" content="shell">
-<meta name="note-builder-version" content="v9.4.0">
+<meta name="note-builder-version" content="v9.4.1">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Home Visit MA Note Builder</title>
 <style>
@@ -386,7 +386,7 @@ dialog.scrim::backdrop{background:transparent}
 <main class="app">
   <header class="top"><div>
     <h1>Home Visit MA Note Builder</h1>
-    <p class="sub"><b>v9.4.0</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
+    <p class="sub"><b>v9.4.1</b> · All visits save on this device in Patients Seen. Copy a message with labs collected/sent to also save it to Office.</p>
     <p class="sub"><a href="previous-version.html" target="_blank" rel="noopener">Open original v8.7</a> · <a href="backups/before-office-overnights-2026-10-11/index.html" target="_blank" rel="noopener">Open previous v8.8</a></p>
   </div><button type="button" class="btn theme-toggle" id="themeToggle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.6 13.2A8.8 8.8 0 0 1 10.8 3.4a9 9 0 1 0 9.8 9.8Z"/></svg><span>Dark mode</span></button></header>
   <div class="offline-status small"><span id="offlineStatus" role="status">Preparing offline access…</span><button type="button" class="btn small" id="retryOffline" hidden>Retry offline setup</button></div>
@@ -481,8 +481,12 @@ dialog.scrim::backdrop{background:transparent}
   <ul id="shiftReviewList" class="shift-review-list"></ul>
   <p>This removes every patient form, Patients Seen visit, saved draft and Office entry, including unfinished information. It starts one blank patient for your next shift. Your layout settings stay.</p>
   <p>Other tabs running this version in the same browser will also reset. This cannot be undone.</p>
+  <p class="small">Optional: save a PDF summary of every visit in Patients Seen before clearing. On iPad, choose Save to Files in the share sheet, then return here to clear the shift.</p>
+  <p id="shiftPdfStatus" class="small" role="status" aria-live="polite"></p>
   <div id="clearShiftError" class="err" role="alert"></div>
   <div class="btns">
+    <button type="button" class="btn primary" id="saveShiftPdfBtn">Save shift summary PDF</button>
+    <a class="btn" id="downloadShiftPdf" target="_blank" rel="noopener" hidden>Open / download PDF</a>
     <button type="button" class="btn" id="cancelClearShift" autofocus>Cancel</button>
     <button type="button" class="btn solid danger" id="confirmClearShift">Clear everything</button>
   </div>
@@ -717,6 +721,151 @@ function fmtDayTime(t){
 }
 
 function fmtDay(t){ try{ return new Date(t).toLocaleDateString([], {weekday:'long', month:'short', day:'numeric'}); }catch(e){ return 'an earlier day'; } }
+
+// Build a PDF entirely on the device. Canvas preserves the names, symbols and
+// scripts the browser can render, without fetching fonts, libraries or patient data.
+function makeShiftSummaryPdf(visits){
+  const W = 612, H = 792, scale = 2, margin = 38, bottom = H - 45;
+  const pages = [];
+  const dates = visits.map(v => Number(v.meta?.seenAt)).filter(t => Number.isFinite(t) && t > 0).sort((a,b) => a-b);
+  const date = t => new Date(t).toLocaleDateString([], {year:'numeric', month:'short', day:'numeric'});
+  const localDateKey = t => {
+    const d = new Date(t);
+    return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
+  };
+  const first = dates[0] || Date.now(), last = dates[dates.length-1] || first;
+  const period = date(first) + (localDateKey(first) === localDateKey(last) ? '' : ' - ' + date(last));
+  const filename = 'Patient-summary-' + localDateKey(first) +
+    (localDateKey(first) === localDateKey(last) ? '' : '-to-' + localDateKey(last)) + '.pdf';
+  const bodyFont = '11px Arial, sans-serif', titleFont = 'bold 14px Arial, sans-serif';
+  let canvas, ctx, y, patientNumber = 0;
+  function write(text, x, baseline, font, color = '#15202b'){
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'left';
+    ctx.fillText(text, x, baseline);
+  }
+  function startPage(continued = false){
+    canvas = document.createElement('canvas'); canvas.width = W*scale; canvas.height = H*scale;
+    ctx = canvas.getContext('2d', {alpha:false});
+    if(!ctx) throw Error('PDF rendering unavailable');
+    ctx.scale(scale, scale); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+    write('Daily patient summary', margin, 45, 'bold 22px Arial, sans-serif', '#142c49');
+    write(period + '  |  ' + visits.length + (visits.length === 1 ? ' visit' : ' visits'), margin, 66, '12px Arial, sans-serif', '#475569');
+    ctx.strokeStyle = '#cbd5e1'; ctx.beginPath(); ctx.moveTo(margin,78); ctx.lineTo(W-margin,78); ctx.stroke();
+    y = 98;
+    if(continued){ write('Patient ' + patientNumber + ' (continued)', margin, y, titleFont); y += 20; }
+  }
+  function finishPage(){
+    write('Confidential patient summary', margin, H-24, '9px Arial, sans-serif', '#475569');
+    ctx.font = '9px Arial, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#475569';
+    ctx.fillText('Page ' + (pages.length+1), W-margin, H-24);
+    const url = canvas.toDataURL('image/jpeg', 0.90);
+    if(!url.startsWith('data:image/jpeg;base64,')) throw Error('PDF page generation failed');
+    const decoded = atob(url.slice(url.indexOf(',')+1));
+    pages.push(Uint8Array.from(decoded, c => c.charCodeAt(0)));
+    // Release the full-sized bitmap before rendering the next page.
+    canvas.width = canvas.height = 1;
+  }
+  function ensure(height, continued = true){
+    if(y + height <= bottom) return;
+    finishPage(); startPage(continued);
+  }
+  function wrap(text, font){
+    ctx.font = font;
+    const max = W-2*margin, lines = [];
+    for(const para of String(text).split(/\r?\n/)){
+      let line = '';
+      for(const word of para.trim().split(/\s+/).filter(Boolean)){
+        const candidate = line ? line + ' ' + word : word;
+        if(ctx.measureText(candidate).width <= max){ line = candidate; continue; }
+        if(line){ lines.push(line); line = ''; }
+        for(const ch of word){
+          if(line && ctx.measureText(line + ch).width > max){ lines.push(line); line = ''; }
+          line += ch;
+        }
+      }
+      if(line) lines.push(line);
+    }
+    return lines;
+  }
+  function block(text, font = bodyFont, leading = 15){
+    for(const line of wrap(text, font)){
+      ensure(leading); write(line, margin, y, font); y += leading;
+    }
+  }
+  const entered = value => typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
+  startPage();
+  visits.forEach((visit, index) => {
+    patientNumber = index+1;
+    const v = visit.vals || {};
+    const field = (label, value) => { const val = entered(value); if(val) block(label + ': ' + val); };
+    const combined = (label, pairs) => {
+      const detail = pairs.map(([key,value]) => entered(value) ? key + ' ' + entered(value) : '').filter(Boolean);
+      if(detail.length) block(label + ': ' + detail.join('  |  '));
+    };
+    ensure(65, false);
+    if(y > 98){
+      ctx.strokeStyle = '#e2e8f0'; ctx.beginPath(); ctx.moveTo(margin,y-3); ctx.lineTo(W-margin,y-3); ctx.stroke();
+      y += 13;
+    }
+    block(patientNumber + '. ' + (entered(v.name) || 'Unnamed patient'), titleFont, 19);
+    const seenAt = Number(visit.meta?.seenAt);
+    combined('Visit', [['DOB',v.dob], ['Entered',Number.isFinite(seenAt) && seenAt > 0 ? date(seenAt) + ', ' + fmtTime(seenAt) : '']]);
+    combined('Symptoms', [['',v.symptoms], ['Duration:',v.duration]]);
+    combined('History', [['Allergies:',v.allergies], ['Conditions:',v.history], ['Daily meds:',v.meds],
+      ['Recent antibiotics:',[entered(v.abx_name), entered(v.abx_when)].filter(Boolean).join(', ') || entered(v.abx)]]);
+    const height = [entered(v.height_ft) && entered(v.height_ft)+' ft', entered(v.height_in) && entered(v.height_in)+' in'].filter(Boolean).join(' ');
+    combined('Vitals', [['Temp',v.temp], ['HR',v.hr], ['O2',v.o2], ['BP',v.bp], ['Weight',v.weight], ['Height',height]]);
+    const tests = [];
+    for(const section of visit.layout?.sections || []){
+      if(section.tab !== 'visit') continue;
+      for(const f of section.fields || []){
+        if(f.type !== 'tests') continue;
+        for(const test of f.items || []){
+          const state = v[f.id]?.[test.id];
+          if(!state?.on) continue;
+          const result = test.kind === 'done' ? 'Performed' : entered(state.r) || 'Result not entered';
+          tests.push(test.n + ': ' + (result === 'running' ? 'Running' : result) +
+            (state.r === 'Positive' && entered(state.s) ? ' ' + entered(state.s) : '') +
+            (state.r === 'Positive' && entered(state.aware) ? ' (' + entered(state.aware) + ')' : ''));
+        }
+      }
+    }
+    block('Tests: ' + (tests.length ? tests.join('  |  ') : 'None recorded'));
+    field('Labs collected/sent',v.overnights);
+    field('Notes',v.notes);
+    y += 10;
+  });
+  finishPage();
+
+  // A minimal PDF document with JPEG page streams. All cross-reference
+  // offsets and stream lengths are counted in bytes, not JavaScript characters.
+  const chunks = [], offsets = [0], enc = new TextEncoder();
+  let length = 0;
+  const append = value => {
+    const bytes = typeof value === 'string' ? enc.encode(value) : value;
+    chunks.push(bytes); length += bytes.length;
+  };
+  const object = (id, value, stream) => {
+    offsets[id] = length;
+    append(id + ' 0 obj\n' + value);
+    if(stream){ append('\nstream\n'); append(stream); append('\nendstream'); }
+    append('\nendobj\n');
+  };
+  append('%PDF-1.4\n'); append(new Uint8Array([37,226,227,207,211,10]));
+  object(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  object(2, '<< /Type /Pages /Count ' + pages.length + ' /Kids [' + pages.map((_,i) => (3+i*3)+' 0 R').join(' ') + '] >>');
+  pages.forEach((image,i) => {
+    const id = 3+i*3, commands = enc.encode('q '+W+' 0 0 '+H+' 0 0 cm /Im0 Do Q\n');
+    object(id, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /XObject << /Im0 '+(id+2)+' 0 R >> >> /Contents '+(id+1)+' 0 R >>');
+    object(id+1, '<< /Length '+commands.length+' >>', commands);
+    object(id+2, '<< /Type /XObject /Subtype /Image /Width '+(W*scale)+' /Height '+(H*scale)+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+image.length+' >>', image);
+  });
+  const xref = length;
+  append('xref\n0 '+offsets.length+'\n0000000000 65535 f \n');
+  for(let i=1;i<offsets.length;i++) append(String(offsets[i]).padStart(10,'0')+' 00000 n \n');
+  append('trailer\n<< /Size '+offsets.length+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF\n');
+  return {blob:new Blob(chunks,{type:'application/pdf'}), filename};
+}
 
 function store(kind){ try{ return kind === 'local' ? window.localStorage : window.sessionStorage; }catch(e){ return null; } }
 function readJSON(kind, key){
@@ -3055,6 +3204,26 @@ function createPatientPage(){
   let storedOfficeLayouts = null, storedOfficeLayoutIds = new Set();
   const clearDialog = document.querySelector('#clearShiftDialog');
   const clearError = document.querySelector('#clearShiftError');
+  const pdfButton = document.querySelector('#saveShiftPdfBtn');
+  const pdfDownload = document.querySelector('#downloadShiftPdf');
+  const pdfStatus = document.querySelector('#shiftPdfStatus');
+  const confirmClear = document.querySelector('#confirmClearShift');
+  let pdfUrl = null, pdfBusy = false, pdfAttempt = 0;
+  function resetPdfExport(){
+    pdfAttempt++;
+    if(pdfUrl){ URL.revokeObjectURL(pdfUrl); pdfUrl = null; }
+    pdfDownload.hidden = true; pdfDownload.removeAttribute('href'); pdfDownload.removeAttribute('download');
+    pdfStatus.textContent = '';
+    pdfBusy = false; pdfButton.disabled = confirmClear.disabled = false;
+  }
+  function offerPdfDownload(pdf){
+    if(pdfUrl) URL.revokeObjectURL(pdfUrl);
+    pdfUrl = URL.createObjectURL(pdf.blob);
+    pdfDownload.href = pdfUrl;
+    pdfDownload.download = pdf.filename;
+    pdfDownload.hidden = false;
+    pdfStatus.textContent = 'Your PDF is ready. Open or download it, save it to Files, then clear the shift when ready.';
+  }
   const clearWarning = document.querySelector('#shiftClearWarning');
   const status = document.querySelector('#shiftStatus');
   let patients = [], archivedVisits = [], timer = null, held = false, serial = 0;
@@ -3225,7 +3394,37 @@ function createPatientPage(){
     },
     openShiftReview:() => {
       if(!page.isCurrentShift() || clearDialog.open) return;
+      resetPdfExport();
       clearError.textContent = ''; canClearShift(); reviewSignature = ''; page.renderShiftReview(); clearDialog.showModal(); document.querySelector('#cancelClearShift').focus();
+    },
+    exportShiftPdf:async () => {
+      if(pdfBusy || !clearDialog.open || !canClearShift()) return;
+      resetPdfExport();
+      const visits = page.seenVisits().map(entry => entry.visit);
+      if(!visits.length){ pdfStatus.textContent = 'There are no patient visits to save for this shift.'; return; }
+      const attempt = pdfAttempt;
+      pdfBusy = true; pdfButton.disabled = confirmClear.disabled = true;
+      pdfStatus.textContent = 'Preparing patient summary…';
+      try{
+        const pdf = makeShiftSummaryPdf(visits);
+        const file = typeof File === 'function' ? new File([pdf.blob], pdf.filename, {type:'application/pdf'}) : null;
+        let canShare = false;
+        try{ canShare = !!(file && navigator.share && navigator.canShare?.({files:[file]})); }catch(_){}
+        if(canShare){
+          try{
+            await navigator.share({files:[file]});
+            if(attempt === pdfAttempt) pdfStatus.textContent = 'PDF shared. Confirm it is saved, then clear the shift when ready.';
+          }catch(error){
+            if(attempt !== pdfAttempt) return;
+            if(error?.name === 'AbortError') pdfStatus.textContent = 'Saving was canceled. Nothing was cleared.';
+            else offerPdfDownload(pdf);
+          }
+        }else offerPdfDownload(pdf);
+      }catch(error){
+        if(attempt === pdfAttempt) pdfStatus.textContent = 'The PDF could not be prepared. Your patient records are unchanged. Please retry.';
+      }finally{
+        if(attempt === pdfAttempt){ pdfBusy = false; pdfButton.disabled = confirmClear.disabled = false; }
+      }
     },
     generation:() => generation,
     matchesShift:value => !!value && (value.shift === generation || (!value.shift && generation === 'initial')),
@@ -3855,7 +4054,7 @@ function createPatientPage(){
       status.textContent = cleared ? message : 'Patient forms cleared. Saved-data removal still needs a retry.';
     },
     clearShift:() => {
-      if(!canClearShift()) return;
+      if(pdfBusy || !canClearShift()) return;
       const nextGeneration = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
       try{ window.localStorage.setItem(shiftKey, nextGeneration); }
       catch(e){ clearError.textContent = 'Couldn’t clear this shift because browser storage is unavailable. Nothing was cleared. Try again.'; return; }
@@ -3962,6 +4161,8 @@ function createPatientPage(){
   });
   document.querySelector('#clearShiftBtn').addEventListener('click', () => page.openShiftReview());
   document.querySelector('#cancelClearShift').addEventListener('click', () => clearDialog.close());
+  pdfButton.addEventListener('click', page.exportShiftPdf);
+  clearDialog.addEventListener('close', resetPdfExport);
   document.querySelector('#confirmClearShift').addEventListener('click', page.clearShift);
   document.querySelector('#retryShiftClear').addEventListener('click', () => {
     if(page.isCurrentShift() && page.cleanupSavedData()) status.textContent = 'Saved information from the cleared shift was removed.';
@@ -4205,4 +4406,3 @@ openCurrentApp();
 </script>
 </body>
 </html>
-

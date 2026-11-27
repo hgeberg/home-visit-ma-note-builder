@@ -82,6 +82,86 @@ async function fillTwoSaved(page) {
   await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('hvnb_current_draft') || '{}').patients?.length === 2);
 }
 
+test('PDF export includes archived and live visits; canceling the save never clears the shift', async ({page}) => {
+  await fillPatient(page, 'SYNTHETIC ARCHIVED', '4plex');
+  await local(patient(page), 'newBtn').click();
+  await sheet(page).getByRole('button', {name:'Clear this patient', exact:true}).click();
+  await fillPatient(page, 'SYNTHETIC LIVE', 'Strep throat PCR');
+  await page.locator('#newHouseBtn').click();
+  await fillPatient(page, 'SYNTHETIC THIRD', '', 1);
+  await local(patient(page,1),'f_notes').fill('Synthetic Unicode note: Café 你好. ' + 'Long note for page wrapping. '.repeat(160));
+  await patient(page,1).locator('[data-item="flu"] input[type="checkbox"]').check();
+  await patient(page,1).locator('[data-item="flu"] [data-r="running"]').click();
+  await page.evaluate(() => {
+    window.pdfDraws = []; window.pdfShares = [];
+    const draw = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function(text, ...args){
+      if(this.canvas.width === 1224) window.pdfDraws.push(text);
+      return draw.call(this,text,...args);
+    };
+    Object.defineProperty(navigator,'canShare',{configurable:true,value:args => args.files[0].type === 'application/pdf'});
+    Object.defineProperty(navigator,'share',{configurable:true,value:async args => {
+      window.pdfShares.push(args.files[0]);
+      if(window.pdfShares.length === 1) throw new DOMException('Canceled','AbortError');
+    }});
+  });
+  await startClear(page);
+  await page.locator('#saveShiftPdfBtn').click();
+  await page.getByText('Saving was canceled. Nothing was cleared.').waitFor();
+  assert.equal(await local(patient(page,1),'f_name').inputValue(),'SYNTHETIC THIRD');
+  await page.evaluate(() => { window.pdfDraws = []; });
+  await page.locator('#saveShiftPdfBtn').click();
+  await page.getByText('PDF shared. Confirm it is saved, then clear the shift when ready.').waitFor();
+  const exported = await page.evaluate(async () => {
+    const file = pdfShares[1], bytes = new Uint8Array(await file.arrayBuffer()), content = new TextDecoder('windows-1252').decode(bytes);
+    const startxref = Number(content.match(/startxref\n(\d+)\n%%EOF/)?.[1]);
+    const refs = content.slice(startxref).split('\n');
+    const count = Number(refs[1].split(' ')[1]);
+    return {name:file.name, type:file.type, header:content.slice(0,8), draws:pdfDraws,
+      pages:Number(content.match(/\/Type \/Pages \/Count (\d+)/)?.[1]),
+      xref:refs[0] === 'xref' && refs.slice(3,2+count).every((ref,i)=>content.startsWith((i+1)+' 0 obj',Number(ref.slice(0,10))))};
+  });
+  assert.match(exported.name,/^Patient-summary-\d{4}-\d{2}-\d{2}.*\.pdf$/);
+  assert.equal(exported.type,'application/pdf');
+  assert.equal(exported.header,'%PDF-1.4');
+  assert.equal(exported.xref,true);
+  assert.ok(exported.pages >= 2,'Long summaries paginate');
+  for(const text of ['SYNTHETIC ARCHIVED','SYNTHETIC LIVE','SYNTHETIC THIRD','Rapid flu: Running','Café 你好','Strep throat PCR']){
+    assert.ok(exported.draws.some(line=>line.includes(text)),'Summary includes '+text);
+  }
+  await page.locator('#cancelClearShift').click();
+  await page.locator('#view-seen').click();
+  assert.equal(await page.locator('#seenList article').count(),3);
+  await clearShift(page);
+  await assertBlank(page);
+  await page.locator('#view-seen').click();
+  assert.equal(await page.locator('#seenList article').count(),0);
+});
+
+test('PDF download fallback keeps the shift; an empty shift does not create a file', async ({page}) => {
+  await startClear(page);
+  await page.locator('#saveShiftPdfBtn').click();
+  await page.getByText('There are no patient visits to save for this shift.').waitFor();
+  assert.equal(await page.locator('#downloadShiftPdf').isVisible(),false);
+  await page.locator('#cancelClearShift').click();
+  await fillPatient(page,'SYNTHETIC DOWNLOAD','');
+  await page.evaluate(() => Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false}));
+  await startClear(page);
+  await page.locator('#saveShiftPdfBtn').click();
+  await page.locator('#downloadShiftPdf').waitFor({state:'visible'});
+  const pdf = await page.locator('#downloadShiftPdf').evaluate(async link => {
+    const response = await fetch(link.href);
+    return {type:response.headers.get('content-type'),name:link.download,header:await response.text().then(text=>text.slice(0,8))};
+  });
+  assert.equal(pdf.type,'application/pdf');
+  assert.equal(pdf.header,'%PDF-1.4');
+  assert.match(pdf.name,/\.pdf$/);
+  await page.locator('#cancelClearShift').click();
+  assert.equal(await local(patient(page),'f_name').inputValue(),'SYNTHETIC DOWNLOAD');
+  await startClear(page);
+  assert.equal(await page.locator('#downloadShiftPdf').isVisible(),false);
+});
+
 test('Office navigation hides patient forms and preserves patient inputs and checklist state', async ({ page }) => {
   await fillTwoSaved(page);
   await local(patient(page), 'tab-check').click();

@@ -44,7 +44,7 @@ function dom(){
       content:{firstElementChild:{cloneNode:() => element()}},
       append(...children){ this.children.push(...children); },
       replaceChildren(...children){ this.children = children; },
-      after(){}, remove(){ this.isConnected = false; }, setAttribute(){}, scrollIntoView(){},
+      after(){}, remove(){ this.isConnected = false; }, setAttribute(){}, removeAttribute(){}, scrollIntoView(){},
       querySelector:() => null, querySelectorAll:() => [],
       addEventListener(type, fn){ listeners.set(type, fn); },
       click(){ listeners.get('click')?.(); },
@@ -74,7 +74,10 @@ function app(local = new MemoryStorage(), session = new MemoryStorage()){
   const environment = {
     console, document, Math,
     window:{localStorage:local, sessionStorage:session, addEventListener(){}, scrollTo(){}},
-    setTimeout:() => 1, clearTimeout(){}, scheduleMessageViewport(){}
+    setTimeout:() => 1, clearTimeout(){}, scheduleMessageViewport(){},
+    navigator:{},
+    URL:{createObjectURL:()=> 'blob:synthetic-summary', revokeObjectURL(){}},
+    makeShiftSummaryPdf(visits){ environment.exportedVisits = clone(visits); return {blob:{},filename:'Patient-summary.pdf'}; }
   };
   environment.mountPatient = (root, seed, page) => {
     environment.page = page;
@@ -130,6 +133,7 @@ function app(local = new MemoryStorage(), session = new MemoryStorage()){
   vm.runInContext(section('function createPatientPage(){', '\nlet initialized = false;') + '\ncreatePatientPage();', environment);
   return {
     page:environment.page, document, local, session,
+    get exportedVisits(){ return environment.exportedVisits; },
     get offeredDraft(){ return environment.offeredDraft; },
     get patients(){ return mounted.filter(patient => !patient.destroyed); },
     get first(){ return this.patients[0]; }
@@ -140,6 +144,25 @@ function seedVisit(patient, id = 'visit-synthetic'){
   patient.setValues({name:'SYNTHETIC PATIENT', dob:'01/01/2000', notes:'Original note'});
   patient.setMeta({visitId:id, seenAt:1000});
 }
+
+check('PDF export uses all current and archived Patients Seen records without writing or clearing storage', () => {
+  const a = app(), p = a.first;
+  seedVisit(p,'visit-archived');
+  p.clear();
+  p.setValues({name:'SYNTHETIC CURRENT',notes:'Current notes'});
+  p.setMeta({visitId:'visit-current',seenAt:2000});
+  a.page.saveDraft();
+  const localBefore = a.local.getItem('hvnb_current_app_draft'), sessionBefore = a.session.getItem('hvnb_current_draft');
+  a.page.openShiftReview();
+  a.page.exportShiftPdf();
+  assert.deepEqual(a.exportedVisits.map(visit=>visit.meta.visitId), ['visit-archived','visit-current']);
+  assert.equal(a.document.querySelector('#downloadShiftPdf').href,'blob:synthetic-summary');
+  assert.equal(a.document.querySelector('#downloadShiftPdf').hidden,false);
+  assert.equal(a.page.seenVisits().length,2);
+  assert.equal(a.local.getItem('hvnb_current_app_draft'),localBefore);
+  assert.equal(a.session.getItem('hvnb_current_draft'),sessionBefore);
+  assert.equal(a.document.querySelector('#clearShiftDialog').open,true);
+});
 
 check('Deleting an uncopied household patient removes its live form and archived visit, not the other patient', () => {
   const a = app(), keep = a.first;

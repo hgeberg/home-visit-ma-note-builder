@@ -1,5 +1,9 @@
 # Home Visit MA Note Builder versions
 
+## v9.4.1: Daily patient summary PDF (November 27, 2026)
+
+The Clear shift review offers Save shift summary PDF for all Patients Seen visits, including archived visits and visits from earlier houses. The file is generated on-device, dated from the shift's visits and paginated. It opens the device's file share sheet when supported, otherwise offers a PDF download. Canceling the share or an export failure leaves the shift unchanged. Clearing remains a separate explicit confirmation.
+
 ## v9.4.0: Shortcuts ask before replacing answers, and shifts are easier to end (November 24, 2026)
 
 A one-tap shortcut that fills a field, such as NKDA, None, N/A or a duration, used to replace whatever the field held. It now asks first when that would discard an answer that was typed or built from other choices: the prompt shows the entered text and offers Keep what is entered or Replace. Empty fields, the shortcut’s own value, and switching between one-tap values of the same field change without a prompt, and shortcuts that add to a list never ask. On a copied visit, confirming a replacement is followed by the usual same-patient question, and undoing it restores the typed answer.
@@ -329,4 +333,3 @@ Run `node office-checks.cjs` for the overnight list, copy-only saving, legacy re
 Run `node shift-checks.cjs` for separate-view navigation, confirmation/cancellation, clearing, cross-tab synchronization, stale drafts, pending copies and failed storage deletion.
 
 `WEBSITE-AUDIT.md` and `audit-checks.cjs` document the original v8.7 audit. That older script deliberately reproduces original defects and reads the preserved v8.7 snapshot; its passing defect checks are not claims that those defects are fixed.
-

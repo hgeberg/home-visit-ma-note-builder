@@ -1,6 +1,8 @@
 # Home Visit MA Note Builder
 
-Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.4.0.
+Static home-visit notes, patient checklists, and Office follow-up. Current version: v9.4.1.
+
+In the Clear shift confirmation, Save shift summary PDF creates a dated, paginated PDF of all current-shift Patients Seen visits, including archived visits, entered symptoms, vitals, tests and results, labs, and notes. On iPad, use Save to Files in the share sheet; browsers without file sharing offer a download link. Exporting or canceling the share leaves the shift intact. Choose Clear everything separately after saving. PDF generation is local and works offline.
 
 One-tap shortcuts such as NKDA, None and N/A ask before they replace an answer that was typed or built from other choices. The prompt shows what is entered and offers Keep what is entered or Replace. Empty fields, a shortcut’s own value, and switching between one-tap values still change at once, and shortcuts that add to a list never ask.
 
@@ -79,4 +81,3 @@ All browser suites use disposable contexts and synthetic patients. The shared br
 GitHub Actions runs the source checks and all browser groups on pull requests and main, using the Ubuntu 24.04 runner's preinstalled Google Chrome. Physical iPhone/iPad installation and on-screen keyboards require device testing.
 
 See `VERSION-HISTORY.md` for behavior changes and historical versions.
-
